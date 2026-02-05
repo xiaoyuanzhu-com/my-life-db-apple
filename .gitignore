@@ -1,0 +1,16 @@
+# Xcode
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+DerivedData/
+*.xcworkspace
+!default.xcworkspace
+*.hmap
+*.ipa
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# Git worktrees
+.worktrees/
