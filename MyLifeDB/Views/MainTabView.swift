@@ -18,12 +18,14 @@ enum Tab: String, CaseIterable {
     case inbox = "Inbox"
     case library = "Library"
     case claude = "Claude"
+    case me = "Me"
 
     var icon: String {
         switch self {
         case .inbox: return "tray"
         case .library: return "folder"
         case .claude: return "bubble.left.and.bubble.right"
+        case .me: return "person.circle"
         }
     }
 }
@@ -77,6 +79,8 @@ struct MainTabView: View {
             LibraryView()
         case .claude:
             ClaudeView()
+        case .me:
+            Text("Me View - Coming Soon")
         }
     }
     #endif
