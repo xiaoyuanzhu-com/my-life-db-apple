@@ -2,8 +2,8 @@
 //  InboxView.swift
 //  MyLifeDB
 //
-//  Displays inbox items from the backend API.
-//  Items are files that need to be processed/organized.
+//  Main inbox view with chat-style feed, input bar, and pinned items.
+//  Items are displayed newest at bottom, scroll up for history.
 //
 //  API: GET /api/inbox
 //
@@ -14,30 +14,61 @@ struct InboxView: View {
 
     // MARK: - State
 
+    /// Inbox items (API order: newest first)
     @State private var items: [InboxItem] = []
+
+    /// Pinned items for quick navigation
+    @State private var pinnedItems: [PinnedItem] = []
+
+    /// Loading states
     @State private var isLoading = false
+    @State private var isLoadingMore = false
+
+    /// Error state
     @State private var error: APIError?
+
+    /// Pagination
     @State private var cursors: InboxCursors?
     @State private var hasMore = InboxHasMore(older: false, newer: false)
+
+    /// Input text
+    @State private var inputText = ""
+
+    /// Selected item for detail modal
+    @State private var selectedItem: InboxItem?
+
+    /// Sending state
+    @State private var isSending = false
 
     // MARK: - Body
 
     var body: some View {
         NavigationStack {
-            Group {
-                if isLoading && items.isEmpty {
-                    ProgressView("Loading...")
-                } else if let error = error, items.isEmpty {
-                    errorView(error)
-                } else if items.isEmpty {
-                    emptyView
-                } else {
-                    itemsList
+            VStack(spacing: 0) {
+                // Main content
+                mainContent
+
+                Divider()
+
+                // Pinned items bar
+                PinnedItemsBar(
+                    items: pinnedItems,
+                    onTap: { pinnedItem in
+                        navigateToPinnedItem(pinnedItem)
+                    },
+                    onUnpin: { pinnedItem in
+                        Task { await unpinItem(pinnedItem) }
+                    }
+                )
+
+                // Input bar
+                InboxInputBar(text: $inputText) { text, files in
+                    Task { await createItem(text: text, files: files) }
                 }
             }
             .navigationTitle("Inbox")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .automatic) {
@@ -49,40 +80,35 @@ struct InboxView: View {
                     .disabled(isLoading)
                 }
             }
+            .sheet(item: $selectedItem) { item in
+                ItemDetailModal(item: item, allItems: items)
+            }
         }
         .task {
-            await loadItems()
+            await loadInitialData()
         }
     }
 
-    // MARK: - Views
+    // MARK: - Main Content
 
-    private var itemsList: some View {
-        List {
-            ForEach(items) { item in
-                InboxItemRow(item: item)
-            }
-            .onDelete(perform: deleteItems)
-
-            // Load more button
-            if hasMore.older {
-                Button {
-                    Task { await loadMore() }
-                } label: {
-                    if isLoading {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        Text("Load More")
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-            }
+    @ViewBuilder
+    private var mainContent: some View {
+        if isLoading && items.isEmpty {
+            loadingView
+        } else if let error = error, items.isEmpty {
+            errorView(error)
+        } else if items.isEmpty {
+            emptyView
+        } else {
+            feedView
         }
-        .refreshable {
-            await refresh()
+    }
+
+    private var loadingView: some View {
+        VStack {
+            Spacer()
+            ProgressView("Loading inbox...")
+            Spacer()
         }
     }
 
@@ -90,7 +116,7 @@ struct InboxView: View {
         ContentUnavailableView(
             "No Items",
             systemImage: "tray",
-            description: Text("Your inbox is empty")
+            description: Text("Your inbox is empty.\nAdd something to get started!")
         )
     }
 
@@ -103,10 +129,41 @@ struct InboxView: View {
             Button("Retry") {
                 Task { await loadItems() }
             }
+            .buttonStyle(.borderedProminent)
+        }
+    }
+
+    private var feedView: some View {
+        InboxFeedView(
+            items: items,
+            isLoadingMore: isLoadingMore,
+            hasOlderItems: hasMore.older,
+            onLoadMore: {
+                Task { await loadMore() }
+            },
+            onItemTap: { item in
+                selectedItem = item
+            },
+            onItemDelete: { item in
+                Task { await deleteItem(item) }
+            },
+            onItemPin: { item in
+                Task { await togglePin(item) }
+            }
+        )
+        .refreshable {
+            await refresh()
         }
     }
 
     // MARK: - Data Loading
+
+    private func loadInitialData() async {
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await loadItems() }
+            group.addTask { await loadPinnedItems() }
+        }
+    }
 
     private func loadItems() async {
         guard !isLoading else { return }
@@ -128,15 +185,30 @@ struct InboxView: View {
         isLoading = false
     }
 
+    private func loadPinnedItems() async {
+        do {
+            let response = try await APIClient.shared.inbox.listPinned()
+            pinnedItems = response.items
+        } catch {
+            // Silently fail for pinned items
+            print("Failed to load pinned items: \(error)")
+        }
+    }
+
     private func refresh() async {
         isLoading = true
         error = nil
 
         do {
-            let response = try await APIClient.shared.inbox.list()
-            items = response.items
-            cursors = response.cursors
-            hasMore = response.hasMore
+            async let itemsTask = APIClient.shared.inbox.list()
+            async let pinnedTask = APIClient.shared.inbox.listPinned()
+
+            let (itemsResponse, pinnedResponse) = try await (itemsTask, pinnedTask)
+
+            items = itemsResponse.items
+            cursors = itemsResponse.cursors
+            hasMore = itemsResponse.hasMore
+            pinnedItems = pinnedResponse.items
         } catch let apiError as APIError {
             error = apiError
         } catch {
@@ -147,9 +219,9 @@ struct InboxView: View {
     }
 
     private func loadMore() async {
-        guard let lastCursor = cursors?.last, hasMore.older else { return }
+        guard let lastCursor = cursors?.last, hasMore.older, !isLoadingMore else { return }
 
-        isLoading = true
+        isLoadingMore = true
 
         do {
             let response = try await APIClient.shared.inbox.fetchOlder(cursor: lastCursor)
@@ -158,34 +230,98 @@ struct InboxView: View {
             hasMore = response.hasMore
         } catch {
             // Silently fail for load more
+            print("Failed to load more: \(error)")
         }
 
-        isLoading = false
+        isLoadingMore = false
     }
 
-    private func deleteItems(at offsets: IndexSet) {
-        let itemsToDelete = offsets.map { items[$0] }
+    // MARK: - Actions
 
-        // Optimistically remove from UI
-        items.remove(atOffsets: offsets)
+    private func createItem(text: String, files: [FileAttachment]) async {
+        guard !isSending else { return }
+        isSending = true
+
+        do {
+            if !files.isEmpty {
+                // Upload files
+                let fileData = files.map { (filename: $0.filename, data: $0.data, mimeType: $0.mimeType) }
+                _ = try await APIClient.shared.inbox.uploadFiles(fileData, text: text.isEmpty ? nil : text)
+            } else if !text.isEmpty {
+                // Create text item
+                _ = try await APIClient.shared.inbox.createText(text)
+            }
+
+            // Refresh to show new item
+            await refresh()
+        } catch {
+            print("Failed to create item: \(error)")
+        }
+
+        isSending = false
+    }
+
+    private func deleteItem(_ item: InboxItem) async {
+        // Optimistic update
+        withAnimation(.easeOut(duration: 0.3)) {
+            items.removeAll { $0.id == item.id }
+        }
+
+        // Also remove from pinned if applicable
+        pinnedItems.removeAll { $0.path == item.path }
 
         // Delete from server
-        Task {
-            for item in itemsToDelete {
-                let id = InboxAPI.idFromPath(item.path)
-                do {
-                    try await APIClient.shared.inbox.delete(id: id)
-                } catch {
-                    // Reload on failure
-                    await loadItems()
-                    break
-                }
+        let id = InboxAPI.idFromPath(item.path)
+        do {
+            try await APIClient.shared.inbox.delete(id: id)
+        } catch {
+            // Reload on failure
+            print("Failed to delete item: \(error)")
+            await loadItems()
+        }
+    }
+
+    private func togglePin(_ item: InboxItem) async {
+        do {
+            _ = try await APIClient.shared.library.pin(path: item.path)
+            // Refresh both lists
+            await refresh()
+        } catch {
+            print("Failed to toggle pin: \(error)")
+        }
+    }
+
+    private func unpinItem(_ pinnedItem: PinnedItem) async {
+        // Optimistic update
+        pinnedItems.removeAll { $0.path == pinnedItem.path }
+
+        // Update on server
+        do {
+            try await APIClient.shared.library.unpin(path: pinnedItem.path)
+            // Also update the item in the feed if visible
+            if let index = items.firstIndex(where: { $0.path == pinnedItem.path }) {
+                // Can't modify isPinned directly, so just refresh
+                await loadItems()
             }
+        } catch {
+            print("Failed to unpin: \(error)")
+            await loadPinnedItems()
+        }
+    }
+
+    private func navigateToPinnedItem(_ pinnedItem: PinnedItem) {
+        // Find the item in the feed
+        if let item = items.first(where: { $0.path == pinnedItem.path }) {
+            selectedItem = item
+        } else {
+            // Item not loaded, could implement scroll-to functionality
+            // For now, just open the detail
+            // TODO: Implement scroll to cursor
         }
     }
 }
 
-// MARK: - Inbox Item Row
+// MARK: - Legacy Inbox Item Row (kept for backwards compatibility)
 
 struct InboxItemRow: View {
     let item: InboxItem
