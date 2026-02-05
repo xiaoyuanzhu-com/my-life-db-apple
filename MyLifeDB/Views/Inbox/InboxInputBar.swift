@@ -46,7 +46,7 @@ struct InboxInputBar: View {
                     .lineLimit(1...6)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(Color(.systemGray6))
+                    .background(Color.platformGray6)
                     .clipShape(RoundedRectangle(cornerRadius: 20))
 
                 // Send button
@@ -55,7 +55,7 @@ struct InboxInputBar: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
         .onChange(of: photoPickerItems) { _, newItems in
             Task {
                 await handlePhotoPickerSelection(newItems)
@@ -245,12 +245,34 @@ struct AttachmentChip: View {
     var body: some View {
         HStack(spacing: 6) {
             // Thumbnail or icon
-            if attachment.isImage, let uiImage = UIImage(data: attachment.data) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 32, height: 32)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            if attachment.isImage {
+                #if os(iOS)
+                if let uiImage = UIImage(data: attachment.data) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 32, height: 32)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                } else {
+                    Image(systemName: iconForMimeType(attachment.mimeType))
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, height: 32)
+                }
+                #elseif os(macOS)
+                if let nsImage = NSImage(data: attachment.data) {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 32, height: 32)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                } else {
+                    Image(systemName: iconForMimeType(attachment.mimeType))
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, height: 32)
+                }
+                #endif
             } else {
                 Image(systemName: iconForMimeType(attachment.mimeType))
                     .font(.body)
@@ -275,7 +297,7 @@ struct AttachmentChip: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(Color(.systemGray5))
+        .background(Color.platformGray5)
         .clipShape(Capsule())
     }
 
@@ -298,5 +320,5 @@ struct AttachmentChip: View {
             print("Send: \(text), files: \(files.count)")
         }
     }
-    .background(Color(.systemGroupedBackground))
+    .background(Color.platformGroupedBackground)
 }

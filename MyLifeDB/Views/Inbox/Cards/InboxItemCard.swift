@@ -16,7 +16,7 @@ struct InboxItemCard: View {
 
     var body: some View {
         cardContent
-            .background(Color(.systemBackground))
+            .background(Color.platformBackground)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
             .contentShape(RoundedRectangle(cornerRadius: 12))
@@ -366,5 +366,5 @@ struct DocumentCard: View {
         }
         .padding()
     }
-    .background(Color(.systemGroupedBackground))
+    .background(Color.platformGroupedBackground)
 }

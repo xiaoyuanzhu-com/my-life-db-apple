@@ -236,5 +236,5 @@ struct InboxFeedView: View {
         onItemDelete: { item in print("Delete: \(item.name)") },
         onItemPin: { item in print("Pin: \(item.name)") }
     )
-    .background(Color(.systemGroupedBackground))
+    .background(Color.platformGroupedBackground)
 }

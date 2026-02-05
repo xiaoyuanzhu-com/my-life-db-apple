@@ -104,14 +104,14 @@ struct PinnedTag: View {
             onTap: { item in print("Tapped: \(item.name)") },
             onUnpin: { item in print("Unpin: \(item.name)") }
         )
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
 
         PinnedItemsBar(
             items: [],
             onTap: { _ in },
             onUnpin: { _ in }
         )
-        .background(Color(.systemBackground))
+        .background(Color.platformBackground)
     }
-    .background(Color(.systemGroupedBackground))
+    .background(Color.platformGroupedBackground)
 }
