@@ -186,23 +186,19 @@ final class AuthManager {
 
             guard httpResponse.statusCode == 200 else { return false }
 
-            // Extract new tokens from Set-Cookie headers
-            let newTokens = extractTokensFromSetCookie(httpResponse)
+            // Parse tokens from JSON response body
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return false
+            }
 
-            if let newAccess = newTokens.accessToken {
+            if let newAccess = json["access_token"] as? String, !newAccess.isEmpty {
                 self.accessToken = newAccess
             }
-            if let newRefresh = newTokens.refreshToken {
+            if let newRefresh = json["refresh_token"] as? String, !newRefresh.isEmpty {
                 self.refreshToken = newRefresh
             }
 
-            // Parse expiresIn from response body for scheduling
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let _ = json["expiresIn"] as? Int {
-                // expiresIn available but we derive from JWT
-            }
-
-            // Validate new token
+            // Validate new token and update state
             if let token = self.accessToken {
                 let result = await validateToken(token)
                 if case .valid(let username) = result {
@@ -342,28 +338,6 @@ final class AuthManager {
         } catch {
             return false
         }
-    }
-
-    private func extractTokensFromSetCookie(_ response: HTTPURLResponse) -> (accessToken: String?, refreshToken: String?) {
-        guard let headers = response.allHeaderFields as? [String: String],
-              let url = response.url else {
-            return (nil, nil)
-        }
-
-        let cookies = HTTPCookie.cookies(withResponseHeaderFields: headers, for: url)
-
-        var access: String?
-        var refresh: String?
-
-        for cookie in cookies {
-            if cookie.name == "access_token" {
-                access = cookie.value
-            } else if cookie.name == "refresh_token" {
-                refresh = cookie.value
-            }
-        }
-
-        return (access, refresh)
     }
 
     // MARK: - JWT Helpers
