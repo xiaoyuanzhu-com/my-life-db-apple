@@ -65,6 +65,12 @@ struct MainTabView: View {
                     Label(Tab.claude.rawValue, systemImage: Tab.claude.icon)
                 }
                 .tag(Tab.claude)
+
+            MeView()
+                .tabItem {
+                    Label(Tab.me.rawValue, systemImage: Tab.me.icon)
+                }
+                .tag(Tab.me)
         }
         #endif
     }
@@ -80,7 +86,7 @@ struct MainTabView: View {
         case .claude:
             ClaudeView()
         case .me:
-            Text("Me View - Coming Soon")
+            MeView()
         }
     }
     #endif
