@@ -2,6 +2,9 @@
 
 > Native iOS/macOS client for the MyLifeDB personal knowledge management system.
 
+**Related docs:**
+- **[ui-architecture.md](ui-architecture.md)** — Hybrid Native + WebView UI approach
+
 ---
 
 ## Design Principles
@@ -21,31 +24,46 @@ The app uses **SwiftUI** with a single Xcode target that builds for:
 
 **Code sharing goal:** 80-95% shared code across all platforms.
 
-### 2. Client-Server Architecture
+### 2. Hybrid Native + WebView Architecture
 
-The app is a **native client** that consumes the MyLifeDB backend API:
+The app uses a **hybrid approach**: native SwiftUI shell with WebView-rendered content.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         Clients                                  │
-├─────────────────────────┬───────────────────────────────────────┤
-│   iOS/macOS App         │   Web App (React)                     │
-│   (This project)        │   (my-life-db/frontend)               │
-└───────────┬─────────────┴───────────────────┬───────────────────┘
-            │                                 │
-            └─────────────┬───────────────────┘
-                          ↓
-            ┌─────────────────────────────┐
-            │   MyLifeDB Backend (Go)     │
-            │   REST API + WebSocket      │
-            │   Port 12345                │
-            └─────────────────────────────┘
-                          ↓
-            ┌─────────────────────────────┐
-            │   User Data Directory       │
-            │   (Source of Truth)         │
-            └─────────────────────────────┘
+│                    iOS/macOS App (This Project)                  │
+├─────────────────────────────────────────────────────────────────┤
+│   ┌─────────────────────┐    ┌─────────────────────────────┐   │
+│   │  Native SwiftUI     │    │  WKWebView                  │   │
+│   │  Shell              │    │  (Embedded Web Frontend)    │   │
+│   │                     │    │                             │   │
+│   │  • Tab bar/Sidebar  │◄──►│  • Document viewer          │   │
+│   │  • Navigation       │ JS │  • Library browser          │   │
+│   │  • Share extension  │Brdg│  • Search results           │   │
+│   │  • Widgets          │    │  • Rich content (MD, code)  │   │
+│   │  • Notifications    │    │  • Mermaid diagrams         │   │
+│   └─────────────────────┘    └─────────────────────────────┘   │
+└───────────────────────────────────┬─────────────────────────────┘
+                                    │
+                                    ▼
+                      ┌─────────────────────────────┐
+                      │   MyLifeDB Backend (Go)     │
+                      │   REST API + SSE            │
+                      │   Port 12345                │
+                      └─────────────────────────────┘
+                                    ↓
+                      ┌─────────────────────────────┐
+                      │   User Data Directory       │
+                      │   (Source of Truth)         │
+                      └─────────────────────────────┘
 ```
+
+**Why hybrid?**
+- Reuse 80%+ of existing web frontend code
+- Web excels at rich content (Markdown, code highlighting, Mermaid)
+- Industry standard (Instagram, Uber, Slack, Discord use this approach)
+- Single codebase for complex UI, faster iteration
+
+**See [ui-architecture.md](ui-architecture.md)** for detailed UI implementation.
 
 **Key insight:** The backend owns all data. The iOS app is a view into that data.
 
