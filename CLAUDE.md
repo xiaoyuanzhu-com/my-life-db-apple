@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 MyLifeDB Apple is a **native iOS/macOS client** for the MyLifeDB personal knowledge management system. It consumes the MyLifeDB backend API (Go server) and provides a native Apple experience.
 
 **Key architecture documents:**
-- **[docs/architecture.md](docs/architecture.md)** — High-level architecture, API mapping, data flow
+- See Apple Client section in `../my-life-db-docs/` — High-level architecture, API mapping, data flow
 
 ## Design Principles
 
@@ -84,7 +84,7 @@ Key endpoints:
 - `GET /raw/*path` — Serve file content
 - `GET /api/notifications/stream` — SSE real-time updates
 
-See [docs/architecture.md](docs/architecture.md) for full API reference.
+See Apple Client section in `../my-life-db-docs/` for full API reference.
 
 ## Data Layer
 
