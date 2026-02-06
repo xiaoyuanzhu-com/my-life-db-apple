@@ -48,6 +48,12 @@ struct MeView: View {
                     }
 
                     NavigationLink {
+                        DataCollectView()
+                    } label: {
+                        Label("Data Collect", systemImage: "antenna.radiowaves.left.and.right")
+                    }
+
+                    NavigationLink {
                         ServerSettingsView()
                     } label: {
                         Label("Server", systemImage: "server.rack")
