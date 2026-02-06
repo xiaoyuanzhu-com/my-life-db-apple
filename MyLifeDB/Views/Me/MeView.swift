@@ -9,6 +9,8 @@
 import SwiftUI
 
 struct MeView: View {
+    private var authManager: AuthManager { .shared }
+
     var body: some View {
         NavigationStack {
             List {
@@ -27,7 +29,7 @@ struct MeView: View {
                                         .foregroundColor(.gray)
                                 )
 
-                            Text("User")
+                            Text(authManager.username ?? "User")
                                 .font(.title2)
                                 .fontWeight(.semibold)
                         }
@@ -61,6 +63,19 @@ struct MeView: View {
                         AboutView()
                     } label: {
                         Label("About", systemImage: "info.circle")
+                    }
+                }
+
+                // Sign out (only when authenticated via OAuth)
+                if case .authenticated = authManager.state {
+                    Section {
+                        Button(role: .destructive) {
+                            Task {
+                                await authManager.logout()
+                            }
+                        } label: {
+                            Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                        }
                     }
                 }
             }

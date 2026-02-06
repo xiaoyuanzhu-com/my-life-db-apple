@@ -17,10 +17,10 @@ final class APIClient {
 
     // MARK: - Configuration
 
-    /// Base URL for the API server
+    /// Base URL for the API server (reads from UserDefaults)
     var baseURL: URL {
-        // TODO: Make configurable via Settings
-        URL(string: "http://localhost:12345")!
+        let urlString = UserDefaults.standard.string(forKey: "apiBaseURL") ?? "http://localhost:12345"
+        return URL(string: urlString) ?? URL(string: "http://localhost:12345")!
     }
 
     // MARK: - URLSession
@@ -85,10 +85,10 @@ final class APIClient {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        // TODO: Add auth token if needed
-        // if let token = AuthManager.shared.token {
-        //     request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        // }
+        // Add auth token if available
+        if let token = AuthManager.shared.accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
 
         if let body = body {
             request.httpBody = body
@@ -104,7 +104,8 @@ final class APIClient {
         path: String,
         method: HTTPMethod = .get,
         queryItems: [URLQueryItem]? = nil,
-        body: Encodable? = nil
+        body: Encodable? = nil,
+        allowRetryOn401: Bool = true
     ) async throws -> T {
         var bodyData: Data? = nil
         if let body = body {
@@ -135,6 +136,16 @@ final class APIClient {
         case 400:
             throw APIError.badRequest(parseErrorMessage(from: data))
         case 401:
+            // Try refresh and retry once
+            if allowRetryOn401 {
+                let refreshed = await AuthManager.shared.handleUnauthorized()
+                if refreshed {
+                    return try await self.request(
+                        path: path, method: method, queryItems: queryItems,
+                        body: body, allowRetryOn401: false
+                    )
+                }
+            }
             throw APIError.unauthorized
         case 403:
             throw APIError.forbidden
@@ -154,7 +165,8 @@ final class APIClient {
         path: String,
         method: HTTPMethod = .get,
         queryItems: [URLQueryItem]? = nil,
-        body: Encodable? = nil
+        body: Encodable? = nil,
+        allowRetryOn401: Bool = true
     ) async throws {
         var bodyData: Data? = nil
         if let body = body {
@@ -180,6 +192,16 @@ final class APIClient {
         case 400:
             throw APIError.badRequest(parseErrorMessage(from: data))
         case 401:
+            if allowRetryOn401 {
+                let refreshed = await AuthManager.shared.handleUnauthorized()
+                if refreshed {
+                    try await self.requestVoid(
+                        path: path, method: method, queryItems: queryItems,
+                        body: body, allowRetryOn401: false
+                    )
+                    return
+                }
+            }
             throw APIError.unauthorized
         case 403:
             throw APIError.forbidden
@@ -210,6 +232,10 @@ final class APIClient {
         var request = URLRequest(url: url)
         request.httpMethod = HTTPMethod.post.rawValue
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        if let token = AuthManager.shared.accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
 
         var body = Data()
 

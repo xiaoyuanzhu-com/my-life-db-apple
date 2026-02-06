@@ -27,10 +27,33 @@ struct MyLifeDBApp: App {
         }
     }()
 
+    @State private var authManager = AuthManager.shared
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
-            MainTabView()
+            Group {
+                switch authManager.state {
+                case .unknown, .checking:
+                    ProgressView("Connecting...")
+                        .task {
+                            await authManager.checkAuth()
+                        }
+
+                case .unauthenticated:
+                    LoginView()
+
+                case .authenticated, .noAuthRequired:
+                    MainTabView()
+                }
+            }
+            .animation(.default, value: authManager.state)
         }
         .modelContainer(sharedModelContainer)
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                authManager.handleForeground()
+            }
+        }
     }
 }
