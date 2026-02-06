@@ -3,13 +3,14 @@
 //  MyLifeDB
 //
 //  Login screen shown when authentication is required.
-//  Opens OAuth login in the default system browser.
+//  Presents ASWebAuthenticationSession for OAuth sign-in.
 //
 
 import SwiftUI
 
 struct LoginView: View {
     @AppStorage("apiBaseURL") private var apiBaseURL = "http://localhost:12345"
+    @State private var showingOAuth = false
     @State private var showingServerSettings = false
     @State private var errorMessage: String?
     @State private var isRetrying = false
@@ -53,11 +54,7 @@ struct LoginView: View {
                 VStack(spacing: 16) {
                     Button {
                         errorMessage = nil
-                        guard let url = URL(string: apiBaseURL) else {
-                            errorMessage = "Invalid server URL"
-                            return
-                        }
-                        OAuthHelper.openLoginInBrowser(baseURL: url)
+                        showingOAuth = true
                     } label: {
                         Label("Sign In", systemImage: "person.badge.key")
                             .frame(maxWidth: .infinity)
@@ -98,6 +95,27 @@ struct LoginView: View {
                 .padding(.bottom, 32)
             }
             .padding(.horizontal, 32)
+            .sheet(isPresented: $showingOAuth) {
+                if let url = URL(string: apiBaseURL) {
+                    OAuthWebView(
+                        baseURL: url,
+                        onCompletion: { accessToken, refreshToken in
+                            showingOAuth = false
+                            authManager.handleOAuthCompletion(
+                                accessToken: accessToken,
+                                refreshToken: refreshToken
+                            )
+                        },
+                        onError: { message in
+                            showingOAuth = false
+                            errorMessage = message
+                        },
+                        onCancel: {
+                            showingOAuth = false
+                        }
+                    )
+                }
+            }
             .sheet(isPresented: $showingServerSettings) {
                 NavigationStack {
                     ServerSettingsView()
