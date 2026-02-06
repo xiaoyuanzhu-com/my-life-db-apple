@@ -30,7 +30,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		13D39500AAAA00010032BA9F /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		13D39500AAAA00010032BA9F /* Exceptions for "MyLifeDB" folder in "MyLifeDB" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -43,7 +43,7 @@
 		13D394882EE7C55F0032BA9F /* MyLifeDB */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				13D39500AAAA00010032BA9F /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+				13D39500AAAA00010032BA9F /* Exceptions for "MyLifeDB" folder in "MyLifeDB" target */,
 			);
 			path = MyLifeDB;
 			sourceTree = "<group>";
@@ -404,6 +404,7 @@
 				CODE_SIGN_ENTITLEMENTS = MyLifeDB/MyLifeDB.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = R3845XW5FZ;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -448,6 +449,7 @@
 				CODE_SIGN_ENTITLEMENTS = MyLifeDB/MyLifeDB.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = R3845XW5FZ;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
