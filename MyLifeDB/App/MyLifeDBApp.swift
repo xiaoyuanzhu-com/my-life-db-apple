@@ -48,6 +48,14 @@ struct MyLifeDBApp: App {
                 }
             }
             .animation(.default, value: authManager.state)
+            .onOpenURL { url in
+                if let tokens = OAuthHelper.parseCallbackURL(url) {
+                    authManager.handleOAuthCompletion(
+                        accessToken: tokens.accessToken,
+                        refreshToken: tokens.refreshToken
+                    )
+                }
+            }
         }
         .modelContainer(sharedModelContainer)
         .onChange(of: scenePhase) { _, newPhase in
