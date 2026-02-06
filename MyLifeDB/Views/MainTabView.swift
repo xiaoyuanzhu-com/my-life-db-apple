@@ -2,10 +2,11 @@
 //  MainTabView.swift
 //  MyLifeDB
 //
-//  Root navigation view with three tabs:
+//  Root navigation view with four tabs:
 //  - Inbox: Incoming items to process
 //  - Library: Organized file tree
 //  - Claude: AI chat interface
+//  - Me: Profile and settings
 //
 //  Platform behavior:
 //  - iOS/iPadOS: Bottom tab bar
