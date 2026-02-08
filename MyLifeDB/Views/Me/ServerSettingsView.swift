@@ -102,6 +102,7 @@ struct ServerSettingsView: View {
         // Empty is allowed (will use default)
         guard !urlString.isEmpty else {
             apiBaseURL = "http://localhost:12345"
+            reloadWebViewIfNeeded()
             return
         }
 
@@ -115,7 +116,21 @@ struct ServerSettingsView: View {
         }
 
         // Valid - save it
+        let oldURL = apiBaseURL
         apiBaseURL = urlString
+
+        // If the URL actually changed, reload the WebView with the new backend
+        if oldURL != urlString {
+            reloadWebViewIfNeeded()
+        }
+    }
+
+    /// Tear down and recreate the WebView pointing at the new server URL.
+    private func reloadWebViewIfNeeded() {
+        guard let newURL = URL(string: apiBaseURL) else { return }
+        Task {
+            await WebViewManager.shared.teardownAndReload(baseURL: newURL)
+        }
     }
 
     private func checkConnection() {

@@ -1,3 +1,4 @@
+#if LEGACY_NATIVE_VIEWS
 //
 //  InboxView.swift
 //  MyLifeDB
@@ -402,3 +403,5 @@ struct InboxItemRow: View {
 #Preview {
     InboxView()
 }
+
+#endif // LEGACY_NATIVE_VIEWS

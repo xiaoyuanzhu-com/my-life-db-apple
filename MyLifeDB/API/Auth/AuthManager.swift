@@ -72,7 +72,9 @@ final class AuthManager {
 
     // MARK: - Base URL
 
-    private var baseURL: URL {
+    /// The backend base URL (configurable via Settings → Server).
+    /// Used by both APIClient and WebViewManager.
+    var baseURL: URL {
         let urlString = UserDefaults.standard.string(forKey: "apiBaseURL") ?? "http://localhost:12345"
         return URL(string: urlString) ?? URL(string: "http://localhost:12345")!
     }

@@ -1,3 +1,4 @@
+#if LEGACY_NATIVE_VIEWS
 //
 //  LibraryView.swift
 //  MyLifeDB
@@ -29,3 +30,5 @@ struct LibraryView: View {
 #Preview {
     LibraryView()
 }
+
+#endif // LEGACY_NATIVE_VIEWS

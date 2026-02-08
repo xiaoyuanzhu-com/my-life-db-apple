@@ -1,3 +1,4 @@
+#if LEGACY_NATIVE_VIEWS
 //
 //  FallbackCard.swift
 //  MyLifeDB
@@ -166,3 +167,5 @@ struct FallbackCard: View {
     .padding()
     .background(Color.platformGroupedBackground)
 }
+
+#endif // LEGACY_NATIVE_VIEWS

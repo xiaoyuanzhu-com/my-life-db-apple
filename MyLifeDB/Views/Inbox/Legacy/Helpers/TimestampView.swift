@@ -1,3 +1,4 @@
+#if LEGACY_NATIVE_VIEWS
 //
 //  TimestampView.swift
 //  MyLifeDB
@@ -84,3 +85,5 @@ struct TimestampView: View {
     }
     .padding()
 }
+
+#endif // LEGACY_NATIVE_VIEWS

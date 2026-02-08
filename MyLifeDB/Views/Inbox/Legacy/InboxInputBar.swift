@@ -1,3 +1,4 @@
+#if LEGACY_NATIVE_VIEWS
 //
 //  InboxInputBar.swift
 //  MyLifeDB
@@ -322,3 +323,5 @@ struct AttachmentChip: View {
     }
     .background(Color.platformGroupedBackground)
 }
+
+#endif // LEGACY_NATIVE_VIEWS

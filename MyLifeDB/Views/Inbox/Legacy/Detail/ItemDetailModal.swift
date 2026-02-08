@@ -1,3 +1,4 @@
+#if LEGACY_NATIVE_VIEWS
 //
 //  ItemDetailModal.swift
 //  MyLifeDB
@@ -410,3 +411,5 @@ struct DigestRow: View {
         allItems: []
     )
 }
+
+#endif // LEGACY_NATIVE_VIEWS

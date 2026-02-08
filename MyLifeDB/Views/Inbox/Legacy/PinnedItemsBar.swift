@@ -1,3 +1,4 @@
+#if LEGACY_NATIVE_VIEWS
 //
 //  PinnedItemsBar.swift
 //  MyLifeDB
@@ -115,3 +116,5 @@ struct PinnedTag: View {
     }
     .background(Color.platformGroupedBackground)
 }
+
+#endif // LEGACY_NATIVE_VIEWS

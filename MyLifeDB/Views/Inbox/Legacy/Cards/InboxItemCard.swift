@@ -1,3 +1,4 @@
+#if LEGACY_NATIVE_VIEWS
 //
 //  InboxItemCard.swift
 //  MyLifeDB
@@ -368,3 +369,5 @@ struct DocumentCard: View {
     }
     .background(Color.platformGroupedBackground)
 }
+
+#endif // LEGACY_NATIVE_VIEWS

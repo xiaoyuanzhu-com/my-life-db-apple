@@ -1,3 +1,4 @@
+#if LEGACY_NATIVE_VIEWS
 //
 //  InboxFeedView.swift
 //  MyLifeDB
@@ -238,3 +239,5 @@ struct InboxFeedView: View {
     )
     .background(Color.platformGroupedBackground)
 }
+
+#endif // LEGACY_NATIVE_VIEWS

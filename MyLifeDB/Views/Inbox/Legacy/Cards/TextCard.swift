@@ -1,3 +1,4 @@
+#if LEGACY_NATIVE_VIEWS
 //
 //  TextCard.swift
 //  MyLifeDB
@@ -105,3 +106,5 @@ struct TextCard: View {
     .padding()
     .background(Color.platformGroupedBackground)
 }
+
+#endif // LEGACY_NATIVE_VIEWS

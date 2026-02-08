@@ -1,3 +1,4 @@
+#if LEGACY_NATIVE_VIEWS
 //
 //  ClaudeView.swift
 //  MyLifeDB
@@ -53,3 +54,5 @@ struct ClaudeView: View {
 #Preview {
     ClaudeView()
 }
+
+#endif // LEGACY_NATIVE_VIEWS
