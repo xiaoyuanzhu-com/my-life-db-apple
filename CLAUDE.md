@@ -6,8 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 MyLifeDB Apple is a **native iOS/macOS client** for the MyLifeDB personal knowledge management system. It consumes the MyLifeDB backend API (Go server) and provides a native Apple experience.
 
-**Key architecture documents:**
-- See Apple Client section in `../my-life-db-docs/` — High-level architecture, API mapping, data flow
+**Documentation:** All project docs live in [`../my-life-db-docs/`](../my-life-db-docs/) (Astro Starlight site). See the **Apple Client** section for architecture, hybrid UI approach, data collection, and inbox PRD.
 
 ## Design Principles
 
@@ -16,15 +15,15 @@ MyLifeDB Apple is a **native iOS/macOS client** for the MyLifeDB personal knowle
 - SwiftUI with `#if os()` for platform-specific code
 - Goal: 80-95% shared code
 
-### 2. Client-Server Architecture
+### 2. Hybrid Native + WebView Architecture
+- Native SwiftUI shell with WKWebView-rendered content
+- Reuses 80%+ of existing web frontend code
+- Web excels at rich content (Markdown, code, Mermaid)
 - Backend (Go) is the source of truth
-- App fetches data directly via REST API
-- No local database or sync — simple API client
 
-### 3. Native Experience
-- SwiftUI for all UI
-- SwiftData for persistence
-- Platform-appropriate navigation and controls
+### 3. Simple API Client
+- App fetches data directly via REST API
+- No local database or sync
 
 ## Build & Test Commands
 
@@ -84,7 +83,7 @@ Key endpoints:
 - `GET /raw/*path` — Serve file content
 - `GET /api/notifications/stream` — SSE real-time updates
 
-See Apple Client section in `../my-life-db-docs/` for full API reference.
+See the Apple Client section in [`../my-life-db-docs/`](../my-life-db-docs/) for full API reference.
 
 ## Data Layer
 
