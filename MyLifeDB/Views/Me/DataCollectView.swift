@@ -280,8 +280,58 @@ private let dataCategories: [DataCategory] = [
 // MARK: - View
 
 struct DataCollectView: View {
+    private var syncManager = SyncManager.shared
+
     var body: some View {
         List {
+            // Sync status section
+            Section {
+                HStack {
+                    if syncManager.state == .syncing {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Syncing...")
+                            .foregroundStyle(.secondary)
+                    } else if let lastSync = syncManager.lastSyncDate {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.caption)
+                        Text("Last sync: \(lastSync, format: .relative(presentation: .named))")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                        Text("Not synced yet")
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        syncManager.sync(force: true)
+                    } label: {
+                        Text("Sync Now")
+                            .font(.subheadline)
+                    }
+                    .disabled(syncManager.state == .syncing)
+                }
+
+                if let error = syncManager.lastError {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                            .font(.caption)
+                        Text(error.summary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Label("Sync", systemImage: "arrow.triangle.2.circlepath")
+            }
+
+            // Data source categories
             ForEach(dataCategories) { category in
                 Section {
                     ForEach(category.sources) { source in

@@ -52,6 +52,12 @@ struct MyLifeDBApp: App {
                             await WebViewManager.shared.setup(
                                 baseURL: authManager.baseURL
                             )
+
+                            // Register background sync task
+                            #if os(iOS)
+                            SyncManager.shared.registerBackgroundTask()
+                            SyncManager.shared.scheduleBackgroundSync()
+                            #endif
                         }
                 }
             }
@@ -74,6 +80,9 @@ struct MyLifeDBApp: App {
                 Task {
                     await WebViewManager.shared.updateAuthCookies()
                 }
+
+                // Trigger data collection sync (throttled internally)
+                SyncManager.shared.sync()
             }
         }
     }
