@@ -53,7 +53,9 @@ enum WebViewConfiguration {
         config.userContentController = contentController
 
         // --- Media Playback ---
+        #if os(iOS) || os(visionOS)
         config.allowsInlineMediaPlayback = true
+        #endif
         config.mediaTypesRequiringUserActionForPlayback = []
 
         // --- Data Store ---
