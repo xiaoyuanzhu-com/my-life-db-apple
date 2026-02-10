@@ -2,7 +2,7 @@
 //  LoginView.swift
 //  MyLifeDB
 //
-//  Login screen shown when authentication is required.
+//  Native init page shown before login.
 //  Presents ASWebAuthenticationSession for OAuth sign-in.
 //
 
@@ -13,7 +13,6 @@ struct LoginView: View {
     @State private var showingOAuth = false
     @State private var showingServerSettings = false
     @State private var errorMessage: String?
-    @State private var isRetrying = false
     @State private var appeared = false
 
     private var authManager: AuthManager { .shared }
@@ -58,7 +57,6 @@ struct LoginView: View {
                         .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
                     }
 
-                    // Sign in
                     Button {
                         errorMessage = nil
                         showingOAuth = true
@@ -69,22 +67,6 @@ struct LoginView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-
-                    // Continue without login
-                    Button {
-                        retryWithoutAuth()
-                    } label: {
-                        if isRetrying {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Text("Continue Without Login")
-                                .font(.callout)
-                        }
-                    }
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(.secondary)
-                    .disabled(isRetrying)
                 }
 
                 Spacer()
@@ -152,9 +134,6 @@ struct LoginView: View {
 
     @ViewBuilder
     private var appIcon: some View {
-        // Uses AppLogo from asset catalog. Add your SVG to
-        // Assets.xcassets/AppLogo.imageset/ to display it here.
-        // Falls back to SF Symbol if no image is found.
         if let uiImage = imageFromAsset("AppLogo") {
             Image(uiImage: uiImage)
                 .resizable()
@@ -168,27 +147,12 @@ struct LoginView: View {
         }
     }
 
-    /// Load image from asset catalog, returning nil if not found.
     private func imageFromAsset(_ name: String) -> PlatformImage? {
         #if os(macOS)
         return NSImage(named: name)
         #else
         return UIImage(named: name)
         #endif
-    }
-
-    // MARK: - Actions
-
-    private func retryWithoutAuth() {
-        isRetrying = true
-        errorMessage = nil
-        Task {
-            await authManager.checkAuth()
-            isRetrying = false
-            if !authManager.isAuthenticated {
-                errorMessage = "Server requires authentication"
-            }
-        }
     }
 }
 

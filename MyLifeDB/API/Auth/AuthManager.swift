@@ -23,16 +23,13 @@ final class AuthManager {
         case checking
         case authenticated(String) // username
         case unauthenticated
-        case noAuthRequired
     }
 
     private(set) var state: AuthState = .unknown
 
     var isAuthenticated: Bool {
-        switch state {
-        case .authenticated, .noAuthRequired: return true
-        default: return false
-        }
+        if case .authenticated = state { return true }
+        return false
     }
 
     var username: String? {
@@ -101,33 +98,18 @@ final class AuthManager {
                 state = .authenticated(username)
                 scheduleRefresh()
                 return
-            case .invalid:
-                // Token expired, try refresh
+            case .invalid, .noOAuth:
+                // Token expired or OAuth not configured, try refresh
                 if await tryRefresh() {
                     return
                 }
-                // Refresh failed, need login
                 state = .unauthenticated
-                return
-            case .noOAuth:
-                // OAuth not configured, check if auth is needed at all
-                if await checkNoAuthMode() {
-                    state = .noAuthRequired
-                } else {
-                    state = .unauthenticated
-                }
                 return
             case .connectionError:
                 // Can't reach server - stay unauthenticated so user can fix server URL
                 state = .unauthenticated
                 return
             }
-        }
-
-        // No stored token - check if auth is even required
-        if await checkNoAuthMode() {
-            state = .noAuthRequired
-            return
         }
 
         // Try refresh if we have a refresh token
@@ -320,25 +302,6 @@ final class AuthManager {
             return .invalid
         } catch {
             return .connectionError
-        }
-    }
-
-    private func checkNoAuthMode() async -> Bool {
-        do {
-            let url = baseURL.appendingPathComponent("api/inbox")
-            var request = URLRequest(url: url)
-            request.httpMethod = "GET"
-            request.setValue("application/json", forHTTPHeaderField: "Accept")
-            request.timeoutInterval = 10
-
-            let (_, response) = try await URLSession.shared.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse else { return false }
-
-            // If we get 200 without auth, no auth is required
-            return httpResponse.statusCode == 200
-        } catch {
-            return false
         }
     }
 

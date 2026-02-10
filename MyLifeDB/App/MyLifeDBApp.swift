@@ -43,7 +43,7 @@ struct MyLifeDBApp: App {
                 case .unauthenticated:
                     LoginView()
 
-                case .authenticated, .noAuthRequired:
+                case .authenticated:
                     MainTabView()
                         .task {
                             // Initialize the shared WebView with the backend URL.
