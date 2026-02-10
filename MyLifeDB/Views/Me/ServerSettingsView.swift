@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct ServerSettingsView: View {
-    @AppStorage("apiBaseURL") private var apiBaseURL = "http://localhost:12345"
+    @AppStorage("apiBaseURL") private var apiBaseURL = "https://my.xiaoyuanzhu.com"
     @State private var urlInput: String = ""
     @State private var validationError: String?
     @State private var isCheckingConnection = false
@@ -42,7 +42,7 @@ struct ServerSettingsView: View {
                     Text("API Base URL")
                         .font(.headline)
 
-                    TextField("http://localhost:12345", text: $urlInput)
+                    TextField("https://my.xiaoyuanzhu.com", text: $urlInput)
                         .textFieldStyle(.roundedBorder)
                         #if os(iOS)
                         .autocapitalization(.none)
@@ -101,7 +101,7 @@ struct ServerSettingsView: View {
 
         // Empty is allowed (will use default)
         guard !urlString.isEmpty else {
-            apiBaseURL = "http://localhost:12345"
+            apiBaseURL = "https://my.xiaoyuanzhu.com"
             reloadWebViewIfNeeded()
             return
         }

@@ -19,8 +19,8 @@ final class APIClient {
 
     /// Base URL for the API server (reads from UserDefaults)
     var baseURL: URL {
-        let urlString = UserDefaults.standard.string(forKey: "apiBaseURL") ?? "http://localhost:12345"
-        return URL(string: urlString) ?? URL(string: "http://localhost:12345")!
+        let urlString = UserDefaults.standard.string(forKey: "apiBaseURL") ?? "https://my.xiaoyuanzhu.com"
+        return URL(string: urlString) ?? URL(string: "https://my.xiaoyuanzhu.com")!
     }
 
     // MARK: - URLSession

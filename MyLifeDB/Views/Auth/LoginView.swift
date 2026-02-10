@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct LoginView: View {
-    @AppStorage("apiBaseURL") private var apiBaseURL = "http://localhost:12345"
+    @AppStorage("apiBaseURL") private var apiBaseURL = "https://my.xiaoyuanzhu.com"
     @State private var showingOAuth = false
     @State private var showingServerSettings = false
     @State private var errorMessage: String?
