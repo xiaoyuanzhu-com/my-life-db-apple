@@ -14,44 +14,51 @@ struct LoginView: View {
     @State private var showingServerSettings = false
     @State private var errorMessage: String?
     @State private var isRetrying = false
+    @State private var appeared = false
 
     private var authManager: AuthManager { .shared }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 32) {
+            VStack(spacing: 0) {
                 Spacer()
 
-                // App icon and title
-                VStack(spacing: 12) {
-                    Image(systemName: "brain.head.profile")
-                        .font(.system(size: 64))
-                        .foregroundStyle(.tint)
-
-                    Text("MyLifeDB")
-                        .font(.largeTitle.bold())
-
-                    Text("Personal Knowledge Management")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                // Error message
-                if let error = errorMessage {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                        Text(error)
-                            .font(.callout)
-                    }
-                    .padding()
-                    .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
-                }
-
-                // Sign in button
+                // MARK: - Branding
                 VStack(spacing: 16) {
+                    appIcon
+                        .frame(width: 80, height: 80)
+                        .clipShape(.rect(cornerRadius: 18))
+                        .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+
+                    VStack(spacing: 6) {
+                        Text("MyLifeDB")
+                            .font(.largeTitle.bold())
+
+                        Text("Personal Knowledge Management")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                // MARK: - Actions
+                VStack(spacing: 20) {
+                    // Error message
+                    if let error = errorMessage {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                            Text(error)
+                                .font(.callout)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                    }
+
+                    // Sign in
                     Button {
                         errorMessage = nil
                         showingOAuth = true
@@ -63,7 +70,7 @@ struct LoginView: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
 
-                    // Retry without auth (for when server has auth_mode=none)
+                    // Continue without login
                     Button {
                         retryWithoutAuth()
                     } label: {
@@ -76,25 +83,35 @@ struct LoginView: View {
                         }
                     }
                     .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
                     .disabled(isRetrying)
                 }
 
-                // Server info
+                Spacer()
+                    .frame(height: 40)
+
+                // MARK: - Server footer
                 Button {
                     showingServerSettings = true
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "server.rack")
-                            .font(.caption)
+                            .font(.caption2)
                         Text(apiBaseURL)
                             .font(.caption)
                     }
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.borderless)
-                .padding(.bottom, 32)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, 32)
+            .padding(.horizontal, 40)
+            .frame(maxWidth: 400)
+            .frame(maxWidth: .infinity)
+            .opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 10)
+            .animation(.easeOut(duration: 0.5), value: appeared)
+            .onAppear { appeared = true }
             .sheet(isPresented: $showingOAuth) {
                 if let url = URL(string: apiBaseURL) {
                     OAuthWebView(
@@ -131,6 +148,37 @@ struct LoginView: View {
         }
     }
 
+    // MARK: - App Icon
+
+    @ViewBuilder
+    private var appIcon: some View {
+        // Uses AppLogo from asset catalog. Add your SVG to
+        // Assets.xcassets/AppLogo.imageset/ to display it here.
+        // Falls back to SF Symbol if no image is found.
+        if let uiImage = imageFromAsset("AppLogo") {
+            Image(uiImage: uiImage)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+        } else {
+            Image(systemName: "brain.head.profile")
+                .font(.system(size: 40))
+                .foregroundStyle(.tint)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.tint.opacity(0.1))
+        }
+    }
+
+    /// Load image from asset catalog, returning nil if not found.
+    private func imageFromAsset(_ name: String) -> PlatformImage? {
+        #if os(macOS)
+        return NSImage(named: name)
+        #else
+        return UIImage(named: name)
+        #endif
+    }
+
+    // MARK: - Actions
+
     private func retryWithoutAuth() {
         isRetrying = true
         errorMessage = nil
@@ -143,6 +191,17 @@ struct LoginView: View {
         }
     }
 }
+
+#if os(macOS)
+private typealias PlatformImage = NSImage
+extension Image {
+    init(uiImage: NSImage) {
+        self.init(nsImage: uiImage)
+    }
+}
+#else
+private typealias PlatformImage = UIImage
+#endif
 
 #Preview {
     LoginView()
