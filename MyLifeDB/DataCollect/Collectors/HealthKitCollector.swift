@@ -58,6 +58,7 @@ final class HealthKitCollector: DataCollector {
                                       HKQuantityType(.heartRate),
                                       HKQuantityType(.restingHeartRate),
                                       HKQuantityType(.walkingHeartRateAverage),
+                                      HKQuantityType(.heartRateRecoveryOneMinute),
                                   ]
         case "hrv":               return [HKQuantityType(.heartRateVariabilitySDNN)]
         case "blood_oxygen":      return [HKQuantityType(.oxygenSaturation)]
@@ -112,6 +113,7 @@ final class HealthKitCollector: DataCollector {
         case .heartRate:                     return .count().unitDivided(by: .minute())
         case .restingHeartRate:              return .count().unitDivided(by: .minute())
         case .walkingHeartRateAverage:       return .count().unitDivided(by: .minute())
+        case .heartRateRecoveryOneMinute:    return .count().unitDivided(by: .minute())
         case .heartRateVariabilitySDNN:      return .secondUnit(with: .milli)
         case .oxygenSaturation:              return .percent()
         case .respiratoryRate:               return .count().unitDivided(by: .minute())
