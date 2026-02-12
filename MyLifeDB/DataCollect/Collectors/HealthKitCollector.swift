@@ -8,6 +8,9 @@
 
 import Foundation
 import HealthKit
+#if os(iOS)
+import UIKit
+#endif
 
 final class HealthKitCollector: DataCollector {
 
