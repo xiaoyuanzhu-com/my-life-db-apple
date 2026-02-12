@@ -231,6 +231,12 @@ final class WebViewManager {
         // Sync theme on first load
         syncTheme()
 
+        // Signal the web frontend to re-check auth.
+        // WKWebView cookies set via WKHTTPCookieStore may not be available
+        // during the initial React mount, so we re-trigger after page load.
+        let js = "window.__nativeBridge?.recheckAuth()"
+        webView?.evaluateJavaScript(js, completionHandler: nil)
+
         // Navigate to the desired path if it was set before load completed
         if currentPath != "/" {
             navigateTo(path: currentPath)
