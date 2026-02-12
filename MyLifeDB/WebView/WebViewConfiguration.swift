@@ -18,7 +18,7 @@ enum WebViewConfiguration {
     ///
     /// - Parameter bridgeHandler: The native bridge message handler for Web-to-Native communication.
     /// - Returns: A fully configured `WKWebViewConfiguration`.
-    static func create(bridgeHandler: WKScriptMessageHandler) -> WKWebViewConfiguration {
+    static func create(bridgeHandler: WKScriptMessageHandler, isDarkMode: Bool = false) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
         config.processPool = processPool
 
@@ -40,10 +40,19 @@ enum WebViewConfiguration {
         platform = "unknown"
         #endif
 
+        let theme = isDarkMode ? "dark" : "light"
+
         let injectionScript = WKUserScript(
             source: """
                 window.isNativeApp = true;
                 window.nativePlatform = '\(platform)';
+
+                // Apply theme immediately at document start to prevent light-mode flash.
+                // The native bridge (syncTheme) will handle runtime appearance changes later.
+                document.addEventListener('DOMContentLoaded', function() {
+                    document.documentElement.classList.toggle('dark', \(isDarkMode));
+                    document.documentElement.style.colorScheme = '\(theme)';
+                });
                 """,
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true

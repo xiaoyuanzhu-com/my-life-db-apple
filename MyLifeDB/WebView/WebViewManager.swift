@@ -77,7 +77,16 @@ final class WebViewManager {
 
         self.baseURL = baseURL
 
-        let config = WebViewConfiguration.create(bridgeHandler: bridgeHandler)
+        let isDark: Bool
+        #if os(iOS)
+        isDark = UITraitCollection.current.userInterfaceStyle == .dark
+        #elseif os(macOS)
+        isDark = NSApp?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        #else
+        isDark = false
+        #endif
+
+        let config = WebViewConfiguration.create(bridgeHandler: bridgeHandler, isDarkMode: isDark)
         let webView = WKWebView(frame: .zero, configuration: config)
 
         // Create the delegate and wire it up
