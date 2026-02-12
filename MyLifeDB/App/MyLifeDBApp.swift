@@ -89,11 +89,17 @@ struct MyLifeDBApp: App {
 
     // MARK: - Deep Linking
 
-    /// Handle deep links (e.g., mylifedb://inbox/12345, mylifedb://library/path/to/file).
+    /// Handle deep links (e.g., mylifedb://oauth/callback?access_token=..., mylifedb://inbox/12345).
     @MainActor
     private func handleDeepLink(_ url: URL) {
         // Only handle our custom scheme
         guard url.scheme == "mylifedb" else { return }
+
+        // Handle OAuth callback
+        if url.host == "oauth" && url.path == "/callback" {
+            handleOAuthCallback(url)
+            return
+        }
 
         // The host + path form the web route
         // e.g., mylifedb://inbox/123 → /inbox/123
@@ -108,5 +114,18 @@ struct MyLifeDBApp: App {
         guard !path.isEmpty else { return }
 
         WebViewManager.shared.navigateTo(path: path)
+    }
+
+    @MainActor
+    private func handleOAuthCallback(_ url: URL) {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
+        let queryItems = components.queryItems ?? []
+
+        guard let accessToken = queryItems.first(where: { $0.name == "access_token" })?.value else {
+            return
+        }
+
+        let refreshToken = queryItems.first(where: { $0.name == "refresh_token" })?.value
+        authManager.handleOAuthCompletion(accessToken: accessToken, refreshToken: refreshToken)
     }
 }

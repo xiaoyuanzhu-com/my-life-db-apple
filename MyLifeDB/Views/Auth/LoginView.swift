@@ -10,12 +10,8 @@ import SwiftUI
 
 struct LoginView: View {
     @AppStorage("apiBaseURL") private var apiBaseURL = "https://my.xiaoyuanzhu.com"
-    @State private var showingOAuth = false
     @State private var showingServerSettings = false
-    @State private var errorMessage: String?
     @State private var appeared = false
-
-    private var authManager: AuthManager { .shared }
 
     var body: some View {
         NavigationStack {
@@ -43,23 +39,8 @@ struct LoginView: View {
 
                 // MARK: - Actions
                 VStack(spacing: 20) {
-                    // Error message
-                    if let error = errorMessage {
-                        HStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.orange)
-                            Text(error)
-                                .font(.callout)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
-                    }
-
                     Button {
-                        errorMessage = nil
-                        showingOAuth = true
+                        openSignInInBrowser()
                     } label: {
                         Label("Sign In", systemImage: "person.badge.key")
                             .frame(maxWidth: .infinity)
@@ -94,27 +75,6 @@ struct LoginView: View {
             .offset(y: appeared ? 0 : 10)
             .animation(.easeOut(duration: 0.5), value: appeared)
             .onAppear { appeared = true }
-            .sheet(isPresented: $showingOAuth) {
-                if let url = URL(string: apiBaseURL) {
-                    OAuthWebView(
-                        baseURL: url,
-                        onCompletion: { accessToken, refreshToken in
-                            showingOAuth = false
-                            authManager.handleOAuthCompletion(
-                                accessToken: accessToken,
-                                refreshToken: refreshToken
-                            )
-                        },
-                        onError: { message in
-                            showingOAuth = false
-                            errorMessage = message
-                        },
-                        onCancel: {
-                            showingOAuth = false
-                        }
-                    )
-                }
-            }
             .sheet(isPresented: $showingServerSettings) {
                 NavigationStack {
                     ServerSettingsView()
@@ -128,6 +88,24 @@ struct LoginView: View {
                 }
             }
         }
+    }
+
+    private func openSignInInBrowser() {
+        let callbackScheme = "mylifedb"
+        let nativeRedirect = "\(callbackScheme)://oauth/callback"
+        var components = URLComponents(string: apiBaseURL)
+        components?.path = "/api/oauth/authorize"
+        components?.queryItems = [
+            URLQueryItem(name: "native_redirect", value: nativeRedirect)
+        ]
+
+        guard let authorizeURL = components?.url else { return }
+
+        #if os(macOS)
+        NSWorkspace.shared.open(authorizeURL)
+        #else
+        UIApplication.shared.open(authorizeURL)
+        #endif
     }
 
     // MARK: - App Icon
