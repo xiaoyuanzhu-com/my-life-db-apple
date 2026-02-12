@@ -11,16 +11,12 @@ import WebKit
 
 enum WebViewConfiguration {
 
-    /// Shared process pool — ensures cookies and sessions persist across any WKWebView instances.
-    static let processPool = WKProcessPool()
-
     /// Create a configured WKWebViewConfiguration for the hybrid shell.
     ///
     /// - Parameter bridgeHandler: The native bridge message handler for Web-to-Native communication.
     /// - Returns: A fully configured `WKWebViewConfiguration`.
     static func create(bridgeHandler: WKScriptMessageHandler, isDarkMode: Bool = false) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
-        config.processPool = processPool
 
         // --- User Content Controller ---
         let contentController = WKUserContentController()

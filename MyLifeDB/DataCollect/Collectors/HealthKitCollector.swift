@@ -319,11 +319,11 @@ final class HealthKitCollector: DataCollector {
             var meta = encodeMetadata(workout.metadata) ?? [:]
             meta["workoutActivityType"] = workout.workoutActivityType.rawValue
             meta["duration"] = workout.duration
-            if let energy = workout.totalEnergyBurned {
+            if let energy = workout.statistics(for: HKQuantityType(.activeEnergyBurned))?.sumQuantity() {
                 meta["totalEnergyBurned"] = energy.doubleValue(for: .kilocalorie())
                 meta["totalEnergyBurnedUnit"] = "kcal"
             }
-            if let distance = workout.totalDistance {
+            if let distance = workout.statistics(for: HKQuantityType(.distanceWalkingRunning))?.sumQuantity() {
                 meta["totalDistance"] = distance.doubleValue(for: .meter())
                 meta["totalDistanceUnit"] = "m"
             }
