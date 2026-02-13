@@ -7,7 +7,7 @@
 
 import Foundation
 
-/// Represents a Claude Code session (active or historical)
+/// Represents a Claude Code session
 struct ClaudeSession: Codable, Identifiable {
 
     let id: String
@@ -19,6 +19,7 @@ struct ClaudeSession: Codable, Identifiable {
     let isSidechain: Bool
     let isActive: Bool
     let status: String        // "active", "archived", "dead"
+    let isHidden: Bool
     let processId: Int?
     let clients: Int?
     let git: ClaudeSessionGitInfo?

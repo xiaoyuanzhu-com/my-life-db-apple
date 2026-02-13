@@ -21,15 +21,15 @@ struct ClaudeAPI {
 
     // MARK: - List Operations
 
-    /// List all Claude sessions (active + historical, newest first)
+    /// List all Claude sessions (newest first)
     /// - Parameters:
     ///   - limit: Number of sessions to fetch (default 20, max 100)
     ///   - cursor: Pagination cursor from previous response
-    ///   - status: Filter by status ("all", "active", "archived")
+    ///   - status: Filter by status ("all", "active", "hidden"). "active" = not hidden (default).
     func listAll(
         limit: Int = 20,
         cursor: String? = nil,
-        status: String = "all"
+        status: String = "active"
     ) async throws -> ClaudeSessionsResponse {
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "limit", value: String(limit)),
@@ -43,6 +43,24 @@ struct ClaudeAPI {
         return try await client.request(
             path: "/api/claude/sessions/all",
             queryItems: queryItems
+        )
+    }
+
+    // MARK: - Hide/Unhide Operations
+
+    /// Hide a Claude session from the default session list
+    func hide(sessionId: String) async throws {
+        try await client.requestVoid(
+            path: "/api/claude/sessions/\(sessionId)/hide",
+            method: .post
+        )
+    }
+
+    /// Unhide a Claude session (make it visible in the default session list)
+    func unhide(sessionId: String) async throws {
+        try await client.requestVoid(
+            path: "/api/claude/sessions/\(sessionId)/unhide",
+            method: .post
         )
     }
 }
