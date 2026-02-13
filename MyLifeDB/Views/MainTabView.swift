@@ -8,7 +8,7 @@
 //  - Claude: Native session list → WebView detail per session
 //  - Me: Native SwiftUI (profile and settings)
 //
-//  Inbox and Claude web tabs own independent WKWebView instances via TabWebViewModel.
+//  Inbox and Claude web tabs own independent WebPage instances via TabWebViewModel.
 //  Uses native SwiftUI TabView on iOS/iPadOS and NavigationSplitView on macOS.
 //
 

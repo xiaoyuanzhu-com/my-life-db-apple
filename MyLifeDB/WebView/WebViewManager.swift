@@ -2,13 +2,10 @@
 //  TabWebViewModel.swift
 //  MyLifeDB
 //
-//  Per-tab WebView model. Each web tab (Inbox, Library, Claude) creates its own
-//  instance, which owns an independent WKWebView loaded at a fixed route.
+//  Per-tab WebView model. Each web tab (Inbox, Claude) creates its own
+//  instance, which owns an independent WebPage loaded at a fixed route.
 //
-//  Architecture note: @Observable cannot be applied to NSObject subclasses.
-//  So we split into:
-//  - TabWebViewModel (@Observable) — state and API surface
-//  - TabWebViewNavigationDelegate (NSObject) — WKNavigationDelegate conformance
+//  Uses the SwiftUI-native WebView/WebPage API (iOS 26+).
 //
 
 import WebKit
@@ -32,13 +29,13 @@ final class TabWebViewModel {
 
     // MARK: - Configuration
 
-    /// The route this WebView is pinned to (e.g. "/", "/library", "/claude").
+    /// The route this WebView is pinned to (e.g. "/", "/claude").
     let route: String
 
     // MARK: - Observable State
 
-    /// The WKWebView instance. Nil until `setup()` is called.
-    private(set) var webView: WKWebView?
+    /// The WebPage instance that backs the SwiftUI WebView.
+    private(set) var webPage: WebPage
 
     /// Whether the initial page load has completed.
     private(set) var isLoaded = false
@@ -51,8 +48,8 @@ final class TabWebViewModel {
     /// The base URL of the backend (e.g., http://localhost:12345).
     private var baseURL: URL?
 
-    /// The navigation delegate (separate NSObject to avoid @Observable + NSObject conflict).
-    private var navigationDelegate: TabWebViewNavigationDelegate?
+    /// Whether the bridge polyfill has been injected for the current page load.
+    private var bridgeInjected = false
 
     // MARK: - Bridge
 
@@ -62,19 +59,19 @@ final class TabWebViewModel {
 
     init(route: String) {
         self.route = route
+        let config = WebViewConfiguration.create(bridgeHandler: bridgeHandler)
+        self.webPage = WebPage(configuration: config)
     }
 
     // MARK: - Setup
 
-    /// Create the WebView, inject auth cookies, and load the base URL + route.
+    /// Inject auth cookies and load the base URL + route.
     /// Call this after authentication is confirmed.
     @MainActor
     func setup(baseURL: URL) async {
         // Avoid double-setup
-        guard self.webView == nil else {
-            // If base URL changed, reload
+        guard self.baseURL == nil else {
             if self.baseURL != baseURL {
-                self.baseURL = baseURL
                 await teardownAndReload(baseURL: baseURL)
             }
             return
@@ -82,36 +79,8 @@ final class TabWebViewModel {
 
         self.baseURL = baseURL
 
-        let isDark: Bool
-        #if os(iOS)
-        isDark = UITraitCollection.current.userInterfaceStyle == .dark
-        #elseif os(macOS)
-        isDark = NSApp?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        #else
-        isDark = false
-        #endif
-
-        let config = WebViewConfiguration.create(bridgeHandler: bridgeHandler, isDarkMode: isDark)
-        let webView = WKWebView(frame: .zero, configuration: config)
-
-        // Create the delegate and wire it up
-        let delegate = TabWebViewNavigationDelegate(viewModel: self)
-        self.navigationDelegate = delegate
-        webView.navigationDelegate = delegate
-
-        #if os(iOS)
-        // Match system scroll behavior and safe areas
-        webView.scrollView.contentInsetAdjustmentBehavior = .never
-        // Transparent background during loading to match native theme
-        webView.isOpaque = false
-        webView.backgroundColor = .clear
-        webView.scrollView.backgroundColor = .clear
-        #endif
-
-        self.webView = webView
-
         // Inject auth cookies before loading
-        await injectAuthCookies(into: webView, for: baseURL)
+        await injectAuthCookies(for: baseURL)
 
         // Load the SPA at this tab's route
         let loadURL: URL
@@ -120,8 +89,71 @@ final class TabWebViewModel {
         } else {
             loadURL = baseURL.appendingPathComponent(route)
         }
-        let request = URLRequest(url: loadURL)
-        webView.load(request)
+        webPage.load(URLRequest(url: loadURL))
+
+        // Start observing navigation events
+        observeNavigationEvents()
+    }
+
+    // MARK: - Navigation Event Observation
+
+    private func observeNavigationEvents() {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                for try await event in self.webPage.navigations {
+                    switch event {
+                    case .committed:
+                        // Inject bridge polyfill and platform detection as soon as content starts loading
+                        await self.injectBridgePolyfill()
+
+                    case .finished:
+                        self.isLoaded = true
+                        self.loadError = nil
+
+                        // Sync theme on load
+                        self.syncTheme()
+
+                        // Signal the web frontend to re-check auth
+                        _ = try? await self.webPage.callJavaScript("window.__nativeBridge?.recheckAuth()")
+
+                    default:
+                        break
+                    }
+                }
+            } catch let error as WebPage.NavigationError {
+                switch error {
+                case .failedProvisionalNavigation(let underlying):
+                    self.isLoaded = false
+                    self.loadError = underlying
+                    print("[TabWebViewModel:\(self.route)] Provisional navigation failed: \(underlying.localizedDescription)")
+                case .webContentProcessTerminated:
+                    print("[TabWebViewModel:\(self.route)] WebView process terminated, reloading...")
+                    self.isLoaded = false
+                    self.bridgeInjected = false
+                    self.webPage.reload()
+                default:
+                    self.loadError = error
+                    print("[TabWebViewModel:\(self.route)] Navigation error: \(error)")
+                }
+            } catch {
+                self.loadError = error
+                print("[TabWebViewModel:\(self.route)] Navigation failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - Bridge Injection
+
+    @MainActor
+    private func injectBridgePolyfill() async {
+        guard !bridgeInjected else { return }
+        bridgeInjected = true
+
+        _ = try? await webPage.callJavaScript(NativeBridgeHandler.bridgePolyfillScript)
+
+        // Also apply theme immediately
+        syncTheme()
     }
 
     // MARK: - Navigation (for deep links only)
@@ -130,13 +162,11 @@ final class TabWebViewModel {
     /// Used for deep links that target a sub-path within this tab's route.
     @MainActor
     func navigateTo(path: String) {
-        guard let webView = webView, isLoaded else { return }
+        guard isLoaded else { return }
 
         let js = "window.__nativeBridge?.navigateTo('\(path.escapedForJS)')"
-        webView.evaluateJavaScript(js) { _, error in
-            if let error = error {
-                print("[TabWebViewModel] navigateTo error: \(error.localizedDescription)")
-            }
+        Task {
+            _ = try? await webPage.callJavaScript(js)
         }
     }
 
@@ -156,28 +186,29 @@ final class TabWebViewModel {
 
         let theme = isDark ? "dark" : "light"
         let js = "window.__nativeBridge?.setTheme('\(theme)')"
-        webView?.evaluateJavaScript(js, completionHandler: nil)
+        Task {
+            _ = try? await webPage.callJavaScript(js)
+        }
     }
 
     // MARK: - Auth Cookie Management
 
-    /// Inject the current auth tokens as cookies into the WebView's cookie store.
+    /// Inject the current auth tokens as cookies via JavaScript.
     @MainActor
-    func injectAuthCookies(into webView: WKWebView, for baseURL: URL) async {
+    func injectAuthCookies(for baseURL: URL) async {
         guard let host = baseURL.host else { return }
 
-        let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
-
-        // Inject access token
         if let accessToken = AuthManager.shared.accessToken {
-            if let cookie = HTTPCookie(properties: [
+            let secure = baseURL.scheme == "https" ? "; Secure" : ""
+            let cookie = HTTPCookie(properties: [
                 .name: "access_token",
                 .value: accessToken,
                 .domain: host,
                 .path: "/",
                 .secure: baseURL.scheme == "https" ? "TRUE" : "FALSE",
-            ]) {
-                await cookieStore.setCookie(cookie)
+            ])
+            if let cookie {
+                HTTPCookieStorage.shared.setCookie(cookie)
             }
         }
     }
@@ -185,8 +216,8 @@ final class TabWebViewModel {
     /// Update auth cookies after a token refresh.
     @MainActor
     func updateAuthCookies() async {
-        guard let webView = webView, let baseURL = baseURL else { return }
-        await injectAuthCookies(into: webView, for: baseURL)
+        guard let baseURL = baseURL else { return }
+        await injectAuthCookies(for: baseURL)
     }
 
     // MARK: - Reload
@@ -195,100 +226,34 @@ final class TabWebViewModel {
     @MainActor
     func reload() {
         loadError = nil
-        webView?.reload()
+        bridgeInjected = false
+        webPage.reload()
     }
 
     // MARK: - Teardown
 
-    /// Tear down the current WebView and set up a new one.
+    /// Create a new WebPage and reload from scratch.
     @MainActor
     func teardownAndReload(baseURL: URL) async {
         isLoaded = false
         loadError = nil
+        bridgeInjected = false
 
-        // Remove the old WebView's message handler to avoid leaks
-        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "native")
-        webView?.navigationDelegate = nil
-        navigationDelegate = nil
-        webView = nil
+        // Create a fresh WebPage with new configuration
+        let config = WebViewConfiguration.create(bridgeHandler: bridgeHandler)
+        self.webPage = WebPage(configuration: config)
 
         self.baseURL = baseURL
-        await setup(baseURL: baseURL)
-    }
+        await injectAuthCookies(for: baseURL)
 
-    // MARK: - Delegate Callbacks (called by TabWebViewNavigationDelegate)
-
-    @MainActor
-    func handleDidFinishNavigation() {
-        isLoaded = true
-        loadError = nil
-
-        // Sync theme on first load
-        syncTheme()
-
-        // Signal the web frontend to re-check auth.
-        // WKWebView cookies set via WKHTTPCookieStore may not be available
-        // during the initial React mount, so we re-trigger after page load.
-        let js = "window.__nativeBridge?.recheckAuth()"
-        webView?.evaluateJavaScript(js, completionHandler: nil)
-    }
-
-    @MainActor
-    func handleNavigationFailed(error: Error) {
-        loadError = error
-        print("[TabWebViewModel:\(route)] Navigation failed: \(error.localizedDescription)")
-    }
-
-    @MainActor
-    func handleProvisionalNavigationFailed(error: Error) {
-        isLoaded = false
-        loadError = error
-        print("[TabWebViewModel:\(route)] Provisional navigation failed: \(error.localizedDescription)")
-    }
-
-    @MainActor
-    func handleProcessTerminated(webView: WKWebView) {
-        print("[TabWebViewModel:\(route)] WebView process terminated, reloading...")
-        isLoaded = false
-        webView.reload()
-    }
-}
-
-// MARK: - TabWebViewNavigationDelegate
-
-/// Separate NSObject subclass for WKNavigationDelegate conformance.
-/// Delegates all callbacks to the @Observable TabWebViewModel.
-private class TabWebViewNavigationDelegate: NSObject, WKNavigationDelegate {
-
-    weak var viewModel: TabWebViewModel?
-
-    init(viewModel: TabWebViewModel) {
-        self.viewModel = viewModel
-        super.init()
-    }
-
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        Task { @MainActor in
-            viewModel?.handleDidFinishNavigation()
+        let loadURL: URL
+        if route == "/" {
+            loadURL = baseURL
+        } else {
+            loadURL = baseURL.appendingPathComponent(route)
         }
-    }
-
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        Task { @MainActor in
-            viewModel?.handleNavigationFailed(error: error)
-        }
-    }
-
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        Task { @MainActor in
-            viewModel?.handleProvisionalNavigationFailed(error: error)
-        }
-    }
-
-    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        Task { @MainActor in
-            viewModel?.handleProcessTerminated(webView: webView)
-        }
+        webPage.load(URLRequest(url: loadURL))
+        observeNavigationEvents()
     }
 }
 

@@ -2,8 +2,12 @@
 //  NativeBridgeHandler.swift
 //  MyLifeDB
 //
-//  WKScriptMessageHandler that receives messages from the web frontend
-//  via window.webkit.messageHandlers.native.postMessage({ action, ... }).
+//  URLSchemeHandler that receives messages from the web frontend
+//  via fetch('nativebridge://message', { method: 'POST', body: JSON.stringify({ action, ... }) }).
+//
+//  Also provides a JavaScript polyfill so existing web code using
+//  window.webkit.messageHandlers.native.postMessage({ action, ... })
+//  continues to work unchanged.
 //
 //  Supported actions:
 //  - share: Present native share sheet
@@ -20,23 +24,46 @@ import UIKit
 import AppKit
 #endif
 
-class NativeBridgeHandler: NSObject, WKScriptMessageHandler {
+final class NativeBridgeHandler: URLSchemeHandler {
 
-    // MARK: - WKScriptMessageHandler
+    // MARK: - URLSchemeHandler
 
-    func userContentController(
-        _ userContentController: WKUserContentController,
-        didReceive message: WKScriptMessage
-    ) {
-        guard let body = message.body as? [String: Any],
-              let action = body["action"] as? String else {
-            print("[NativeBridge] Invalid message format: \(message.body)")
-            return
+    func reply(for request: URLRequest) -> AsyncThrowingStream<URLSchemeTaskResult, any Error> {
+        // Capture request data before entering the stream
+        let body = request.httpBody
+        let url = request.url ?? URL(string: "nativebridge://message")!
+
+        return AsyncThrowingStream { continuation in
+            // Parse and dispatch the message
+            if let body,
+               let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+               let action = json["action"] as? String {
+                Task { @MainActor in
+                    self.dispatch(action: action, body: json)
+                }
+            } else {
+                print("[NativeBridge] Invalid message format from URL scheme request")
+            }
+
+            // Return an empty 204 response
+            let response = HTTPURLResponse(
+                url: url,
+                statusCode: 204,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            continuation.yield(.response(response))
+            continuation.finish()
         }
+    }
 
+    // MARK: - Dispatch
+
+    @MainActor
+    private func dispatch(action: String, body: [String: Any]) {
         switch action {
         case "share":
-            handleShare(body, webView: message.webView)
+            handleShare(body)
         case "haptic":
             handleHaptic(body)
         case "openExternal":
@@ -52,7 +79,8 @@ class NativeBridgeHandler: NSObject, WKScriptMessageHandler {
 
     // MARK: - Action Handlers
 
-    private func handleShare(_ body: [String: Any], webView: WKWebView?) {
+    @MainActor
+    private func handleShare(_ body: [String: Any]) {
         let title = body["title"] as? String ?? ""
         let url = body["url"] as? String
         let text = body["text"] as? String
@@ -66,75 +94,104 @@ class NativeBridgeHandler: NSObject, WKScriptMessageHandler {
 
         guard !activityItems.isEmpty else { return }
 
-        Task { @MainActor in
-            #if os(iOS)
-            let activityVC = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
-
-            // Find the presenting view controller
-            guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                  let rootVC = scene.windows.first?.rootViewController else { return }
-
-            // For iPad: set popover source
-            if let popover = activityVC.popoverPresentationController {
-                popover.sourceView = webView ?? rootVC.view
-                popover.sourceRect = CGRect(x: UIScreen.main.bounds.midX, y: UIScreen.main.bounds.midY, width: 0, height: 0)
-                popover.permittedArrowDirections = []
-            }
-
-            rootVC.present(activityVC, animated: true)
-            #elseif os(macOS)
-            guard let webView = webView else { return }
-            let picker = NSSharingServicePicker(items: activityItems)
-            picker.show(relativeTo: webView.bounds, of: webView, preferredEdge: .minY)
-            #endif
-        }
-    }
-
-    private func handleHaptic(_ body: [String: Any]) {
         #if os(iOS)
-        let style = body["style"] as? String ?? "medium"
-        Task { @MainActor in
-            let feedbackStyle: UIImpactFeedbackGenerator.FeedbackStyle
-            switch style {
-            case "light": feedbackStyle = .light
-            case "heavy": feedbackStyle = .heavy
-            default: feedbackStyle = .medium
-            }
-            let generator = UIImpactFeedbackGenerator(style: feedbackStyle)
-            generator.impactOccurred()
+        let activityVC = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootVC = scene.windows.first?.rootViewController else { return }
+
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = rootVC.view
+            popover.sourceRect = CGRect(x: UIScreen.main.bounds.midX, y: UIScreen.main.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
         }
+
+        rootVC.present(activityVC, animated: true)
+        #elseif os(macOS)
+        guard let window = NSApp?.mainWindow else { return }
+        let picker = NSSharingServicePicker(items: activityItems)
+        picker.show(relativeTo: .zero, of: window.contentView!, preferredEdge: .minY)
         #endif
     }
 
+    @MainActor
+    private func handleHaptic(_ body: [String: Any]) {
+        #if os(iOS)
+        let style = body["style"] as? String ?? "medium"
+        let feedbackStyle: UIImpactFeedbackGenerator.FeedbackStyle
+        switch style {
+        case "light": feedbackStyle = .light
+        case "heavy": feedbackStyle = .heavy
+        default: feedbackStyle = .medium
+        }
+        let generator = UIImpactFeedbackGenerator(style: feedbackStyle)
+        generator.impactOccurred()
+        #endif
+    }
+
+    @MainActor
     private func handleOpenExternal(_ body: [String: Any]) {
         guard let urlString = body["url"] as? String,
               let url = URL(string: urlString) else { return }
 
-        Task { @MainActor in
-            #if os(iOS)
-            UIApplication.shared.open(url)
-            #elseif os(macOS)
-            NSWorkspace.shared.open(url)
-            #endif
-        }
+        #if os(iOS)
+        UIApplication.shared.open(url)
+        #elseif os(macOS)
+        NSWorkspace.shared.open(url)
+        #endif
     }
 
+    @MainActor
     private func handleCopyToClipboard(_ body: [String: Any]) {
         guard let text = body["text"] as? String else { return }
 
-        Task { @MainActor in
-            #if os(iOS)
-            UIPasteboard.general.string = text
-            #elseif os(macOS)
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
-            #endif
-        }
+        #if os(iOS)
+        UIPasteboard.general.string = text
+        #elseif os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        #endif
     }
 
     private func handleLog(_ body: [String: Any]) {
         let level = body["level"] as? String ?? "log"
         let message = body["message"] as? String ?? "\(body)"
         print("[WebView:\(level)] \(message)")
+    }
+
+    // MARK: - JavaScript Polyfill
+
+    /// Returns a JavaScript snippet that sets up the native bridge polyfill.
+    /// This maps the old `window.webkit.messageHandlers.native.postMessage(msg)`
+    /// API to the new `fetch('nativebridge://message', ...)` URL scheme approach,
+    /// so existing web frontend code works without changes.
+    static let bridgePolyfillScript: String = """
+        window.isNativeApp = true;
+        window.nativePlatform = '\(nativePlatform)';
+
+        // Polyfill: map window.webkit.messageHandlers.native.postMessage → fetch
+        if (!window.webkit) window.webkit = {};
+        if (!window.webkit.messageHandlers) window.webkit.messageHandlers = {};
+        window.webkit.messageHandlers.native = {
+            postMessage: function(msg) {
+                fetch('nativebridge://message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(msg)
+                }).catch(function() {});
+            }
+        };
+        """
+
+    private static var nativePlatform: String {
+        #if os(iOS)
+        "ios"
+        #elseif os(macOS)
+        "macos"
+        #elseif os(visionOS)
+        "visionos"
+        #else
+        "unknown"
+        #endif
     }
 }
