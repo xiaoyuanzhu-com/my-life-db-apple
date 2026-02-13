@@ -16,9 +16,6 @@ struct ClaudeSessionDetailView: View {
     var body: some View {
         ZStack {
             WebViewContainer(viewModel: claudeVM)
-                #if !os(macOS)
-                .ignoresSafeArea(edges: .bottom)
-                #endif
 
             if !claudeVM.isLoaded {
                 VStack(spacing: 12) {

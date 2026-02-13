@@ -54,8 +54,10 @@ class WebViewWrapperView: UIView {
         webView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(webView)
         NSLayoutConstraint.activate([
-            webView.topAnchor.constraint(equalTo: topAnchor),
-            webView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            // Pin to safe area on top and bottom so content doesn't overlap
+            // the status bar / Dynamic Island at the top or the tab bar at the bottom.
+            webView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
+            webView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor),
             webView.leadingAnchor.constraint(equalTo: leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: trailingAnchor),
         ])

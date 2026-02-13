@@ -118,9 +118,6 @@ struct MainTabView: View {
     private func tabContent(viewModel: TabWebViewModel) -> some View {
         ZStack {
             WebViewContainer(viewModel: viewModel)
-                #if !os(macOS)
-                .ignoresSafeArea(edges: .bottom)
-                #endif
 
             if !viewModel.isLoaded {
                 loadingOverlay
