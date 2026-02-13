@@ -30,7 +30,9 @@ struct ClaudeSessionDetailView: View {
             }
         }
         #if os(iOS)
-        .navigationBarHidden(true)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         #else
         .navigationTitle(session.title)
