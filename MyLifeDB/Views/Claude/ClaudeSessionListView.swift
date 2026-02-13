@@ -253,7 +253,7 @@ struct ClaudeSessionListView: View {
                     sessions.remove(at: index)
                 } else {
                     // Update in-place when viewing all/archived
-                    sessions[index] = session.withArchived(true)
+                    sessions[index] = session.withStatus("archived")
                 }
             }
         }
@@ -276,7 +276,7 @@ struct ClaudeSessionListView: View {
                     sessions.remove(at: index)
                 } else {
                     // Update in-place when viewing all/active
-                    sessions[index] = session.withArchived(false)
+                    sessions[index] = session.withStatus("active")
                 }
             }
         }
@@ -298,82 +298,60 @@ private struct SessionRow: View {
     let session: ClaudeSession
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Status indicator
-            Circle()
-                .fill(statusColor)
-                .frame(width: 8, height: 8)
+        VStack(alignment: .leading, spacing: 4) {
+            // Title
+            HStack(spacing: 6) {
+                Text(session.title)
+                    .font(.body)
+                    .lineLimit(2)
 
-            VStack(alignment: .leading, spacing: 4) {
-                // Title
-                HStack(spacing: 6) {
-                    Text(session.title)
-                        .font(.body)
-                        .lineLimit(2)
-
-                    if session.isArchived {
-                        Image(systemName: "archivebox")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
+                if session.isArchived {
+                    Image(systemName: "archivebox")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                 }
-
-                // Subtitle: working dir + metadata
-                HStack(spacing: 6) {
-                    // Project path (last component)
-                    if let projectName = session.workingDir.split(separator: "/").last {
-                        Text(String(projectName))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    // Git branch
-                    if let git = session.git, let branch = git.branch {
-                        Text("·")
-                            .font(.caption)
-                            .foregroundStyle(.quaternary)
-                        Image(systemName: "arrow.triangle.branch")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        Text(branch)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    // Message count
-                    if session.messageCount > 0 {
-                        Text("·")
-                            .font(.caption)
-                            .foregroundStyle(.quaternary)
-                        Text("\(session.messageCount) msgs")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                // Relative time
-                Text(session.lastActivity, style: .relative)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
             }
 
-            Spacer()
+            // Subtitle: working dir + metadata
+            HStack(spacing: 6) {
+                // Project path (last component)
+                if let projectName = session.workingDir.split(separator: "/").last {
+                    Text(String(projectName))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                // Git branch
+                if let git = session.git, let branch = git.branch {
+                    Text("·")
+                        .font(.caption)
+                        .foregroundStyle(.quaternary)
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(branch)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                // Message count
+                if session.messageCount > 0 {
+                    Text("·")
+                        .font(.caption)
+                        .foregroundStyle(.quaternary)
+                    Text("\(session.messageCount) msgs")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            // Relative time
+            Text(session.lastActivity, style: .relative)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 4)
         .opacity(session.isArchived ? 0.6 : 1.0)
-    }
-
-    private var statusColor: Color {
-        switch session.status {
-        case "active":
-            return .green
-        case "archived":
-            return .gray
-        case "dead":
-            return .red
-        default:
-            return .gray
-        }
     }
 }
 

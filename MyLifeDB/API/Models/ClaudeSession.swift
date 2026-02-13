@@ -17,17 +17,15 @@ struct ClaudeSession: Codable, Identifiable {
     let lastActivity: Date
     let messageCount: Int
     let isSidechain: Bool
-    let isActive: Bool
-    let status: String        // "active", "archived", "dead"
-    var isArchived: Bool
-    let processId: Int?
-    let clients: Int?
+    var status: String        // "active" or "archived"
     let git: ClaudeSessionGitInfo?
 
-    /// Returns a copy with the archived state changed
-    func withArchived(_ archived: Bool) -> ClaudeSession {
+    var isArchived: Bool { status == "archived" }
+
+    /// Returns a copy with the given status
+    func withStatus(_ newStatus: String) -> ClaudeSession {
         var copy = self
-        copy.isArchived = archived
+        copy.status = newStatus
         return copy
     }
 }
