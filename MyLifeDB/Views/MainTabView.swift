@@ -5,7 +5,7 @@
 //  Root navigation view with four tabs:
 //  - Inbox: WebView (web frontend "/")
 //  - Library: WebView (web frontend "/library")
-//  - Claude: WebView (web frontend "/claude")
+//  - Claude: Native session list → WebView detail per session
 //  - Me: Native SwiftUI (profile and settings)
 //
 //  Each web tab owns its own independent WKWebView instance via TabWebViewModel.
@@ -67,7 +67,7 @@ struct MainTabView: View {
                 tabContent(viewModel: libraryVM)
             }
             Tab(AppTab.claude.rawValue, systemImage: AppTab.claude.icon, value: .claude) {
-                tabContent(viewModel: claudeVM)
+                ClaudeSessionListView(claudeVM: claudeVM)
             }
             Tab(AppTab.me.rawValue, systemImage: AppTab.me.icon, value: .me) {
                 MeView()
@@ -99,7 +99,7 @@ struct MainTabView: View {
             case .library:
                 tabContent(viewModel: libraryVM)
             case .claude:
-                tabContent(viewModel: claudeVM)
+                ClaudeSessionListView(claudeVM: claudeVM)
             case .me:
                 MeView()
             }
