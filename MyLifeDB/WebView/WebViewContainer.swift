@@ -63,6 +63,24 @@ class WebViewWrapperView: UIView {
         ])
         currentWebView = webView
     }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        guard let webView = currentWebView else { return }
+
+        // Find the UINavigationController's interactive pop gesture recognizer
+        // and make the WebView's scroll pan gesture defer to it, so the
+        // standard iOS swipe-back-from-edge works even over a WKWebView.
+        var responder: UIResponder? = self
+        while let next = responder?.next {
+            if let nav = next as? UINavigationController,
+               let popGesture = nav.interactivePopGestureRecognizer {
+                webView.scrollView.panGestureRecognizer.require(toFail: popGesture)
+                break
+            }
+            responder = next
+        }
+    }
 }
 
 #elseif os(macOS)
