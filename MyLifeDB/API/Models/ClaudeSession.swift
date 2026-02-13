@@ -19,15 +19,15 @@ struct ClaudeSession: Codable, Identifiable {
     let isSidechain: Bool
     let isActive: Bool
     let status: String        // "active", "archived", "dead"
-    var isHidden: Bool
+    var isArchived: Bool
     let processId: Int?
     let clients: Int?
     let git: ClaudeSessionGitInfo?
 
-    /// Returns a copy with the hidden state changed
-    func withHidden(_ hidden: Bool) -> ClaudeSession {
+    /// Returns a copy with the archived state changed
+    func withArchived(_ archived: Bool) -> ClaudeSession {
         var copy = self
-        copy.isHidden = hidden
+        copy.isArchived = archived
         return copy
     }
 }

@@ -25,7 +25,7 @@ struct ClaudeAPI {
     /// - Parameters:
     ///   - limit: Number of sessions to fetch (default 20, max 100)
     ///   - cursor: Pagination cursor from previous response
-    ///   - status: Filter by status ("all", "active", "hidden"). "active" = not hidden (default).
+    ///   - status: Filter by status ("all", "active", "archived"). "active" = not archived (default).
     func listAll(
         limit: Int = 20,
         cursor: String? = nil,
@@ -46,20 +46,20 @@ struct ClaudeAPI {
         )
     }
 
-    // MARK: - Hide/Unhide Operations
+    // MARK: - Archive/Unarchive Operations
 
-    /// Hide a Claude session from the default session list
-    func hide(sessionId: String) async throws {
+    /// Archive a Claude session from the default session list
+    func archive(sessionId: String) async throws {
         try await client.requestVoid(
-            path: "/api/claude/sessions/\(sessionId)/hide",
+            path: "/api/claude/sessions/\(sessionId)/archive",
             method: .post
         )
     }
 
-    /// Unhide a Claude session (make it visible in the default session list)
-    func unhide(sessionId: String) async throws {
+    /// Unarchive a Claude session (make it visible in the default session list)
+    func unarchive(sessionId: String) async throws {
         try await client.requestVoid(
-            path: "/api/claude/sessions/\(sessionId)/unhide",
+            path: "/api/claude/sessions/\(sessionId)/unarchive",
             method: .post
         )
     }

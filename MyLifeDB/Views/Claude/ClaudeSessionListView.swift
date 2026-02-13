@@ -23,13 +23,13 @@ struct ClaudeSessionListView: View {
     enum StatusFilter: String, CaseIterable {
         case active
         case all
-        case hidden
+        case archived
 
         var label: String {
             switch self {
             case .active: "Active"
             case .all: "All"
-            case .hidden: "Hidden"
+            case .archived: "Archived"
             }
         }
 
@@ -93,35 +93,35 @@ struct ClaudeSessionListView: View {
                 }
                 #if os(iOS)
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    if session.isHidden {
+                    if session.isArchived {
                         Button {
-                            Task { await unhideSession(session) }
+                            Task { await unarchiveSession(session) }
                         } label: {
-                            Label("Unhide", systemImage: "eye")
+                            Label("Unarchive", systemImage: "tray.and.arrow.up")
                         }
                         .tint(.blue)
                     } else {
                         Button {
-                            Task { await hideSession(session) }
+                            Task { await archiveSession(session) }
                         } label: {
-                            Label("Hide", systemImage: "eye.slash")
+                            Label("Archive", systemImage: "archivebox")
                         }
                         .tint(.orange)
                     }
                 }
                 #endif
                 .contextMenu {
-                    if session.isHidden {
+                    if session.isArchived {
                         Button {
-                            Task { await unhideSession(session) }
+                            Task { await unarchiveSession(session) }
                         } label: {
-                            Label("Unhide", systemImage: "eye")
+                            Label("Unarchive", systemImage: "tray.and.arrow.up")
                         }
                     } else {
                         Button {
-                            Task { await hideSession(session) }
+                            Task { await archiveSession(session) }
                         } label: {
-                            Label("Hide", systemImage: "eye.slash")
+                            Label("Archive", systemImage: "archivebox")
                         }
                     }
                 }
@@ -242,9 +242,9 @@ struct ClaudeSessionListView: View {
         isLoading = false
     }
 
-    // MARK: - Hide / Unhide
+    // MARK: - Archive / Unarchive
 
-    private func hideSession(_ session: ClaudeSession) async {
+    private func archiveSession(_ session: ClaudeSession) async {
         // Optimistic update
         if let index = sessions.firstIndex(where: { $0.id == session.id }) {
             withAnimation {
@@ -252,40 +252,40 @@ struct ClaudeSessionListView: View {
                     // Remove from list when viewing active sessions
                     sessions.remove(at: index)
                 } else {
-                    // Update in-place when viewing all/hidden
-                    sessions[index] = session.withHidden(true)
+                    // Update in-place when viewing all/archived
+                    sessions[index] = session.withArchived(true)
                 }
             }
         }
 
         do {
-            try await APIClient.shared.claude.hide(sessionId: session.id)
+            try await APIClient.shared.claude.archive(sessionId: session.id)
         } catch {
             // Revert on failure
-            print("[ClaudeSessionListView] Hide failed: \(error)")
+            print("[ClaudeSessionListView] Archive failed: \(error)")
             await refresh()
         }
     }
 
-    private func unhideSession(_ session: ClaudeSession) async {
+    private func unarchiveSession(_ session: ClaudeSession) async {
         // Optimistic update
         if let index = sessions.firstIndex(where: { $0.id == session.id }) {
             withAnimation {
-                if statusFilter == .hidden {
-                    // Remove from list when viewing hidden sessions
+                if statusFilter == .archived {
+                    // Remove from list when viewing archived sessions
                     sessions.remove(at: index)
                 } else {
                     // Update in-place when viewing all/active
-                    sessions[index] = session.withHidden(false)
+                    sessions[index] = session.withArchived(false)
                 }
             }
         }
 
         do {
-            try await APIClient.shared.claude.unhide(sessionId: session.id)
+            try await APIClient.shared.claude.unarchive(sessionId: session.id)
         } catch {
             // Revert on failure
-            print("[ClaudeSessionListView] Unhide failed: \(error)")
+            print("[ClaudeSessionListView] Unarchive failed: \(error)")
             await refresh()
         }
     }
@@ -311,8 +311,8 @@ private struct SessionRow: View {
                         .font(.body)
                         .lineLimit(2)
 
-                    if session.isHidden {
-                        Image(systemName: "eye.slash")
+                    if session.isArchived {
+                        Image(systemName: "archivebox")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
@@ -360,7 +360,7 @@ private struct SessionRow: View {
             Spacer()
         }
         .padding(.vertical, 4)
-        .opacity(session.isHidden ? 0.6 : 1.0)
+        .opacity(session.isArchived ? 0.6 : 1.0)
     }
 
     private var statusColor: Color {
