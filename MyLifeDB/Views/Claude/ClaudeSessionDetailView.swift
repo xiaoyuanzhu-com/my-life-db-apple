@@ -29,9 +29,11 @@ struct ClaudeSessionDetailView: View {
                 .background(Color.platformBackground)
             }
         }
-        .navigationTitle(session.title)
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .tabBar)
+        #else
+        .navigationTitle(session.title)
         #endif
         .onAppear {
             claudeVM.navigateTo(path: "/claude/\(session.id)")

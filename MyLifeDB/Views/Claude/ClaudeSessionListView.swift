@@ -298,12 +298,12 @@ private struct SessionRow: View {
     let session: ClaudeSession
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
             // Title
             HStack(spacing: 6) {
                 Text(session.title)
                     .font(.body)
-                    .lineLimit(2)
+                    .lineLimit(1)
 
                 if session.isArchived {
                     Image(systemName: "archivebox")
@@ -312,45 +312,33 @@ private struct SessionRow: View {
                 }
             }
 
-            // Subtitle: working dir + metadata
-            HStack(spacing: 6) {
-                // Project path (last component)
+            // Meta: project · branch · msgs · time
+            HStack(spacing: 4) {
                 if let projectName = session.workingDir.split(separator: "/").last {
                     Text(String(projectName))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
 
-                // Git branch
                 if let git = session.git, let branch = git.branch {
                     Text("·")
-                        .font(.caption)
                         .foregroundStyle(.quaternary)
-                    Image(systemName: "arrow.triangle.branch")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
                     Text(branch)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
 
-                // Message count
                 if session.messageCount > 0 {
                     Text("·")
-                        .font(.caption)
                         .foregroundStyle(.quaternary)
                     Text("\(session.messageCount) msgs")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
-            }
 
-            // Relative time
-            Text(session.lastActivity, style: .relative)
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+                Text("·")
+                    .foregroundStyle(.quaternary)
+                Text(session.lastActivity, style: .relative)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
         .opacity(session.isArchived ? 0.6 : 1.0)
     }
 }
