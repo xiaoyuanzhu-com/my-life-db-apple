@@ -28,9 +28,27 @@ struct LibraryAPI {
 
     // MARK: - Tree Operations
 
-    /// Get the folder tree structure
+    /// Get the folder tree structure (legacy — returns LibraryTreeResponse)
     func getTree() async throws -> LibraryTreeResponse {
         try await client.request(path: "/api/library/tree")
+    }
+
+    /// Get the folder tree structure for a specific path and depth.
+    /// - Parameters:
+    ///   - path: Directory path to list (empty string for root).
+    ///   - depth: Recursion depth (1 = direct children only, 0 = unlimited).
+    /// - Returns: FileTreeResponse with basePath, path, and children.
+    func getTree(path: String = "", depth: Int = 1) async throws -> FileTreeResponse {
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "depth", value: String(depth))
+        ]
+        if !path.isEmpty {
+            queryItems.append(URLQueryItem(name: "path", value: path))
+        }
+        return try await client.request(
+            path: "/api/library/tree",
+            queryItems: queryItems
+        )
     }
 
     /// Get file information with digests

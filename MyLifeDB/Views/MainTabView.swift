@@ -4,11 +4,11 @@
 //
 //  Root navigation view with four tabs:
 //  - Inbox: WebView (web frontend "/")
-//  - Library: WebView (web frontend "/library")
+//  - Library: Native SwiftUI file browser
 //  - Claude: Native session list → WebView detail per session
 //  - Me: Native SwiftUI (profile and settings)
 //
-//  Each web tab owns its own independent WKWebView instance via TabWebViewModel.
+//  Inbox and Claude web tabs own independent WKWebView instances via TabWebViewModel.
 //  Uses native SwiftUI TabView on iOS/iPadOS and NavigationSplitView on macOS.
 //
 
@@ -40,12 +40,11 @@ struct MainTabView: View {
 
     @State private var selectedTab: AppTab = .inbox
     @State private var inboxVM = TabWebViewModel(route: "/")
-    @State private var libraryVM = TabWebViewModel(route: "/library")
     @State private var claudeVM = TabWebViewModel(route: "/claude")
 
     @Environment(\.scenePhase) private var scenePhase
 
-    private var allViewModels: [TabWebViewModel] { [inboxVM, libraryVM, claudeVM] }
+    private var allViewModels: [TabWebViewModel] { [inboxVM, claudeVM] }
 
     var body: some View {
         #if os(macOS)
@@ -64,7 +63,7 @@ struct MainTabView: View {
                 tabContent(viewModel: inboxVM)
             }
             Tab(AppTab.library.rawValue, systemImage: AppTab.library.icon, value: .library) {
-                tabContent(viewModel: libraryVM)
+                NativeLibraryBrowserView()
             }
             Tab(AppTab.claude.rawValue, systemImage: AppTab.claude.icon, value: .claude) {
                 ClaudeSessionListView(claudeVM: claudeVM)
@@ -97,7 +96,7 @@ struct MainTabView: View {
             case .inbox:
                 tabContent(viewModel: inboxVM)
             case .library:
-                tabContent(viewModel: libraryVM)
+                NativeLibraryBrowserView()
             case .claude:
                 ClaudeSessionListView(claudeVM: claudeVM)
             case .me:
@@ -172,11 +171,10 @@ struct MainTabView: View {
     private func viewModel(for path: String) -> (AppTab, TabWebViewModel)? {
         if path == "/" || path.hasPrefix("/inbox") {
             return (.inbox, inboxVM)
-        } else if path.hasPrefix("/library") || path.hasPrefix("/file") {
-            return (.library, libraryVM)
         } else if path.hasPrefix("/claude") {
             return (.claude, claudeVM)
         }
+        // Library is now native and doesn't use a WebView model
         return nil
     }
 }
@@ -231,6 +229,8 @@ private struct SharedModifiers: ViewModifier {
             selectedTab = .inbox
         } else if path.hasPrefix("/library") || path.hasPrefix("/file") {
             selectedTab = .library
+            // Library is now native; deep path navigation handled by NativeLibraryBrowserView
+            return
         } else if path.hasPrefix("/claude") {
             selectedTab = .claude
         } else if path.hasPrefix("/settings") || path.hasPrefix("/people") {
@@ -239,7 +239,7 @@ private struct SharedModifiers: ViewModifier {
         }
 
         // Navigate within the selected tab's WebView if it's a sub-path
-        if let vm = allViewModels.first(where: { path.hasPrefix($0.route) || (path.hasPrefix("/inbox") && $0.route == "/") || (path.hasPrefix("/file") && $0.route == "/library") }) {
+        if let vm = allViewModels.first(where: { path.hasPrefix($0.route) || (path.hasPrefix("/inbox") && $0.route == "/") }) {
             vm.navigateTo(path: path)
         }
     }
