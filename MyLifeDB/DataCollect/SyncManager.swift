@@ -33,6 +33,9 @@ final class SyncManager {
     /// Last sync error (nil if last sync succeeded)
     private(set) var lastError: SyncError?
 
+    /// Result of the last sync cycle (nil if never synced)
+    private(set) var lastSyncResult: SyncResult?
+
     // MARK: - Configuration
 
     /// Minimum interval between syncs (seconds)
@@ -150,7 +153,7 @@ final class SyncManager {
         state = .syncing
         lastError = nil
 
-        var anySuccess = false
+        var uploadedCount = 0
         var failures: [String: String] = [:]
 
         for collector in collectors {
@@ -193,6 +196,7 @@ final class SyncManager {
                 }
 
                 collectorStates[collector.id] = .uploading(progress: 0)
+                var collectorFailures = 0
 
                 // 2. Upload each day's batch
                 for (index, batch) in batches.enumerated() {
@@ -209,18 +213,24 @@ final class SyncManager {
 
                         // 3. Commit anchor ONLY after successful upload
                         await collector.commitAnchor(for: batch)
+                        uploadedCount += 1
 
                         let progress = Double(index + 1) / Double(batches.count)
                         collectorStates[collector.id] = .uploading(progress: progress)
 
                     } catch {
                         // Partial failure: anchor NOT committed, will retry next sync
+                        collectorFailures += 1
                         failures["\(collector.id)/\(batch.uploadPath)"] = error.localizedDescription
                     }
                 }
 
-                anySuccess = true
-                collectorStates[collector.id] = .idle
+                // Set collector state based on whether any batch failed
+                if collectorFailures > 0 {
+                    collectorStates[collector.id] = .error("\(collectorFailures) upload\(collectorFailures == 1 ? "" : "s") failed")
+                } else {
+                    collectorStates[collector.id] = .idle
+                }
 
             } catch {
                 // Collector-level failure
@@ -234,9 +244,20 @@ final class SyncManager {
             lastError = SyncError(failures: failures)
         }
 
-        if anySuccess || failures.isEmpty {
-            lastSyncDate = Date()
-            UserDefaults.standard.set(lastSyncDate, forKey: "sync.lastSyncDate")
+        // Always update sync date — the sync ran
+        lastSyncDate = Date()
+        UserDefaults.standard.set(lastSyncDate, forKey: "sync.lastSyncDate")
+
+        // Determine sync result
+        let errorCount = failures.count
+        if uploadedCount > 0 && errorCount == 0 {
+            lastSyncResult = .success(fileCount: uploadedCount)
+        } else if uploadedCount > 0 && errorCount > 0 {
+            lastSyncResult = .partial(uploaded: uploadedCount, failed: errorCount)
+        } else if errorCount > 0 {
+            lastSyncResult = .failed(errors: errorCount)
+        } else {
+            lastSyncResult = .noNewData
         }
 
         state = .idle

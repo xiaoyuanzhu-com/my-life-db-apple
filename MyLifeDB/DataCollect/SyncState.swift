@@ -21,6 +21,18 @@ enum CollectorSyncState: Equatable {
     case error(String)
 }
 
+/// Result of the last sync cycle
+enum SyncResult: Equatable {
+    /// Files were uploaded successfully (all succeeded)
+    case success(fileCount: Int)
+    /// Sync ran but there was no new data to upload
+    case noNewData
+    /// Some uploads succeeded but others failed
+    case partial(uploaded: Int, failed: Int)
+    /// All uploads failed
+    case failed(errors: Int)
+}
+
 /// Aggregated error from a sync cycle
 struct SyncError: Equatable {
 

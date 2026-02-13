@@ -293,10 +293,9 @@ struct DataCollectView: View {
                         Text("Syncing...")
                             .foregroundStyle(.secondary)
                     } else if let lastSync = syncManager.lastSyncDate {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                        syncResultIcon
                             .font(.caption)
-                        Text("Last sync: \(lastSync, format: .relative(presentation: .named))")
+                        Text(syncStatusText(lastSync: lastSync))
                             .foregroundStyle(.secondary)
                     } else {
                         Image(systemName: "arrow.triangle.2.circlepath")
@@ -347,6 +346,51 @@ struct DataCollectView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .navigationTitle("Data Collect")
+    }
+}
+
+// MARK: - Sync Status Helpers
+
+extension DataCollectView {
+
+    @ViewBuilder
+    var syncResultIcon: some View {
+        switch syncManager.lastSyncResult {
+        case .success:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+        case .noNewData:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+        case .partial:
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+        case .failed:
+            Image(systemName: "xmark.circle.fill")
+                .foregroundStyle(.red)
+        case nil:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+        }
+    }
+
+    func syncStatusText(lastSync: Date) -> String {
+        let timeAgo = lastSync.formatted(.relative(presentation: .named))
+        switch syncManager.lastSyncResult {
+        case .success(let fileCount):
+            let files = fileCount == 1 ? "1 file" : "\(fileCount) files"
+            return "Synced \(files) \u{00B7} \(timeAgo)"
+        case .noNewData:
+            return "Up to date \u{00B7} \(timeAgo)"
+        case .partial(let uploaded, let failed):
+            let files = uploaded == 1 ? "1 file" : "\(uploaded) files"
+            let errors = failed == 1 ? "1 error" : "\(failed) errors"
+            return "Synced \(files), \(errors) \u{00B7} \(timeAgo)"
+        case .failed:
+            return "Sync failed \u{00B7} \(timeAgo)"
+        case nil:
+            return "Last sync: \(timeAgo)"
+        }
     }
 }
 

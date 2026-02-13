@@ -294,7 +294,7 @@ final class APIClient {
     }
 
     /// Saves raw file data to /raw/*path
-    func saveRawFile(path: String, data: Data) async throws {
+    func saveRawFile(path: String, data: Data, allowRetryOn401: Bool = true) async throws {
         var request = try buildRequest(path: "/raw/\(path)", method: .put)
         request.httpBody = data
 
@@ -304,7 +304,19 @@ final class APIClient {
             throw APIError.invalidResponse
         }
 
-        guard 200...299 ~= httpResponse.statusCode else {
+        switch httpResponse.statusCode {
+        case 200...299:
+            return
+        case 401:
+            if allowRetryOn401 {
+                let refreshed = await AuthManager.shared.handleUnauthorized()
+                if refreshed {
+                    try await self.saveRawFile(path: path, data: data, allowRetryOn401: false)
+                    return
+                }
+            }
+            throw APIError.unauthorized
+        default:
             throw APIError.serverError(httpResponse.statusCode, parseErrorMessage(from: responseData))
         }
     }
