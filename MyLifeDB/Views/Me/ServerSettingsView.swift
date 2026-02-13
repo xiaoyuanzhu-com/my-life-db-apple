@@ -102,6 +102,7 @@ struct ServerSettingsView: View {
         // Empty is allowed (will use default)
         guard !urlString.isEmpty else {
             apiBaseURL = "https://my.xiaoyuanzhu.com"
+            SharedConstants.sharedDefaults.set(apiBaseURL, forKey: SharedConstants.apiBaseURLKey)
             reloadWebViewIfNeeded()
             return
         }
@@ -118,6 +119,9 @@ struct ServerSettingsView: View {
         // Valid - save it
         let oldURL = apiBaseURL
         apiBaseURL = urlString
+
+        // Also sync to shared UserDefaults for the Share Extension
+        SharedConstants.sharedDefaults.set(urlString, forKey: SharedConstants.apiBaseURLKey)
 
         // If the URL actually changed, reload the WebView with the new backend
         if oldURL != urlString {

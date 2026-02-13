@@ -47,6 +47,10 @@ struct MyLifeDBApp: App {
                 case .authenticated:
                     MainTabView(deepLinkPath: $deepLinkPath)
                         .task {
+                            // Sync API base URL to shared UserDefaults so the
+                            // Share Extension can access it via App Group.
+                            syncSharedDefaults()
+
                             // Register background sync task
                             #if os(iOS)
                             SyncManager.shared.registerBackgroundTask()
@@ -69,6 +73,16 @@ struct MyLifeDBApp: App {
                 SyncManager.shared.sync()
             }
         }
+    }
+
+    // MARK: - Shared Defaults Sync
+
+    /// Sync the API base URL to the shared UserDefaults suite so the
+    /// Share Extension (which runs in a separate process) can read it.
+    private func syncSharedDefaults() {
+        let url = UserDefaults.standard.string(forKey: "apiBaseURL")
+            ?? SharedConstants.defaultBaseURL
+        SharedConstants.sharedDefaults.set(url, forKey: SharedConstants.apiBaseURLKey)
     }
 
     // MARK: - Deep Linking
