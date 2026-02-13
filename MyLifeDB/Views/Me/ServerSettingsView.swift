@@ -125,12 +125,10 @@ struct ServerSettingsView: View {
         }
     }
 
-    /// Tear down and recreate the WebView pointing at the new server URL.
+    /// Notify all WebViews to reload with the new server URL.
     private func reloadWebViewIfNeeded() {
         guard let newURL = URL(string: apiBaseURL) else { return }
-        Task {
-            await WebViewManager.shared.teardownAndReload(baseURL: newURL)
-        }
+        NotificationCenter.default.post(name: .webViewShouldReload, object: newURL)
     }
 
     private func checkConnection() {

@@ -8,7 +8,6 @@
 //  Supported actions:
 //  - share: Present native share sheet
 //  - haptic: Trigger haptic feedback (iOS only)
-//  - navigate: Sync web-side navigation to native tab state
 //  - openExternal: Open URL in Safari
 //  - copyToClipboard: Copy text to system clipboard
 //  - log: Forward console messages to native log
@@ -22,9 +21,6 @@ import AppKit
 #endif
 
 class NativeBridgeHandler: NSObject, WKScriptMessageHandler {
-
-    /// Callback when the web frontend navigates — native side should update tab selection.
-    var onNavigate: ((String) -> Void)?
 
     // MARK: - WKScriptMessageHandler
 
@@ -43,8 +39,6 @@ class NativeBridgeHandler: NSObject, WKScriptMessageHandler {
             handleShare(body, webView: message.webView)
         case "haptic":
             handleHaptic(body)
-        case "navigate":
-            handleNavigate(body)
         case "openExternal":
             handleOpenExternal(body)
         case "copyToClipboard":
@@ -110,13 +104,6 @@ class NativeBridgeHandler: NSObject, WKScriptMessageHandler {
             generator.impactOccurred()
         }
         #endif
-    }
-
-    private func handleNavigate(_ body: [String: Any]) {
-        guard let path = body["path"] as? String else { return }
-        Task { @MainActor in
-            onNavigate?(path)
-        }
     }
 
     private func handleOpenExternal(_ body: [String: Any]) {

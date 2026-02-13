@@ -28,6 +28,7 @@ struct MyLifeDBApp: App {
     }()
 
     @State private var authManager = AuthManager.shared
+    @State private var deepLinkPath: String?
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
@@ -44,15 +45,8 @@ struct MyLifeDBApp: App {
                     LoginView()
 
                 case .authenticated:
-                    MainTabView()
+                    MainTabView(deepLinkPath: $deepLinkPath)
                         .task {
-                            // Initialize the shared WebView with the backend URL.
-                            // Auth cookies are injected before the SPA loads so the
-                            // web frontend's cookie-based auth works transparently.
-                            await WebViewManager.shared.setup(
-                                baseURL: authManager.baseURL
-                            )
-
                             // Register background sync task
                             #if os(iOS)
                             SyncManager.shared.registerBackgroundTask()
@@ -70,16 +64,6 @@ struct MyLifeDBApp: App {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 authManager.handleForeground()
-
-                // Sync theme with native appearance when returning to foreground
-                Task { @MainActor in
-                    WebViewManager.shared.syncTheme()
-                }
-
-                // Update auth cookies in case they were refreshed in background
-                Task {
-                    await WebViewManager.shared.updateAuthCookies()
-                }
 
                 // Trigger data collection sync (throttled internally)
                 SyncManager.shared.sync()
@@ -113,7 +97,8 @@ struct MyLifeDBApp: App {
 
         guard !path.isEmpty else { return }
 
-        WebViewManager.shared.navigateTo(path: path)
+        // Pass to MainTabView via binding
+        deepLinkPath = path
     }
 
     @MainActor

@@ -8,23 +8,20 @@
 //  - Claude: WebView (web frontend "/claude")
 //  - Me: Native SwiftUI (profile and settings)
 //
-//  Architecture:
-//  - iOS/iPadOS: ZStack with persistent WebView + CustomTabBar
-//    (standard TabView would recreate child views on switch, detaching the WebView)
-//  - macOS: NavigationSplitView sidebar + WebView or native MeView in detail
+//  Each web tab owns its own independent WKWebView instance via TabWebViewModel.
+//  Uses native SwiftUI TabView on iOS/iPadOS and NavigationSplitView on macOS.
 //
 
 import SwiftUI
 
 // MARK: - Tab Definition
 
-enum Tab: String, CaseIterable {
+enum AppTab: String, CaseIterable {
     case inbox = "Inbox"
     case library = "Library"
     case claude = "Claude"
     case me = "Me"
 
-    /// SF Symbol name (outline variant).
     var icon: String {
         switch self {
         case .inbox: return "tray"
@@ -33,35 +30,22 @@ enum Tab: String, CaseIterable {
         case .me: return "person.circle"
         }
     }
-
-    /// SF Symbol name (filled variant, for selected state).
-    var iconFilled: String {
-        switch self {
-        case .inbox: return "tray.fill"
-        case .library: return "folder.fill"
-        case .claude: return "bubble.left.and.bubble.right.fill"
-        case .me: return "person.circle.fill"
-        }
-    }
-
-    /// The web frontend route this tab navigates to, or nil for native-only tabs.
-    var webRoute: String? {
-        switch self {
-        case .inbox: return "/"
-        case .library: return "/library"
-        case .claude: return "/claude"
-        case .me: return nil
-        }
-    }
-
-    /// Whether this tab renders via WebView (vs native SwiftUI).
-    var isWebView: Bool { webRoute != nil }
 }
 
 // MARK: - MainTabView
 
 struct MainTabView: View {
-    @State private var selectedTab: Tab = .inbox
+    /// Deep link path passed from MyLifeDBApp.
+    @Binding var deepLinkPath: String?
+
+    @State private var selectedTab: AppTab = .inbox
+    @State private var inboxVM = TabWebViewModel(route: "/")
+    @State private var libraryVM = TabWebViewModel(route: "/library")
+    @State private var claudeVM = TabWebViewModel(route: "/claude")
+
+    @Environment(\.scenePhase) private var scenePhase
+
+    private var allViewModels: [TabWebViewModel] { [inboxVM, libraryVM, claudeVM] }
 
     var body: some View {
         #if os(macOS)
@@ -75,46 +59,26 @@ struct MainTabView: View {
 
     #if !os(macOS)
     private var iOSLayout: some View {
-        ZStack {
-            // The shared WebView is always present behind everything.
-            // When the Me tab is selected, it's hidden (opacity 0) but stays alive
-            // so the SPA state (React, query cache, scroll position) is preserved.
-            WebViewContainer()
-                .ignoresSafeArea(edges: .bottom) // CustomTabBar handles bottom safe area
-                .opacity(selectedTab.isWebView ? 1 : 0)
-
-            // Native MeView overlays when the Me tab is selected.
-            // MeView has its own NavigationStack, so no wrapper needed.
-            if selectedTab == .me {
+        TabView(selection: $selectedTab) {
+            Tab(AppTab.inbox.rawValue, systemImage: AppTab.inbox.icon, value: .inbox) {
+                tabContent(viewModel: inboxVM)
+            }
+            Tab(AppTab.library.rawValue, systemImage: AppTab.library.icon, value: .library) {
+                tabContent(viewModel: libraryVM)
+            }
+            Tab(AppTab.claude.rawValue, systemImage: AppTab.claude.icon, value: .claude) {
+                tabContent(viewModel: claudeVM)
+            }
+            Tab(AppTab.me.rawValue, systemImage: AppTab.me.icon, value: .me) {
                 MeView()
-                    .transition(.identity)
-            }
-
-            // Loading overlay while the WebView is booting up.
-            if selectedTab.isWebView && !WebViewManager.shared.isLoaded {
-                loadingOverlay
-            }
-
-            // Error overlay if the WebView failed to load.
-            if selectedTab.isWebView, let error = WebViewManager.shared.loadError {
-                errorOverlay(error)
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            CustomTabBar(selectedTab: $selectedTab)
-        }
-        .onChange(of: selectedTab) { _, newTab in
-            if let route = newTab.webRoute {
-                WebViewManager.shared.navigateTo(path: route)
-            }
-        }
-        .onAppear {
-            // Set up the bridge callback: when the web frontend navigates,
-            // sync the native tab selection.
-            WebViewManager.shared.bridgeHandler.onNavigate = { path in
-                syncTabFromWebPath(path)
-            }
-        }
+        .modifier(SharedModifiers(
+            allViewModels: allViewModels,
+            selectedTab: $selectedTab,
+            deepLinkPath: $deepLinkPath,
+            scenePhase: scenePhase
+        ))
     }
     #endif
 
@@ -123,40 +87,50 @@ struct MainTabView: View {
     #if os(macOS)
     private var macOSLayout: some View {
         NavigationSplitView {
-            List(Tab.allCases, id: \.self, selection: $selectedTab) { tab in
+            List(AppTab.allCases, id: \.self, selection: $selectedTab) { tab in
                 Label(tab.rawValue, systemImage: tab.icon)
                     .tag(tab)
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
         } detail: {
-            if selectedTab == .me {
+            switch selectedTab {
+            case .inbox:
+                tabContent(viewModel: inboxVM)
+            case .library:
+                tabContent(viewModel: libraryVM)
+            case .claude:
+                tabContent(viewModel: claudeVM)
+            case .me:
                 MeView()
-            } else {
-                ZStack {
-                    WebViewContainer()
-
-                    if !WebViewManager.shared.isLoaded {
-                        loadingOverlay
-                    }
-
-                    if let error = WebViewManager.shared.loadError {
-                        errorOverlay(error)
-                    }
-                }
             }
         }
-        .onChange(of: selectedTab) { _, newTab in
-            if let route = newTab.webRoute {
-                WebViewManager.shared.navigateTo(path: route)
+        .modifier(SharedModifiers(
+            allViewModels: allViewModels,
+            selectedTab: $selectedTab,
+            deepLinkPath: $deepLinkPath,
+            scenePhase: scenePhase
+        ))
+    }
+    #endif
+
+    // MARK: - Tab Content
+
+    private func tabContent(viewModel: TabWebViewModel) -> some View {
+        ZStack {
+            WebViewContainer(viewModel: viewModel)
+                #if !os(macOS)
+                .ignoresSafeArea(edges: .bottom)
+                #endif
+
+            if !viewModel.isLoaded {
+                loadingOverlay
             }
-        }
-        .onAppear {
-            WebViewManager.shared.bridgeHandler.onNavigate = { path in
-                syncTabFromWebPath(path)
+
+            if let error = viewModel.loadError {
+                errorOverlay(error, viewModel: viewModel)
             }
         }
     }
-    #endif
 
     // MARK: - Loading & Error Overlays
 
@@ -172,7 +146,7 @@ struct MainTabView: View {
         .background(Color.platformBackground)
     }
 
-    private func errorOverlay(_ error: Error) -> some View {
+    private func errorOverlay(_ error: Error, viewModel: TabWebViewModel) -> some View {
         VStack(spacing: 16) {
             Image(systemName: "wifi.slash")
                 .font(.largeTitle)
@@ -188,7 +162,7 @@ struct MainTabView: View {
                 .padding(.horizontal)
 
             Button("Retry") {
-                WebViewManager.shared.reload()
+                viewModel.reload()
             }
             .buttonStyle(.borderedProminent)
         }
@@ -196,10 +170,66 @@ struct MainTabView: View {
         .background(Color.platformBackground)
     }
 
-    // MARK: - Tab ↔ Web Path Sync
+    // MARK: - Deep Link → Tab Mapping
 
-    /// Map a web frontend path back to the correct native tab.
-    private func syncTabFromWebPath(_ path: String) {
+    private func viewModel(for path: String) -> (AppTab, TabWebViewModel)? {
+        if path == "/" || path.hasPrefix("/inbox") {
+            return (.inbox, inboxVM)
+        } else if path.hasPrefix("/library") || path.hasPrefix("/file") {
+            return (.library, libraryVM)
+        } else if path.hasPrefix("/claude") {
+            return (.claude, claudeVM)
+        }
+        return nil
+    }
+}
+
+// MARK: - Shared Modifiers
+
+/// Extracted as a ViewModifier so iOS and macOS layouts share the same
+/// setup, scenePhase, deep link, and notification handling.
+private struct SharedModifiers: ViewModifier {
+    let allViewModels: [TabWebViewModel]
+    @Binding var selectedTab: AppTab
+    @Binding var deepLinkPath: String?
+    let scenePhase: ScenePhase
+
+    func body(content: Content) -> some View {
+        content
+            .task {
+                let baseURL = AuthManager.shared.baseURL
+                for vm in allViewModels {
+                    await vm.setup(baseURL: baseURL)
+                }
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active {
+                    for vm in allViewModels {
+                        vm.syncTheme()
+                    }
+                    Task {
+                        for vm in allViewModels {
+                            await vm.updateAuthCookies()
+                        }
+                    }
+                }
+            }
+            .onChange(of: deepLinkPath) { _, path in
+                guard let path else { return }
+                handleDeepLink(path)
+                deepLinkPath = nil
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .webViewShouldReload)) { notification in
+                guard let newURL = notification.object as? URL else { return }
+                Task {
+                    for vm in allViewModels {
+                        await vm.teardownAndReload(baseURL: newURL)
+                    }
+                }
+            }
+    }
+
+    private func handleDeepLink(_ path: String) {
         if path == "/" || path.hasPrefix("/inbox") {
             selectedTab = .inbox
         } else if path.hasPrefix("/library") || path.hasPrefix("/file") {
@@ -207,8 +237,13 @@ struct MainTabView: View {
         } else if path.hasPrefix("/claude") {
             selectedTab = .claude
         } else if path.hasPrefix("/settings") || path.hasPrefix("/people") {
-            // Settings and People are accessible from the web but map to Me tab
             selectedTab = .me
+            return
+        }
+
+        // Navigate within the selected tab's WebView if it's a sub-path
+        if let vm = allViewModels.first(where: { path.hasPrefix($0.route) || (path.hasPrefix("/inbox") && $0.route == "/") || (path.hasPrefix("/file") && $0.route == "/library") }) {
+            vm.navigateTo(path: path)
         }
     }
 }
@@ -216,5 +251,6 @@ struct MainTabView: View {
 // MARK: - Preview
 
 #Preview {
-    MainTabView()
+    @Previewable @State var deepLink: String? = nil
+    MainTabView(deepLinkPath: $deepLink)
 }

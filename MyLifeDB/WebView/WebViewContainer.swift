@@ -2,9 +2,8 @@
 //  WebViewContainer.swift
 //  MyLifeDB
 //
-//  SwiftUI representable that embeds the shared WKWebView from WebViewManager.
-//  Uses a wrapper UIView/NSView that adds/removes the WKWebView as a subview,
-//  so the WebView can be swapped in after initial creation.
+//  SwiftUI representable that embeds the WKWebView from a TabWebViewModel.
+//  Each tab creates its own container with its own view model.
 //
 //  Platform:
 //  - iOS/visionOS: UIViewRepresentable
@@ -18,16 +17,18 @@ import WebKit
 
 struct WebViewContainer: UIViewRepresentable {
 
+    let viewModel: TabWebViewModel
+
     func makeUIView(context: Context) -> WebViewWrapperView {
         let wrapper = WebViewWrapperView()
-        wrapper.embedWebView(WebViewManager.shared.webView)
+        wrapper.embedWebView(viewModel.webView)
         return wrapper
     }
 
     func updateUIView(_ wrapper: WebViewWrapperView, context: Context) {
         // If the WebView was created after makeUIView (e.g., setup hadn't finished),
         // embed it now.
-        wrapper.embedWebView(WebViewManager.shared.webView)
+        wrapper.embedWebView(viewModel.webView)
     }
 }
 
@@ -66,14 +67,16 @@ class WebViewWrapperView: UIView {
 
 struct WebViewContainer: NSViewRepresentable {
 
+    let viewModel: TabWebViewModel
+
     func makeNSView(context: Context) -> WebViewWrapperNSView {
         let wrapper = WebViewWrapperNSView()
-        wrapper.embedWebView(WebViewManager.shared.webView)
+        wrapper.embedWebView(viewModel.webView)
         return wrapper
     }
 
     func updateNSView(_ wrapper: WebViewWrapperNSView, context: Context) {
-        wrapper.embedWebView(WebViewManager.shared.webView)
+        wrapper.embedWebView(viewModel.webView)
     }
 }
 

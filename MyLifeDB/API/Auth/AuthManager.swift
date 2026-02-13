@@ -70,7 +70,7 @@ final class AuthManager {
     // MARK: - Base URL
 
     /// The backend base URL (configurable via Settings → Server).
-    /// Used by both APIClient and WebViewManager.
+    /// Used by both APIClient and TabWebViewModel.
     var baseURL: URL {
         let urlString = UserDefaults.standard.string(forKey: "apiBaseURL") ?? "https://my.xiaoyuanzhu.com"
         return URL(string: urlString) ?? URL(string: "https://my.xiaoyuanzhu.com")!

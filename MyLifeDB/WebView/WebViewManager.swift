@@ -1,15 +1,14 @@
 //
-//  WebViewManager.swift
+//  TabWebViewModel.swift
 //  MyLifeDB
 //
-//  Singleton managing a single persistent WKWebView instance.
-//  The WebView is shared across all tabs — tab switches navigate the React Router
-//  via JavaScript (no page reload), keeping the SPA state intact.
+//  Per-tab WebView model. Each web tab (Inbox, Library, Claude) creates its own
+//  instance, which owns an independent WKWebView loaded at a fixed route.
 //
 //  Architecture note: @Observable cannot be applied to NSObject subclasses.
 //  So we split into:
-//  - WebViewManager (@Observable) — state and API surface
-//  - WebViewNavigationDelegate (NSObject) — WKNavigationDelegate conformance
+//  - TabWebViewModel (@Observable) — state and API surface
+//  - TabWebViewNavigationDelegate (NSObject) — WKNavigationDelegate conformance
 //
 
 import WebKit
@@ -20,25 +19,29 @@ import UIKit
 import AppKit
 #endif
 
-// MARK: - WebViewManager
+// MARK: - Notification for server URL changes
+
+extension Notification.Name {
+    static let webViewShouldReload = Notification.Name("webViewShouldReload")
+}
+
+// MARK: - TabWebViewModel
 
 @Observable
-final class WebViewManager {
+final class TabWebViewModel {
 
-    // MARK: - Singleton
+    // MARK: - Configuration
 
-    static let shared = WebViewManager()
+    /// The route this WebView is pinned to (e.g. "/", "/library", "/claude").
+    let route: String
 
     // MARK: - Observable State
 
-    /// The shared WKWebView instance. Nil until `setup()` is called.
+    /// The WKWebView instance. Nil until `setup()` is called.
     private(set) var webView: WKWebView?
 
     /// Whether the initial page load has completed.
     private(set) var isLoaded = false
-
-    /// The current WebView route path (best-effort tracking).
-    private(set) var currentPath: String = "/"
 
     /// Error from the last navigation attempt, if any.
     private(set) var loadError: Error?
@@ -49,7 +52,7 @@ final class WebViewManager {
     private var baseURL: URL?
 
     /// The navigation delegate (separate NSObject to avoid @Observable + NSObject conflict).
-    private var navigationDelegate: WebViewNavigationDelegate?
+    private var navigationDelegate: TabWebViewNavigationDelegate?
 
     // MARK: - Bridge
 
@@ -57,11 +60,13 @@ final class WebViewManager {
 
     // MARK: - Init
 
-    private init() {}
+    init(route: String) {
+        self.route = route
+    }
 
     // MARK: - Setup
 
-    /// Create the WebView, inject auth cookies, and load the base URL.
+    /// Create the WebView, inject auth cookies, and load the base URL + route.
     /// Call this after authentication is confirmed.
     @MainActor
     func setup(baseURL: URL) async {
@@ -90,7 +95,7 @@ final class WebViewManager {
         let webView = WKWebView(frame: .zero, configuration: config)
 
         // Create the delegate and wire it up
-        let delegate = WebViewNavigationDelegate(manager: self)
+        let delegate = TabWebViewNavigationDelegate(viewModel: self)
         self.navigationDelegate = delegate
         webView.navigationDelegate = delegate
 
@@ -108,27 +113,29 @@ final class WebViewManager {
         // Inject auth cookies before loading
         await injectAuthCookies(into: webView, for: baseURL)
 
-        // Load the SPA
-        let request = URLRequest(url: baseURL)
+        // Load the SPA at this tab's route
+        let loadURL: URL
+        if route == "/" {
+            loadURL = baseURL
+        } else {
+            loadURL = baseURL.appendingPathComponent(route)
+        }
+        let request = URLRequest(url: loadURL)
         webView.load(request)
     }
 
-    // MARK: - Navigation
+    // MARK: - Navigation (for deep links only)
 
     /// Navigate the React Router to a given path (no page reload).
+    /// Used for deep links that target a sub-path within this tab's route.
     @MainActor
     func navigateTo(path: String) {
-        currentPath = path
-
-        guard let webView = webView, isLoaded else {
-            // Path stored; will be applied when load completes
-            return
-        }
+        guard let webView = webView, isLoaded else { return }
 
         let js = "window.__nativeBridge?.navigateTo('\(path.escapedForJS)')"
         webView.evaluateJavaScript(js) { _, error in
             if let error = error {
-                print("[WebViewManager] navigateTo error: \(error.localizedDescription)")
+                print("[TabWebViewModel] navigateTo error: \(error.localizedDescription)")
             }
         }
     }
@@ -147,12 +154,6 @@ final class WebViewManager {
         isDark = false
         #endif
 
-        setTheme(isDark: isDark)
-    }
-
-    /// Explicitly set the WebView theme.
-    @MainActor
-    func setTheme(isDark: Bool) {
         let theme = isDark ? "dark" : "light"
         let js = "window.__nativeBridge?.setTheme('\(theme)')"
         webView?.evaluateJavaScript(js, completionHandler: nil)
@@ -197,16 +198,9 @@ final class WebViewManager {
         webView?.reload()
     }
 
-    /// Tell the web frontend to refresh its data (without a full page reload).
-    @MainActor
-    func refreshData() {
-        let js = "window.__nativeBridge?.refresh()"
-        webView?.evaluateJavaScript(js, completionHandler: nil)
-    }
-
     // MARK: - Teardown
 
-    /// Tear down the current WebView and set up a new one with a different base URL.
+    /// Tear down the current WebView and set up a new one.
     @MainActor
     func teardownAndReload(baseURL: URL) async {
         isLoaded = false
@@ -222,15 +216,7 @@ final class WebViewManager {
         await setup(baseURL: baseURL)
     }
 
-    // MARK: - Evaluate JavaScript
-
-    /// Convenience for running arbitrary JS in the WebView.
-    @MainActor
-    func evaluateJS(_ js: String) {
-        webView?.evaluateJavaScript(js, completionHandler: nil)
-    }
-
-    // MARK: - Delegate Callbacks (called by WebViewNavigationDelegate)
+    // MARK: - Delegate Callbacks (called by TabWebViewNavigationDelegate)
 
     @MainActor
     func handleDidFinishNavigation() {
@@ -245,68 +231,63 @@ final class WebViewManager {
         // during the initial React mount, so we re-trigger after page load.
         let js = "window.__nativeBridge?.recheckAuth()"
         webView?.evaluateJavaScript(js, completionHandler: nil)
-
-        // Navigate to the desired path if it was set before load completed
-        if currentPath != "/" {
-            navigateTo(path: currentPath)
-        }
     }
 
     @MainActor
     func handleNavigationFailed(error: Error) {
         loadError = error
-        print("[WebViewManager] Navigation failed: \(error.localizedDescription)")
+        print("[TabWebViewModel:\(route)] Navigation failed: \(error.localizedDescription)")
     }
 
     @MainActor
     func handleProvisionalNavigationFailed(error: Error) {
         isLoaded = false
         loadError = error
-        print("[WebViewManager] Provisional navigation failed: \(error.localizedDescription)")
+        print("[TabWebViewModel:\(route)] Provisional navigation failed: \(error.localizedDescription)")
     }
 
     @MainActor
     func handleProcessTerminated(webView: WKWebView) {
-        print("[WebViewManager] WebView process terminated, reloading...")
+        print("[TabWebViewModel:\(route)] WebView process terminated, reloading...")
         isLoaded = false
         webView.reload()
     }
 }
 
-// MARK: - WebViewNavigationDelegate
+// MARK: - TabWebViewNavigationDelegate
 
 /// Separate NSObject subclass for WKNavigationDelegate conformance.
-/// Delegates all callbacks to the @Observable WebViewManager.
-private class WebViewNavigationDelegate: NSObject, WKNavigationDelegate {
+/// Delegates all callbacks to the @Observable TabWebViewModel.
+private class TabWebViewNavigationDelegate: NSObject, WKNavigationDelegate {
 
-    weak var manager: WebViewManager?
+    weak var viewModel: TabWebViewModel?
 
-    init(manager: WebViewManager) {
-        self.manager = manager
+    init(viewModel: TabWebViewModel) {
+        self.viewModel = viewModel
         super.init()
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         Task { @MainActor in
-            manager?.handleDidFinishNavigation()
+            viewModel?.handleDidFinishNavigation()
         }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         Task { @MainActor in
-            manager?.handleNavigationFailed(error: error)
+            viewModel?.handleNavigationFailed(error: error)
         }
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         Task { @MainActor in
-            manager?.handleProvisionalNavigationFailed(error: error)
+            viewModel?.handleProvisionalNavigationFailed(error: error)
         }
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         Task { @MainActor in
-            manager?.handleProcessTerminated(webView: webView)
+            viewModel?.handleProcessTerminated(webView: webView)
         }
     }
 }
