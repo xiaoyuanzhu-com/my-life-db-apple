@@ -10,7 +10,7 @@
 import SwiftUI
 
 struct ShareView: View {
-    let viewModel: ShareViewModel
+    @Bindable var viewModel: ShareViewModel
     let onDismiss: () -> Void
 
     var body: some View {
