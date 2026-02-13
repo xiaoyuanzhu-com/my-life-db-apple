@@ -19,10 +19,17 @@ struct ClaudeSession: Codable, Identifiable {
     let isSidechain: Bool
     let isActive: Bool
     let status: String        // "active", "archived", "dead"
-    let isHidden: Bool
+    var isHidden: Bool
     let processId: Int?
     let clients: Int?
     let git: ClaudeSessionGitInfo?
+
+    /// Returns a copy with the hidden state changed
+    func withHidden(_ hidden: Bool) -> ClaudeSession {
+        var copy = self
+        copy.isHidden = hidden
+        return copy
+    }
 }
 
 /// Git repository info for a Claude session

@@ -18,6 +18,24 @@ struct ClaudeSessionListView: View {
     @State private var error: Error?
     @State private var hasMore = false
     @State private var nextCursor: String?
+    @State private var statusFilter: StatusFilter = .active
+
+    enum StatusFilter: String, CaseIterable {
+        case active
+        case all
+        case hidden
+
+        var label: String {
+            switch self {
+            case .active: "Active"
+            case .all: "All"
+            case .hidden: "Hidden"
+            }
+        }
+
+        /// API query parameter value
+        var apiValue: String { rawValue }
+    }
 
     var body: some View {
         NavigationStack {
@@ -43,12 +61,23 @@ struct ClaudeSessionListView: View {
                     }
                     .disabled(isLoading)
                 }
+                ToolbarItem(placement: .automatic) {
+                    Picker("Filter", selection: $statusFilter) {
+                        ForEach(StatusFilter.allCases, id: \.self) { filter in
+                            Text(filter.label).tag(filter)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
             }
         }
         .task {
             if sessions.isEmpty {
                 await fetchSessions()
             }
+        }
+        .onChange(of: statusFilter) {
+            Task { await refresh() }
         }
     }
 
@@ -61,6 +90,40 @@ struct ClaudeSessionListView: View {
                     ClaudeSessionDetailView(session: session, claudeVM: claudeVM)
                 } label: {
                     SessionRow(session: session)
+                }
+                #if os(iOS)
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    if session.isHidden {
+                        Button {
+                            Task { await unhideSession(session) }
+                        } label: {
+                            Label("Unhide", systemImage: "eye")
+                        }
+                        .tint(.blue)
+                    } else {
+                        Button {
+                            Task { await hideSession(session) }
+                        } label: {
+                            Label("Hide", systemImage: "eye.slash")
+                        }
+                        .tint(.orange)
+                    }
+                }
+                #endif
+                .contextMenu {
+                    if session.isHidden {
+                        Button {
+                            Task { await unhideSession(session) }
+                        } label: {
+                            Label("Unhide", systemImage: "eye")
+                        }
+                    } else {
+                        Button {
+                            Task { await hideSession(session) }
+                        } label: {
+                            Label("Hide", systemImage: "eye.slash")
+                        }
+                    }
                 }
             }
 
@@ -129,7 +192,9 @@ struct ClaudeSessionListView: View {
         error = nil
 
         do {
-            let response = try await APIClient.shared.claude.listAll()
+            let response = try await APIClient.shared.claude.listAll(
+                status: statusFilter.apiValue
+            )
             sessions = response.sessions
             hasMore = response.pagination.hasMore
             nextCursor = response.pagination.nextCursor
@@ -145,7 +210,9 @@ struct ClaudeSessionListView: View {
         hasMore = false
 
         do {
-            let response = try await APIClient.shared.claude.listAll()
+            let response = try await APIClient.shared.claude.listAll(
+                status: statusFilter.apiValue
+            )
             sessions = response.sessions
             hasMore = response.pagination.hasMore
             nextCursor = response.pagination.nextCursor
@@ -160,7 +227,10 @@ struct ClaudeSessionListView: View {
         isLoading = true
 
         do {
-            let response = try await APIClient.shared.claude.listAll(cursor: cursor)
+            let response = try await APIClient.shared.claude.listAll(
+                cursor: cursor,
+                status: statusFilter.apiValue
+            )
             sessions.append(contentsOf: response.sessions)
             hasMore = response.pagination.hasMore
             nextCursor = response.pagination.nextCursor
@@ -170,6 +240,54 @@ struct ClaudeSessionListView: View {
         }
 
         isLoading = false
+    }
+
+    // MARK: - Hide / Unhide
+
+    private func hideSession(_ session: ClaudeSession) async {
+        // Optimistic update
+        if let index = sessions.firstIndex(where: { $0.id == session.id }) {
+            withAnimation {
+                if statusFilter == .active {
+                    // Remove from list when viewing active sessions
+                    sessions.remove(at: index)
+                } else {
+                    // Update in-place when viewing all/hidden
+                    sessions[index] = session.withHidden(true)
+                }
+            }
+        }
+
+        do {
+            try await APIClient.shared.claude.hide(sessionId: session.id)
+        } catch {
+            // Revert on failure
+            print("[ClaudeSessionListView] Hide failed: \(error)")
+            await refresh()
+        }
+    }
+
+    private func unhideSession(_ session: ClaudeSession) async {
+        // Optimistic update
+        if let index = sessions.firstIndex(where: { $0.id == session.id }) {
+            withAnimation {
+                if statusFilter == .hidden {
+                    // Remove from list when viewing hidden sessions
+                    sessions.remove(at: index)
+                } else {
+                    // Update in-place when viewing all/active
+                    sessions[index] = session.withHidden(false)
+                }
+            }
+        }
+
+        do {
+            try await APIClient.shared.claude.unhide(sessionId: session.id)
+        } catch {
+            // Revert on failure
+            print("[ClaudeSessionListView] Unhide failed: \(error)")
+            await refresh()
+        }
     }
 }
 
@@ -188,9 +306,17 @@ private struct SessionRow: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 // Title
-                Text(session.title)
-                    .font(.body)
-                    .lineLimit(2)
+                HStack(spacing: 6) {
+                    Text(session.title)
+                        .font(.body)
+                        .lineLimit(2)
+
+                    if session.isHidden {
+                        Image(systemName: "eye.slash")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
 
                 // Subtitle: working dir + metadata
                 HStack(spacing: 6) {
@@ -234,6 +360,7 @@ private struct SessionRow: View {
             Spacer()
         }
         .padding(.vertical, 4)
+        .opacity(session.isHidden ? 0.6 : 1.0)
     }
 
     private var statusColor: Color {
