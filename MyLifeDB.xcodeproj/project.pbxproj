@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		AA000003AAAA00010032BA9F /* MyLifeDBShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA000004AAAA00010032BA9F /* MyLifeDBShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		13D394962EE7C5620032BA9F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -50,10 +54,6 @@
 		13D3949F2EE7C5620032BA9F /* MyLifeDBUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MyLifeDBUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA000004AAAA00010032BA9F /* MyLifeDBShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MyLifeDBShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
-
-/* Begin PBXBuildFile section */
-		AA000003AAAA00010032BA9F /* MyLifeDBShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA000004AAAA00010032BA9F /* MyLifeDBShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-/* End PBXBuildFile section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
 		13D39500AAAA00010032BA9F /* Exceptions for "MyLifeDB" folder in "MyLifeDB" target */ = {
@@ -248,8 +248,8 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				AA000007AAAA00010032BA9F /* MyLifeDBShareExtension */,
 				AA000006AAAA00010032BA9F /* Shared */,
+				AA000007AAAA00010032BA9F /* MyLifeDBShareExtension */,
 			);
 			name = MyLifeDBShareExtension;
 			packageProductDependencies = (
