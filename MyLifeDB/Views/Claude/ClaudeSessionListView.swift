@@ -296,48 +296,28 @@ private struct SessionRow: View {
     let session: ClaudeSession
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            // Title
-            HStack(spacing: 6) {
-                Text(session.title)
-                    .font(.body)
-                    .lineLimit(1)
+        HStack {
+            Text(session.title)
+                .lineLimit(1)
 
-                if session.isArchived {
-                    Image(systemName: "archivebox")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-            }
+            Spacer()
 
-            // Meta: project · branch · msgs · time
-            HStack(spacing: 4) {
-                if let projectName = session.workingDir.split(separator: "/").last {
-                    Text(String(projectName))
-                }
-
-                if let git = session.git, let branch = git.branch {
-                    Text("·")
-                        .foregroundStyle(.quaternary)
-                    Text(branch)
-                }
-
-                if session.messageCount > 0 {
-                    Text("·")
-                        .foregroundStyle(.quaternary)
-                    Text("\(session.messageCount) msgs")
-                }
-
-                Text("·")
-                    .foregroundStyle(.quaternary)
-                Text(session.lastActivity, style: .relative)
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
+            Text(shortRelativeTime(session.lastActivity))
+                .foregroundStyle(.secondary)
+                .font(.callout)
         }
-        .padding(.vertical, 2)
         .opacity(session.isArchived ? 0.6 : 1.0)
+    }
+
+    private func shortRelativeTime(_ date: Date) -> String {
+        let seconds = Int(Date().timeIntervalSince(date))
+        if seconds < 60 { return "\(seconds)s" }
+        let minutes = seconds / 60
+        if minutes < 60 { return "\(minutes)m" }
+        let hours = minutes / 60
+        if hours < 24 { return "\(hours)h" }
+        let days = hours / 24
+        return "\(days)d"
     }
 }
 
