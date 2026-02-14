@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AA000003AAAA00010032BA9F /* MyLifeDBShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA000004AAAA00010032BA9F /* MyLifeDBShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		AA000003AAAA00010032BA9F /* MyLifeDBShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA000004AAAA00010032BA9F /* MyLifeDBShareExtension.appex */; platformFilters = (ios, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -381,6 +381,7 @@
 		};
 		AA000009AAAA00010032BA9F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilters = (ios, );
 			target = AA000010AAAA00010032BA9F /* MyLifeDBShareExtension */;
 			targetProxy = AA000001AAAA00010032BA9F /* PBXContainerItemProxy */;
 		};
