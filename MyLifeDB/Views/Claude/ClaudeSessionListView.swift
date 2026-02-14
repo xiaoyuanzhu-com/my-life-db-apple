@@ -225,9 +225,7 @@ struct ClaudeSessionListView: View {
     private func archiveSession(_ session: ClaudeSession) async {
         // Optimistic update — remove from list (always showing active)
         if let index = sessions.firstIndex(where: { $0.id == session.id }) {
-            withAnimation {
-                sessions.remove(at: index)
-            }
+            sessions.remove(at: index)
         }
 
         do {
@@ -242,9 +240,7 @@ struct ClaudeSessionListView: View {
     private func unarchiveSession(_ session: ClaudeSession) async {
         // Optimistic update
         if let index = sessions.firstIndex(where: { $0.id == session.id }) {
-            withAnimation {
-                sessions[index] = session.withStatus("active")
-            }
+            sessions[index] = session.withStatus("active")
         }
 
         do {
