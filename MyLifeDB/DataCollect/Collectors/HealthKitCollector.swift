@@ -126,6 +126,7 @@ final class HealthKitCollector: DataCollector {
         case .dietaryWater:                  return .liter()
         case .dietaryCaffeine:               return .gramUnit(with: .milli)
         case .dietaryEnergyConsumed:         return .kilocalorie()
+        case .appleSleepingWristTemperature: return .degreeCelsius()
         default:                             return .count()
         }
     }
