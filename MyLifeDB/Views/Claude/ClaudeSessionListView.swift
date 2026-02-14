@@ -30,16 +30,6 @@ struct ClaudeSessionListView: View {
                     sessionList
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .automatic) {
-                    Button {
-                        Task { await refresh() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .disabled(isLoading)
-                }
-            }
             .navigationDestination(for: ClaudeSession.self) { session in
                 ClaudeSessionDetailView(session: session, claudeVM: claudeVM)
             }
