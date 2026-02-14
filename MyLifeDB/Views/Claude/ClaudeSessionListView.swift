@@ -63,48 +63,52 @@ struct ClaudeSessionListView: View {
 
     // MARK: - Session List
 
+    private var groupedSessions: [(title: String, sessions: [ClaudeSession])] {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfToday = calendar.startOfDay(for: now)
+
+        guard let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday),
+              let startOfWeek = calendar.date(byAdding: .day, value: -7, to: startOfToday),
+              let startOfMonth = calendar.date(byAdding: .month, value: -1, to: startOfToday)
+        else { return [("All", sessions)] }
+
+        var today: [ClaudeSession] = []
+        var yesterday: [ClaudeSession] = []
+        var pastWeek: [ClaudeSession] = []
+        var pastMonth: [ClaudeSession] = []
+        var earlier: [ClaudeSession] = []
+
+        for session in sessions {
+            let date = session.lastActivity
+            if date >= startOfToday {
+                today.append(session)
+            } else if date >= startOfYesterday {
+                yesterday.append(session)
+            } else if date >= startOfWeek {
+                pastWeek.append(session)
+            } else if date >= startOfMonth {
+                pastMonth.append(session)
+            } else {
+                earlier.append(session)
+            }
+        }
+
+        var result: [(String, [ClaudeSession])] = []
+        if !today.isEmpty { result.append(("Today", today)) }
+        if !yesterday.isEmpty { result.append(("Yesterday", yesterday)) }
+        if !pastWeek.isEmpty { result.append(("Past Week", pastWeek)) }
+        if !pastMonth.isEmpty { result.append(("Past Month", pastMonth)) }
+        if !earlier.isEmpty { result.append(("Earlier", earlier)) }
+        return result
+    }
+
     private var sessionList: some View {
         List {
-            ForEach(sessions) { session in
-                Button {
-                    selectedSession = session
-                } label: {
-                    SessionRow(session: session)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                #if os(iOS)
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    if session.isArchived {
-                        Button {
-                            Task { await unarchiveSession(session) }
-                        } label: {
-                            Label("Unarchive", systemImage: "tray.and.arrow.up")
-                        }
-                        .tint(.blue)
-                    } else {
-                        Button {
-                            Task { await archiveSession(session) }
-                        } label: {
-                            Label("Archive", systemImage: "archivebox")
-                        }
-                        .tint(.orange)
-                    }
-                }
-                #endif
-                .contextMenu {
-                    if session.isArchived {
-                        Button {
-                            Task { await unarchiveSession(session) }
-                        } label: {
-                            Label("Unarchive", systemImage: "tray.and.arrow.up")
-                        }
-                    } else {
-                        Button {
-                            Task { await archiveSession(session) }
-                        } label: {
-                            Label("Archive", systemImage: "archivebox")
-                        }
+            ForEach(groupedSessions, id: \.title) { group in
+                Section(group.title) {
+                    ForEach(group.sessions) { session in
+                        sessionButton(session)
                     }
                 }
             }
@@ -124,6 +128,50 @@ struct ClaudeSessionListView: View {
         .listStyle(.plain)
         .refreshable {
             await refresh()
+        }
+    }
+
+    private func sessionButton(_ session: ClaudeSession) -> some View {
+        Button {
+            selectedSession = session
+        } label: {
+            SessionRow(session: session)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        #if os(iOS)
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            if session.isArchived {
+                Button {
+                    Task { await unarchiveSession(session) }
+                } label: {
+                    Label("Unarchive", systemImage: "tray.and.arrow.up")
+                }
+                .tint(.blue)
+            } else {
+                Button {
+                    Task { await archiveSession(session) }
+                } label: {
+                    Label("Archive", systemImage: "archivebox")
+                }
+                .tint(.orange)
+            }
+        }
+        #endif
+        .contextMenu {
+            if session.isArchived {
+                Button {
+                    Task { await unarchiveSession(session) }
+                } label: {
+                    Label("Unarchive", systemImage: "tray.and.arrow.up")
+                }
+            } else {
+                Button {
+                    Task { await archiveSession(session) }
+                } label: {
+                    Label("Archive", systemImage: "archivebox")
+                }
+            }
         }
     }
 
