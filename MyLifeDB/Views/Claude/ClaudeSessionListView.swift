@@ -18,24 +18,6 @@ struct ClaudeSessionListView: View {
     @State private var error: Error?
     @State private var hasMore = false
     @State private var nextCursor: String?
-    @State private var statusFilter: StatusFilter = .active
-
-    enum StatusFilter: String, CaseIterable {
-        case active
-        case all
-        case archived
-
-        var label: String {
-            switch self {
-            case .active: "Active"
-            case .all: "All"
-            case .archived: "Archived"
-            }
-        }
-
-        /// API query parameter value
-        var apiValue: String { rawValue }
-    }
 
     var body: some View {
         NavigationStack {
@@ -48,10 +30,6 @@ struct ClaudeSessionListView: View {
                     sessionList
                 }
             }
-            .navigationTitle("Claude")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.large)
-            #endif
             .toolbar {
                 ToolbarItem(placement: .automatic) {
                     Button {
@@ -61,23 +39,12 @@ struct ClaudeSessionListView: View {
                     }
                     .disabled(isLoading)
                 }
-                ToolbarItem(placement: .automatic) {
-                    Picker("Filter", selection: $statusFilter) {
-                        ForEach(StatusFilter.allCases, id: \.self) { filter in
-                            Text(filter.label).tag(filter)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
             }
         }
         .task {
             if sessions.isEmpty {
                 await fetchSessions()
             }
-        }
-        .onChange(of: statusFilter) {
-            Task { await refresh() }
         }
     }
 
@@ -139,11 +106,7 @@ struct ClaudeSessionListView: View {
                 .listRowSeparator(.hidden)
             }
         }
-        #if os(iOS)
-        .listStyle(.insetGrouped)
-        #else
-        .listStyle(.sidebar)
-        #endif
+        .listStyle(.plain)
         .refreshable {
             await refresh()
         }
@@ -193,7 +156,7 @@ struct ClaudeSessionListView: View {
 
         do {
             let response = try await APIClient.shared.claude.listAll(
-                status: statusFilter.apiValue
+                status: "active"
             )
             sessions = response.sessions
             hasMore = response.pagination.hasMore
@@ -211,7 +174,7 @@ struct ClaudeSessionListView: View {
 
         do {
             let response = try await APIClient.shared.claude.listAll(
-                status: statusFilter.apiValue
+                status: "active"
             )
             sessions = response.sessions
             hasMore = response.pagination.hasMore
@@ -229,7 +192,7 @@ struct ClaudeSessionListView: View {
         do {
             let response = try await APIClient.shared.claude.listAll(
                 cursor: cursor,
-                status: statusFilter.apiValue
+                status: "active"
             )
             sessions.append(contentsOf: response.sessions)
             hasMore = response.pagination.hasMore
@@ -245,16 +208,10 @@ struct ClaudeSessionListView: View {
     // MARK: - Archive / Unarchive
 
     private func archiveSession(_ session: ClaudeSession) async {
-        // Optimistic update
+        // Optimistic update — remove from list (always showing active)
         if let index = sessions.firstIndex(where: { $0.id == session.id }) {
             withAnimation {
-                if statusFilter == .active {
-                    // Remove from list when viewing active sessions
-                    sessions.remove(at: index)
-                } else {
-                    // Update in-place when viewing all/archived
-                    sessions[index] = session.withStatus("archived")
-                }
+                sessions.remove(at: index)
             }
         }
 
@@ -271,13 +228,7 @@ struct ClaudeSessionListView: View {
         // Optimistic update
         if let index = sessions.firstIndex(where: { $0.id == session.id }) {
             withAnimation {
-                if statusFilter == .archived {
-                    // Remove from list when viewing archived sessions
-                    sessions.remove(at: index)
-                } else {
-                    // Update in-place when viewing all/active
-                    sessions[index] = session.withStatus("active")
-                }
+                sessions[index] = session.withStatus("active")
             }
         }
 
