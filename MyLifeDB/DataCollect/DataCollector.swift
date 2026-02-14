@@ -39,8 +39,8 @@ protocol DataCollector {
 
     /// Collect new samples since the last anchor, grouped by day.
     /// Only collects data for enabled sources.
-    /// Returns an array of DaySamples, each representing one day's data.
-    func collectNewSamples() async throws -> [DaySamples]
+    /// Returns a CollectionResult with batches and stats about what was collected.
+    func collectNewSamples() async throws -> CollectionResult
 
     /// Advance the anchor after successful upload of a batch.
     /// Called by SyncManager ONLY after the upload succeeds.

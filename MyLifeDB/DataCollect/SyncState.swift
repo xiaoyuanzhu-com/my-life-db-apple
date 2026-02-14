@@ -48,3 +48,21 @@ struct SyncError: Equatable {
         lhs.failures == rhs.failures
     }
 }
+
+/// Detailed breakdown of what happened during a sync cycle
+struct SyncDetail: Equatable {
+    /// Total raw samples collected across all collectors
+    let samplesCollected: Int
+    /// Number of framework data types queried
+    let typesQueried: Int
+    /// Number of types that returned data
+    let typesWithData: Int
+    /// Number of files uploaded to the server
+    let filesUploaded: Int
+    /// Number of upload failures
+    let filesFailed: Int
+    /// Number of collectors that had enabled sources
+    let collectorsRun: Int
+    /// Whether HealthKit authorization was requested during this sync
+    let authorizationRequested: Bool
+}

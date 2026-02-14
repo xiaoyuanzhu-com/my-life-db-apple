@@ -36,6 +36,9 @@ final class SyncManager {
     /// Result of the last sync cycle (nil if never synced)
     private(set) var lastSyncResult: SyncResult?
 
+    /// Detailed breakdown of the last sync cycle
+    private(set) var lastSyncDetail: SyncDetail?
+
     // MARK: - Configuration
 
     /// Minimum interval between syncs (seconds)
@@ -155,10 +158,17 @@ final class SyncManager {
 
         var uploadedCount = 0
         var failures: [String: String] = [:]
+        var collectorsRun = 0
+        var totalSamplesCollected = 0
+        var totalTypesQueried = 0
+        var totalTypesWithData = 0
+        var authorizationRequested = false
 
         for collector in collectors {
             // Skip collectors with no enabled sources
             guard collector.hasEnabledSources else { continue }
+
+            collectorsRun += 1
 
             // Check for cancellation
             guard !Task.isCancelled else {
@@ -169,6 +179,7 @@ final class SyncManager {
             // Request authorization if needed
             let authStatus = collector.authorizationStatus()
             if authStatus == .notDetermined {
+                authorizationRequested = true
                 let granted = await collector.requestAuthorization()
                 if !granted {
                     failures[collector.id] = "Permission denied"
@@ -181,14 +192,21 @@ final class SyncManager {
                 continue
             } else if authStatus == .unavailable {
                 // Silently skip unavailable collectors
+                collectorsRun -= 1
                 continue
             }
 
             collectorStates[collector.id] = .collecting
 
             do {
-                // 1. Collect new samples
-                let batches = try await collector.collectNewSamples()
+                // 1. Collect new samples (now returns CollectionResult with stats)
+                let result = try await collector.collectNewSamples()
+                let batches = result.batches
+
+                // Accumulate stats
+                totalSamplesCollected += result.stats.samplesCollected
+                totalTypesQueried += result.stats.typesQueried
+                totalTypesWithData += result.stats.typesWithData
 
                 guard !batches.isEmpty else {
                     collectorStates[collector.id] = .idle
@@ -248,8 +266,19 @@ final class SyncManager {
         lastSyncDate = Date()
         UserDefaults.standard.set(lastSyncDate, forKey: "sync.lastSyncDate")
 
-        // Determine sync result
+        // Build detailed sync breakdown
         let errorCount = failures.count
+        lastSyncDetail = SyncDetail(
+            samplesCollected: totalSamplesCollected,
+            typesQueried: totalTypesQueried,
+            typesWithData: totalTypesWithData,
+            filesUploaded: uploadedCount,
+            filesFailed: errorCount,
+            collectorsRun: collectorsRun,
+            authorizationRequested: authorizationRequested
+        )
+
+        // Determine sync result
         if uploadedCount > 0 && errorCount == 0 {
             lastSyncResult = .success(fileCount: uploadedCount)
         } else if uploadedCount > 0 && errorCount > 0 {

@@ -316,6 +316,11 @@ struct DataCollectView: View {
                     .disabled(syncManager.state == .syncing)
                 }
 
+                // Detailed sync breakdown
+                if let detail = syncManager.lastSyncDetail, syncManager.state != .syncing {
+                    syncDetailView(detail)
+                }
+
                 if let error = syncManager.lastError {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -379,8 +384,17 @@ extension DataCollectView {
         switch syncManager.lastSyncResult {
         case .success(let fileCount):
             let files = fileCount == 1 ? "1 file" : "\(fileCount) files"
+            if let detail = syncManager.lastSyncDetail, detail.samplesCollected > 0 {
+                return "Synced \(files) (\(detail.samplesCollected) samples) \u{00B7} \(timeAgo)"
+            }
             return "Synced \(files) \u{00B7} \(timeAgo)"
         case .noNewData:
+            if let detail = syncManager.lastSyncDetail {
+                if detail.typesQueried == 0 {
+                    return "No data types to query \u{00B7} \(timeAgo)"
+                }
+                return "No new data \u{00B7} queried \(detail.typesQueried) types \u{00B7} \(timeAgo)"
+            }
             return "Up to date \u{00B7} \(timeAgo)"
         case .partial(let uploaded, let failed):
             let files = uploaded == 1 ? "1 file" : "\(uploaded) files"
@@ -390,6 +404,42 @@ extension DataCollectView {
             return "Sync failed \u{00B7} \(timeAgo)"
         case nil:
             return "Last sync: \(timeAgo)"
+        }
+    }
+
+    @ViewBuilder
+    func syncDetailView(_ detail: SyncDetail) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // Authorization notice
+            if detail.authorizationRequested {
+                HStack(spacing: 4) {
+                    Image(systemName: "hand.raised.fill")
+                        .foregroundStyle(.blue)
+                    Text("Health permissions requested")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            // Data collection summary
+            HStack(spacing: 12) {
+                Label("\(detail.typesQueried) types", systemImage: "list.bullet")
+                Label("\(detail.samplesCollected) samples", systemImage: "waveform.path")
+                Label("\(detail.filesUploaded) files", systemImage: "arrow.up.doc")
+            }
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+
+            // Warning if we queried types but got no data
+            if detail.typesQueried > 0 && detail.typesWithData == 0 && detail.samplesCollected == 0 {
+                HStack(spacing: 4) {
+                    Image(systemName: "info.circle.fill")
+                        .foregroundStyle(.orange)
+                    Text("Queried \(detail.typesQueried) data types but found 0 samples. Check that Health permissions are granted in Settings → Privacy → Health.")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
         }
     }
 }

@@ -132,6 +132,9 @@ final class HealthKitCollector: DataCollector {
 
     // MARK: - Authorization
 
+    /// UserDefaults key tracking which HK type identifiers we've already requested auth for.
+    private let authorizedTypesKey = "sync.healthkit.authorizedTypes"
+
     func requestAuthorization() async -> Bool {
         guard HKHealthStore.isHealthDataAvailable() else { return false }
 
@@ -140,6 +143,14 @@ final class HealthKitCollector: DataCollector {
 
         do {
             try await store.requestAuthorization(toShare: [], read: readTypes)
+            // Accumulate type identifiers we've requested auth for
+            // (merge with previously authorized types, don't replace)
+            let previouslyAuthorized = Set(
+                UserDefaults.standard.stringArray(forKey: authorizedTypesKey) ?? []
+            )
+            let newTypeIDs = Set(readTypes.map { $0.identifier })
+            let allAuthorized = Array(previouslyAuthorized.union(newTypeIDs))
+            UserDefaults.standard.set(allAuthorized, forKey: authorizedTypesKey)
             return true
         } catch {
             return false
@@ -150,17 +161,34 @@ final class HealthKitCollector: DataCollector {
         guard HKHealthStore.isHealthDataAvailable() else {
             return .unavailable
         }
-        // HealthKit doesn't expose a single global status.
-        // If we haven't asked yet, return .notDetermined so SyncManager prompts.
-        // After prompting, Apple always returns .notDetermined for read types
-        // (privacy: apps can't know if read access was denied).
-        // We treat this as "authorized" and let queries return empty if denied.
+        // HealthKit doesn't expose read authorization status (privacy policy).
+        // We track which types we've previously requested auth for.
+        // If there are new types we haven't requested yet, return .notDetermined
+        // so SyncManager will prompt the user.
+        let previouslyAuthorized = Set(
+            UserDefaults.standard.stringArray(forKey: authorizedTypesKey) ?? []
+        )
+
+        // If we've never requested auth at all, always prompt
+        if previouslyAuthorized.isEmpty {
+            return .notDetermined
+        }
+
+        // Check if current enabled sources need any types we haven't requested yet
+        let currentTypes = allHKTypes(for: enabledSourceIDs)
+        let currentTypeIDs = Set(currentTypes.map { $0.identifier })
+        let newTypes = currentTypeIDs.subtracting(previouslyAuthorized)
+
+        if !newTypes.isEmpty {
+            return .notDetermined
+        }
+
         return .authorized
     }
 
     // MARK: - Data Collection
 
-    func collectNewSamples() async throws -> [DaySamples] {
+    func collectNewSamples() async throws -> CollectionResult {
         guard HKHealthStore.isHealthDataAvailable() else {
             throw CollectorError.frameworkUnavailable("HealthKit is not available on this device")
         }
@@ -177,13 +205,17 @@ final class HealthKitCollector: DataCollector {
         let anchorDate = loadAnchorDate()
             ?? Calendar.current.date(byAdding: .day, value: -initialLookbackDays, to: Date())!
 
-        // Query each type and collect raw samples
+        // Query each type and collect raw samples, tracking stats
         var allRawSamples: [RawHealthSample] = []
+        var typesWithData = 0
 
         for type in typesToQuery {
             do {
                 let samples = try await querySamples(type: type, since: anchorDate)
                 let rawSamples = samples.compactMap { encodeSample($0) }
+                if !rawSamples.isEmpty {
+                    typesWithData += 1
+                }
                 allRawSamples.append(contentsOf: rawSamples)
             } catch {
                 // Per-query failure: log and continue with other types
@@ -191,8 +223,14 @@ final class HealthKitCollector: DataCollector {
             }
         }
 
+        let stats = CollectionStats(
+            typesQueried: typesToQuery.count,
+            typesWithData: typesWithData,
+            samplesCollected: allRawSamples.count
+        )
+
         guard !allRawSamples.isEmpty else {
-            return []
+            return CollectionResult(batches: [], stats: stats)
         }
 
         // Group samples by startDate's calendar day
@@ -211,7 +249,7 @@ final class HealthKitCollector: DataCollector {
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.sortedKeys]
 
-        var result: [DaySamples] = []
+        var batches: [DaySamples] = []
 
         for (dayString, samples) in grouped.sorted(by: { $0.key < $1.key }) {
             let sorted = samples.sorted { $0.start < $1.start }
@@ -233,7 +271,7 @@ final class HealthKitCollector: DataCollector {
 
             let dayDate = dayDateFormatter.date(from: dayString) ?? Date()
 
-            result.append(DaySamples(
+            batches.append(DaySamples(
                 date: dayDate,
                 collectorID: id,
                 uploadPath: uploadPath,
@@ -242,7 +280,7 @@ final class HealthKitCollector: DataCollector {
             ))
         }
 
-        return result
+        return CollectionResult(batches: batches, stats: stats)
     }
 
     func commitAnchor(for batch: DaySamples) async {

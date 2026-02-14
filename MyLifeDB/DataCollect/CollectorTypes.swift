@@ -28,6 +28,24 @@ struct DaySamples {
     let anchorToken: Any?
 }
 
+/// Statistics from a data collection run, reported alongside batches.
+struct CollectionStats: Equatable {
+    /// Number of framework types queried (e.g., HK sample types)
+    let typesQueried: Int
+    /// Number of types that returned at least one sample
+    let typesWithData: Int
+    /// Total number of raw samples collected across all types
+    let samplesCollected: Int
+}
+
+/// Result of a collector's `collectNewSamples()` call.
+struct CollectionResult {
+    /// The day-grouped batches ready for upload
+    let batches: [DaySamples]
+    /// Statistics about what was collected
+    let stats: CollectionStats
+}
+
 /// Errors specific to data collection
 enum CollectorError: LocalizedError {
 
