@@ -170,6 +170,21 @@ final class TabWebViewModel {
         }
     }
 
+    /// Load a path directly via URL (full page load). Use when JS bridge
+    /// navigation may not work (e.g. WebPage not attached to a view).
+    @MainActor
+    func loadPath(_ path: String) {
+        guard let baseURL else { return }
+        let url: URL
+        if path == "/" {
+            url = baseURL
+        } else {
+            url = baseURL.appendingPathComponent(path)
+        }
+        bridgeInjected = false
+        webPage.load(URLRequest(url: url))
+    }
+
     // MARK: - Theme Sync
 
     /// Push the current system appearance to the WebView.

@@ -33,7 +33,9 @@ struct ClaudeSessionListView: View {
                 }
             }
             .navigationTitle("Sessions")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .navigationDestination(item: $selectedSession) { session in
                 ClaudeSessionDetailView(session: session, claudeVM: claudeVM)
             }
@@ -44,7 +46,7 @@ struct ClaudeSessionListView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         selectedSession = nil
-                        claudeVM.navigateTo(path: "/claude")
+                        claudeVM.loadPath("/claude")
                         showNewSession = true
                     } label: {
                         Image(systemName: "plus")
@@ -285,9 +287,6 @@ private struct NewClaudeSessionView: View {
         #else
         .navigationTitle("New Session")
         #endif
-        .onAppear {
-            claudeVM.navigateTo(path: "/claude")
-        }
         .onDisappear {
             claudeVM.navigateTo(path: "/claude")
         }

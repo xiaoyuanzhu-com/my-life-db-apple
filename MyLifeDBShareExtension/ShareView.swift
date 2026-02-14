@@ -37,7 +37,9 @@ struct ShareView: View {
                 }
             }
             .navigationTitle("Send to Inbox")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     if viewModel.state != .uploading {
