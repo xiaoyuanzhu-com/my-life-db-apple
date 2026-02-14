@@ -19,6 +19,7 @@ struct ClaudeSessionListView: View {
     @State private var hasMore = false
     @State private var nextCursor: String?
     @State private var showNewSession = false
+    @State private var selectedSession: ClaudeSession?
 
     var body: some View {
         NavigationStack {
@@ -33,7 +34,7 @@ struct ClaudeSessionListView: View {
             }
             .navigationTitle("Sessions")
             .navigationBarTitleDisplayMode(.inline)
-            .navigationDestination(for: ClaudeSession.self) { session in
+            .navigationDestination(item: $selectedSession) { session in
                 ClaudeSessionDetailView(session: session, claudeVM: claudeVM)
             }
             .navigationDestination(isPresented: $showNewSession) {
@@ -61,9 +62,13 @@ struct ClaudeSessionListView: View {
     private var sessionList: some View {
         List {
             ForEach(sessions) { session in
-                NavigationLink(value: session) {
+                Button {
+                    selectedSession = session
+                } label: {
                     SessionRow(session: session)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 #if os(iOS)
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     if session.isArchived {
