@@ -18,6 +18,7 @@ struct ClaudeSessionListView: View {
     @State private var error: Error?
     @State private var hasMore = false
     @State private var nextCursor: String?
+    @State private var showNewSession = false
 
     var body: some View {
         NavigationStack {
@@ -30,8 +31,22 @@ struct ClaudeSessionListView: View {
                     sessionList
                 }
             }
+            .navigationTitle("Sessions")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: ClaudeSession.self) { session in
                 ClaudeSessionDetailView(session: session, claudeVM: claudeVM)
+            }
+            .navigationDestination(isPresented: $showNewSession) {
+                NewClaudeSessionView(claudeVM: claudeVM)
+            }
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showNewSession = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
             }
         }
         .task {
@@ -229,6 +244,45 @@ struct ClaudeSessionListView: View {
             // Revert on failure
             print("[ClaudeSessionListView] Unarchive failed: \(error)")
             await refresh()
+        }
+    }
+}
+
+// MARK: - New Session View
+
+private struct NewClaudeSessionView: View {
+
+    let claudeVM: TabWebViewModel
+
+    var body: some View {
+        ZStack {
+            WebViewContainer(viewModel: claudeVM)
+
+            if !claudeVM.isLoaded {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .controlSize(.large)
+                    Text("Loading...")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.platformBackground)
+            }
+        }
+        #if os(iOS)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
+        #else
+        .navigationTitle("New Session")
+        #endif
+        .onAppear {
+            claudeVM.navigateTo(path: "/claude")
+        }
+        .onDisappear {
+            claudeVM.navigateTo(path: "/claude")
         }
     }
 }
