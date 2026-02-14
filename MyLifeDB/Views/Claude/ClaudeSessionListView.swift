@@ -43,6 +43,8 @@ struct ClaudeSessionListView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
+                        selectedSession = nil
+                        claudeVM.navigateTo(path: "/claude")
                         showNewSession = true
                     } label: {
                         Image(systemName: "plus")
