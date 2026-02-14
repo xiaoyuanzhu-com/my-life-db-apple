@@ -8,7 +8,7 @@
 import Foundation
 
 /// Represents a Claude Code session
-struct ClaudeSession: Codable, Identifiable {
+struct ClaudeSession: Codable, Identifiable, Hashable {
 
     let id: String
     let title: String
@@ -31,7 +31,7 @@ struct ClaudeSession: Codable, Identifiable {
 }
 
 /// Git repository info for a Claude session
-struct ClaudeSessionGitInfo: Codable {
+struct ClaudeSessionGitInfo: Codable, Hashable {
     let isRepo: Bool
     let branch: String?
     let remoteUrl: String?

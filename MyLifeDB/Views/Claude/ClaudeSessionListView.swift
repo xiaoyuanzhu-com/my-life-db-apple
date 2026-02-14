@@ -40,6 +40,9 @@ struct ClaudeSessionListView: View {
                     .disabled(isLoading)
                 }
             }
+            .navigationDestination(for: ClaudeSession.self) { session in
+                ClaudeSessionDetailView(session: session, claudeVM: claudeVM)
+            }
         }
         .task {
             if sessions.isEmpty {
@@ -53,9 +56,7 @@ struct ClaudeSessionListView: View {
     private var sessionList: some View {
         List {
             ForEach(sessions) { session in
-                NavigationLink {
-                    ClaudeSessionDetailView(session: session, claudeVM: claudeVM)
-                } label: {
+                NavigationLink(value: session) {
                     SessionRow(session: session)
                 }
                 #if os(iOS)
