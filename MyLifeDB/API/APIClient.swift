@@ -272,6 +272,56 @@ final class APIClient {
         return try decoder.decode(T.self, from: data)
     }
 
+    // MARK: - Raw Upload
+
+    /// Performs a raw PUT upload (sends raw data with specified Content-Type, not JSON)
+    func uploadRaw<T: Decodable>(
+        path: String,
+        data: Data,
+        contentType: String,
+        allowRetryOn401: Bool = true
+    ) async throws -> T {
+        let components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: true)
+        guard let url = components?.url else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = HTTPMethod.put.rawValue
+        request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        if let token = AuthManager.shared.accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        request.httpBody = data
+
+        let (responseData, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+
+        switch httpResponse.statusCode {
+        case 200...299:
+            return try decoder.decode(T.self, from: responseData)
+        case 401:
+            if allowRetryOn401 {
+                let refreshed = await AuthManager.shared.handleUnauthorized()
+                if refreshed {
+                    return try await self.uploadRaw(
+                        path: path, data: data, contentType: contentType,
+                        allowRetryOn401: false
+                    )
+                }
+            }
+            throw APIError.unauthorized
+        default:
+            throw APIError.serverError(httpResponse.statusCode, parseErrorMessage(from: responseData))
+        }
+    }
+
     // MARK: - Raw File Access
 
     /// Gets raw file data from /raw/*path

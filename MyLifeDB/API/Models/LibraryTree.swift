@@ -108,6 +108,13 @@ struct SuccessResponse: Codable {
     let message: String?
 }
 
+/// Response from PUT /api/upload/simple/*path
+struct SimpleUploadResponse: Codable {
+    let success: Bool
+    let path: String
+    let paths: [String]
+}
+
 // MARK: - Tree API Response Models
 
 /// A node in the tree response from GET /api/library/tree.

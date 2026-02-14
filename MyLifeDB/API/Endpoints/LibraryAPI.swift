@@ -13,6 +13,7 @@
 //  - DELETE /api/library/file       - Delete file/folder
 //  - POST   /api/library/pin        - Pin a file
 //  - DELETE /api/library/pin        - Unpin a file
+//  - PUT    /api/upload/simple/*path - Simple file upload
 //
 
 import Foundation
@@ -94,6 +95,30 @@ struct LibraryAPI {
             path: "/api/library/file",
             method: .delete,
             queryItems: [URLQueryItem(name: "path", value: path)]
+        )
+    }
+
+    // MARK: - Upload Operations
+
+    /// Upload a file to the library using the simple upload endpoint.
+    /// Sends raw file data as body with Content-Type header.
+    /// - Parameters:
+    ///   - data: The raw file data to upload.
+    ///   - filename: The filename (will be sanitized server-side).
+    ///   - destination: The destination folder path (empty string for root).
+    ///   - mimeType: The MIME type of the file.
+    /// - Returns: SuccessResponse with the final path.
+    func simpleUpload(data: Data, filename: String, destination: String, mimeType: String) async throws -> SimpleUploadResponse {
+        let uploadPath: String
+        if destination.isEmpty {
+            uploadPath = "/api/upload/simple/\(filename)"
+        } else {
+            uploadPath = "/api/upload/simple/\(destination)/\(filename)"
+        }
+        return try await client.uploadRaw(
+            path: uploadPath,
+            data: data,
+            contentType: mimeType
         )
     }
 
