@@ -45,39 +45,15 @@ final class ShareViewModel {
 
     // MARK: - Extracted Content
 
-    private(set) var extractedURLs: [URL] = []
-    private(set) var extractedTexts: [String] = []
-    private(set) var extractedFiles: [(filename: String, data: Data, mimeType: String)] = []
+    private(set) var items: [SharedContent] = []
 
     private let apiClient = SharedAPIClient()
     private let extractor = ContentExtractor()
 
     // MARK: - Computed Properties
 
-    /// Preview text shown in the compose view.
-    var contentPreview: String {
-        var parts: [String] = []
-
-        for url in extractedURLs {
-            parts.append(url.absoluteString)
-        }
-        for text in extractedTexts {
-            let preview = String(text.prefix(200))
-            parts.append(preview)
-        }
-        for file in extractedFiles {
-            let sizeStr = ByteCountFormatter.string(
-                fromByteCount: Int64(file.data.count),
-                countStyle: .file
-            )
-            parts.append("\(file.filename) (\(sizeStr))")
-        }
-
-        return parts.joined(separator: "\n")
-    }
-
     var hasContent: Bool {
-        !extractedURLs.isEmpty || !extractedTexts.isEmpty || !extractedFiles.isEmpty
+        !items.isEmpty
     }
 
     // MARK: - Content Extraction
@@ -90,18 +66,7 @@ final class ShareViewModel {
         }
 
         state = .loading
-        let contents = await extractor.extract(from: inputItems)
-
-        for content in contents {
-            switch content {
-            case .url(let url):
-                extractedURLs.append(url)
-            case .text(let text):
-                extractedTexts.append(text)
-            case .fileData(let filename, let data, let mimeType):
-                extractedFiles.append((filename: filename, data: data, mimeType: mimeType))
-            }
-        }
+        items = await extractor.extract(from: inputItems)
 
         if hasContent {
             state = .ready
@@ -124,14 +89,24 @@ final class ShareViewModel {
             textParts.append(trimmedNote)
         }
 
-        // URLs
-        for url in extractedURLs {
-            textParts.append(url.absoluteString)
-        }
+        // Collect URLs and text from items
+        var files: [(filename: String, data: Data, mimeType: String)] = []
 
-        // Extracted text
-        for text in extractedTexts {
-            textParts.append(text)
+        for item in items {
+            switch item.kind {
+            case .url(let url):
+                textParts.append(url.absoluteString)
+            case .text(let text):
+                textParts.append(text)
+            case .imageFile(let filename, let data, let mimeType, _):
+                files.append((filename: filename, data: data, mimeType: mimeType))
+            case .videoFile(let filename, let data, let mimeType, _):
+                files.append((filename: filename, data: data, mimeType: mimeType))
+            case .audioFile(let filename, let data, let mimeType):
+                files.append((filename: filename, data: data, mimeType: mimeType))
+            case .genericFile(let filename, let data, let mimeType, _):
+                files.append((filename: filename, data: data, mimeType: mimeType))
+            }
         }
 
         let combinedText = textParts.isEmpty ? nil : textParts.joined(separator: "\n\n")
@@ -139,7 +114,7 @@ final class ShareViewModel {
         do {
             try await apiClient.uploadToInbox(
                 text: combinedText,
-                files: extractedFiles
+                files: files
             )
             state = .success
         } catch let error as ShareUploadError {
