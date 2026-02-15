@@ -51,8 +51,10 @@ struct InboxSearchView: View {
             }
             .buttonStyle(.plain)
 
-            // Match snippet
-            if !result.snippet.isEmpty {
+            // Match context
+            if let matchContext = result.matchContext, !matchContext.snippet.isEmpty {
+                MatchContextView(context: matchContext)
+            } else if !result.snippet.isEmpty {
                 Text(result.snippet)
                     .font(.caption)
                     .foregroundStyle(.secondary)
