@@ -27,6 +27,6 @@ struct InboxTextCard: View {
                     .italic()
             }
         }
-        .frame(maxWidth: 320, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

@@ -32,6 +32,6 @@ struct InboxFallbackCard: View {
                 .font(.title2)
                 .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: 320)
+        .frame(maxWidth: .infinity)
     }
 }

@@ -28,6 +28,7 @@ struct InboxFeedView: View {
     private let newestAnchorID = "feed-newest"
 
     var body: some View {
+        GeometryReader { geo in
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .trailing, spacing: 16) {
@@ -50,6 +51,7 @@ struct InboxFeedView: View {
                     // Items: newest first (no .reversed() needed)
                     ForEach(items) { item in
                         itemView(for: item)
+                            .frame(maxWidth: geo.size.width * 0.8)
                             .id(item.id)
                             .flippedForChat()
                     }
@@ -77,6 +79,7 @@ struct InboxFeedView: View {
                     proxy.scrollTo(newestAnchorID, anchor: .top)
                 }
             }
+        }
         }
     }
 

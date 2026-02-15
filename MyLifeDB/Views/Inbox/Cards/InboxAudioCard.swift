@@ -26,6 +26,6 @@ struct InboxAudioCard: View {
 
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: 280)
+        .frame(maxWidth: .infinity)
     }
 }

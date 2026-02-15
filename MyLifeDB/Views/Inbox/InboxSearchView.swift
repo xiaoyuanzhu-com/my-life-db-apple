@@ -28,10 +28,12 @@ struct InboxSearchView: View {
     // MARK: - Results List
 
     private var resultsList: some View {
+        GeometryReader { geo in
         ScrollView {
             LazyVStack(alignment: .trailing, spacing: 16) {
                 ForEach(results) { result in
                     resultView(for: result)
+                        .frame(maxWidth: geo.size.width * 0.8)
                         .flippedForChat()
                 }
             }
@@ -39,6 +41,7 @@ struct InboxSearchView: View {
             .padding(.vertical, 8)
         }
         .flippedForChat()
+        }
     }
 
     @ViewBuilder
@@ -59,7 +62,7 @@ struct InboxSearchView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
-                    .frame(maxWidth: 320, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -90,12 +93,12 @@ struct InboxSearchView: View {
             .foregroundStyle(.primary)
             .multilineTextAlignment(.leading)
             .padding(12)
-            .frame(maxWidth: 320, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func imageResultCard(_ result: SearchResultItem) -> some View {
         AuthenticatedImage(path: result.path)
-            .frame(maxWidth: 320, maxHeight: 200)
+            .frame(maxHeight: 200)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .padding(8)
     }
@@ -123,7 +126,7 @@ struct InboxSearchView: View {
             Spacer(minLength: 0)
         }
         .padding(12)
-        .frame(maxWidth: 320)
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - State Views

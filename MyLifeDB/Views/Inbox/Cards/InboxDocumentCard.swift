@@ -32,7 +32,7 @@ struct InboxDocumentCard: View {
                 .font(.title2)
                 .foregroundStyle(documentColor)
         }
-        .frame(maxWidth: 320)
+        .frame(maxWidth: .infinity)
     }
 
     private var documentIcon: String {
