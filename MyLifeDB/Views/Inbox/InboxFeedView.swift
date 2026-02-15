@@ -27,8 +27,17 @@ struct InboxFeedView: View {
 
     private let newestAnchorID = "feed-newest"
 
+    private var maxCardWidth: CGFloat {
+        #if os(iOS) || os(visionOS)
+        let scene = UIApplication.shared.connectedScenes
+            .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+        return (scene?.screen.bounds.width ?? 393) * 0.8
+        #elseif os(macOS)
+        return (NSScreen.main?.frame.width ?? 800) * 0.8
+        #endif
+    }
+
     var body: some View {
-        GeometryReader { geo in
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .trailing, spacing: 16) {
@@ -51,7 +60,7 @@ struct InboxFeedView: View {
                     // Items: newest first (no .reversed() needed)
                     ForEach(items) { item in
                         itemView(for: item)
-                            .frame(maxWidth: geo.size.width * 0.8)
+                            .frame(maxWidth: maxCardWidth)
                             .id(item.id)
                             .flippedForChat()
                     }

@@ -76,7 +76,9 @@ struct InboxFeedContainerView: View {
             }
             .background(.background)
         }
+        #if os(iOS) || os(visionOS)
         .toolbar(.hidden, for: .navigationBar)
+        #endif
         .task {
             await loadInitialData()
             setupSSE()
