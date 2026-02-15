@@ -92,11 +92,7 @@ struct NativeLibraryBrowserView: View {
                         }
                     }
                 )
-                .matchedGeometryEffect(
-                    id: "preview-\(preview.path)",
-                    in: previewNamespace,
-                    isSource: false
-                )
+                .ignoresSafeArea()
                 .transition(.opacity)
                 .zIndex(1)
             }
