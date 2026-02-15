@@ -48,21 +48,22 @@ struct InboxFeedView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .trailing, spacing: 16) {
-                    // Newest anchor (internal top = visual bottom)
-                    Color.clear
-                        .frame(height: 1)
-                        .id(newestAnchorID)
+                    // Newest anchor + pinned bar grouped (visual bottom, closest to input)
+                    VStack(spacing: 0) {
+                        Color.clear
+                            .frame(height: 1)
+                            .id(newestAnchorID)
 
-                    // Pinned items bar (scrolls with feed, visual bottom)
-                    if !pinnedItems.isEmpty {
-                        InboxPinnedBar(
-                            items: pinnedItems,
-                            onTap: onPinnedTap,
-                            onUnpin: onPinnedUnpin
-                        )
-                        .frame(maxWidth: .infinity)
-                        .flippedForChat()
+                        if !pinnedItems.isEmpty {
+                            InboxPinnedBar(
+                                items: pinnedItems,
+                                onTap: onPinnedTap,
+                                onUnpin: onPinnedUnpin
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
                     }
+                    .flippedForChat()
 
                     // Pending items (visual bottom, newest area)
                     ForEach(pendingItems.reversed()) { pending in
