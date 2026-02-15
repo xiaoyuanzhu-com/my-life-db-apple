@@ -68,6 +68,7 @@ struct FileViewerView: View {
     @State private var needsFetch: Bool
     @State private var isLoading = false
     @State private var error: Error?
+    @State private var isDownloadingForShare = false
 
     @Environment(\.dismiss) private var dismiss
 
@@ -96,6 +97,37 @@ struct FileViewerView: View {
                     .background(.thinMaterial, in: Circle())
             }
             .padding(.leading, 16)
+            .padding(.top, 8)
+        }
+        .overlay(alignment: .topTrailing) {
+            Button {
+                guard !isDownloadingForShare else { return }
+                isDownloadingForShare = true
+                Task {
+                    defer { isDownloadingForShare = false }
+                    do {
+                        let data = try await APIClient.shared.getRawFile(path: filePath)
+                        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+                        try data.write(to: tempURL)
+                        presentShareSheet(items: [tempURL])
+                    } catch {
+                        print("[FileViewer] Failed to download file for sharing: \(error)")
+                    }
+                }
+            } label: {
+                Group {
+                    if isDownloadingForShare {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 17, weight: .semibold))
+                    }
+                }
+                .frame(width: 36, height: 36)
+                .background(.thinMaterial, in: Circle())
+            }
+            .disabled(isDownloadingForShare)
+            .padding(.trailing, 16)
             .padding(.top, 8)
         }
         .task {

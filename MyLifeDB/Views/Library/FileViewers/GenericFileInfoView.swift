@@ -3,22 +3,15 @@
 //  MyLifeDB
 //
 //  Fallback view for unsupported file types.
-//  Shows file metadata (name, size, type, dates) and a share button.
+//  Shows file metadata (name, size, type, dates).
 //
 
 import SwiftUI
-#if os(iOS)
-import UIKit
-#elseif os(macOS)
-import AppKit
-#endif
 
 struct GenericFileInfoView: View {
 
     let file: FileRecord
     let filePath: String
-
-    @State private var isDownloading = false
 
     var body: some View {
         ScrollView {
@@ -63,35 +56,6 @@ struct GenericFileInfoView: View {
                 .background(Color.platformGray6)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .padding(.horizontal)
-
-                // Share / Open in button
-                Button {
-                    guard !isDownloading else { return }
-                    isDownloading = true
-                    Task {
-                        defer { isDownloading = false }
-                        do {
-                            let data = try await APIClient.shared.getRawFile(path: filePath)
-                            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(file.name)
-                            try data.write(to: tempURL)
-                            presentShareSheet(items: [tempURL])
-                        } catch {
-                            print("[Share] Failed to download file: \(error)")
-                        }
-                    }
-                } label: {
-                    if isDownloading {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        Label("Share", systemImage: "square.and.arrow.up")
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(isDownloading)
-                .padding(.horizontal, 32)
 
                 Spacer()
             }

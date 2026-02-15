@@ -19,16 +19,21 @@ func presentShareSheet(items: [Any]) {
     let activityVC = UIActivityViewController(activityItems: items, applicationActivities: nil)
 
     guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-          let rootVC = scene.keyWindow?.rootViewController else { return }
+          var topVC = scene.keyWindow?.rootViewController else { return }
+
+    // Walk up the presented view controller chain to find the topmost one
+    while let presented = topVC.presentedViewController {
+        topVC = presented
+    }
 
     if let popover = activityVC.popoverPresentationController {
-        popover.sourceView = rootVC.view
-        let bounds = rootVC.view.bounds
+        popover.sourceView = topVC.view
+        let bounds = topVC.view.bounds
         popover.sourceRect = CGRect(x: bounds.midX, y: bounds.midY, width: 0, height: 0)
         popover.permittedArrowDirections = []
     }
 
-    rootVC.present(activityVC, animated: true)
+    topVC.present(activityVC, animated: true)
     #elseif os(macOS)
     guard let window = NSApp?.mainWindow else { return }
     let picker = NSSharingServicePicker(items: items)
