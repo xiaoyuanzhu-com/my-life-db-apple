@@ -11,7 +11,6 @@
 //
 //  Supported actions:
 //  - share: Present native share sheet
-//  - shareFile: Download a file by path and present native share sheet
 //  - haptic: Trigger haptic feedback (iOS only)
 //  - openExternal: Open URL in Safari
 //  - copyToClipboard: Copy text to system clipboard
@@ -65,8 +64,6 @@ final class NativeBridgeHandler: URLSchemeHandler {
         switch action {
         case "share":
             handleShare(body)
-        case "shareFile":
-            handleShareFile(body)
         case "haptic":
             handleHaptic(body)
         case "openExternal":
@@ -88,30 +85,6 @@ final class NativeBridgeHandler: URLSchemeHandler {
         let url = body["url"] as? String
         let text = body["text"] as? String
 
-        // Check if the URL points to a backend raw file — download and share the actual file
-        if let urlString = url, let shareURL = URL(string: urlString) {
-            let rawPrefix = APIClient.shared.baseURL.appendingPathComponent("raw").absoluteString
-            if shareURL.absoluteString.hasPrefix(rawPrefix) {
-                let relativePath = String(shareURL.absoluteString.dropFirst(rawPrefix.count))
-                    .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-                Task { @MainActor in
-                    do {
-                        let data = try await APIClient.shared.getRawFile(path: relativePath)
-                        let filename = shareURL.lastPathComponent
-                        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
-                        try data.write(to: tempURL)
-                        presentShareSheet(items: [tempURL])
-                    } catch {
-                        // Fallback: share the URL as-is
-                        print("[NativeBridge] Failed to download file for sharing: \(error)")
-                        presentShareSheet(items: [shareURL])
-                    }
-                }
-                return
-            }
-        }
-
-        // Non-file share: share text/URL directly
         var activityItems: [Any] = []
         if !title.isEmpty { activityItems.append(title) }
         if let text = text, !text.isEmpty { activityItems.append(text) }
@@ -121,26 +94,6 @@ final class NativeBridgeHandler: URLSchemeHandler {
 
         guard !activityItems.isEmpty else { return }
         presentShareSheet(items: activityItems)
-    }
-
-    @MainActor
-    private func handleShareFile(_ body: [String: Any]) {
-        guard let path = body["path"] as? String else {
-            print("[NativeBridge] shareFile: missing path")
-            return
-        }
-        let name = body["name"] as? String ?? URL(fileURLWithPath: path).lastPathComponent
-
-        Task { @MainActor in
-            do {
-                let data = try await APIClient.shared.getRawFile(path: path)
-                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(name)
-                try data.write(to: tempURL)
-                presentShareSheet(items: [tempURL])
-            } catch {
-                print("[NativeBridge] Failed to download file for sharing: \(error)")
-            }
-        }
     }
 
     @MainActor
