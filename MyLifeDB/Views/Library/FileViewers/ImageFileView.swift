@@ -18,6 +18,8 @@ struct ImageFileView: View {
     @State private var error: Error?
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
 
     var body: some View {
         Group {
@@ -45,20 +47,14 @@ struct ImageFileView: View {
     private func imageContent(data: Data) -> some View {
         #if os(iOS) || os(visionOS)
         if let uiImage = UIImage(data: data) {
-            GeometryReader { geometry in
-                ScrollView([.horizontal, .vertical], showsIndicators: false) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(
-                            width: geometry.size.width * scale,
-                            height: geometry.size.height * scale
-                        )
-                        .frame(
-                            minWidth: geometry.size.width,
-                            minHeight: geometry.size.height
-                        )
-                }
+            Image(uiImage: uiImage)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .scaleEffect(scale)
+                .offset(offset)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .contentShape(Rectangle())
                 .gesture(
                     MagnifyGesture()
                         .onChanged { value in
@@ -68,12 +64,34 @@ struct ImageFileView: View {
                         }
                         .onEnded { _ in
                             lastScale = 1.0
+                            if scale <= 1.0 {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    scale = 1.0
+                                    offset = .zero
+                                    lastOffset = .zero
+                                }
+                            }
+                        }
+                )
+                .simultaneousGesture(
+                    DragGesture()
+                        .onChanged { value in
+                            guard scale > 1.0 else { return }
+                            offset = CGSize(
+                                width: lastOffset.width + value.translation.width,
+                                height: lastOffset.height + value.translation.height
+                            )
+                        }
+                        .onEnded { _ in
+                            lastOffset = offset
                         }
                 )
                 .onTapGesture(count: 2) {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         if scale > 1.1 {
                             scale = 1.0
+                            offset = .zero
+                            lastOffset = .zero
                         } else {
                             scale = 2.5
                         }
@@ -82,26 +100,51 @@ struct ImageFileView: View {
                 .onTapGesture(count: 1) {
                     onDismiss?()
                 }
-            }
         } else {
             ContentUnavailableView("Invalid Image", systemImage: "photo")
         }
         #elseif os(macOS)
         if let nsImage = NSImage(data: data) {
-            ScrollView([.horizontal, .vertical]) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .scaleEffect(scale)
-            }
-            .onTapGesture(count: 2) {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    scale = scale > 1.1 ? 1.0 : 2.5
+            Image(nsImage: nsImage)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .scaleEffect(scale)
+                .offset(offset)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .contentShape(Rectangle())
+                .gesture(
+                    MagnifyGesture()
+                        .onChanged { value in
+                            let delta = value.magnification / lastScale
+                            lastScale = value.magnification
+                            scale = min(max(scale * delta, 0.5), 5.0)
+                        }
+                        .onEnded { _ in
+                            lastScale = 1.0
+                            if scale <= 1.0 {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    scale = 1.0
+                                    offset = .zero
+                                    lastOffset = .zero
+                                }
+                            }
+                        }
+                )
+                .onTapGesture(count: 2) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        if scale > 1.1 {
+                            scale = 1.0
+                            offset = .zero
+                            lastOffset = .zero
+                        } else {
+                            scale = 2.5
+                        }
+                    }
                 }
-            }
-            .onTapGesture(count: 1) {
-                onDismiss?()
-            }
+                .onTapGesture(count: 1) {
+                    onDismiss?()
+                }
         } else {
             ContentUnavailableView("Invalid Image", systemImage: "photo")
         }
