@@ -2,14 +2,16 @@
 //  FileCache.swift
 //  MyLifeDB
 //
-//  General-purpose two-tier file cache:
-//  1. In-memory NSCache for raw Data (fast, auto-evicts under pressure)
-//  2. URLSession with configured URLCache for HTTP caching (honors Cache-Control, ETag, 304s)
+//  Three-tier file cache for authenticated file access:
+//  1. In-memory NSCache for raw Data (fastest, auto-evicts under memory pressure)
+//  2. Disk cache in Caches/ directory (survives app restarts)
+//  3. URLSession network fetch with auth headers
 //
 //  Also provides a decoded image convenience cache on top.
 //
 
 import Foundation
+import CryptoKit
 #if os(iOS) || os(visionOS)
 import UIKit
 #elseif os(macOS)
@@ -34,23 +36,19 @@ final class FileCache: @unchecked Sendable {
 
     private let imageCache = NSCache<NSString, Image>()
 
-    // MARK: - URLSession with HTTP cache
+    // MARK: - Disk cache
+
+    private let diskCacheDir: URL
+
+    // MARK: - URLSession
 
     private let session: URLSession
 
     // MARK: - Init
 
     private init() {
-        // Disk cache: 200MB, Memory cache: 20MB
-        let urlCache = URLCache(
-            memoryCapacity: 20 * 1024 * 1024,
-            diskCapacity: 200 * 1024 * 1024
-        )
-
         let config = URLSessionConfiguration.default
-        config.urlCache = urlCache
-        config.requestCachePolicy = .useProtocolCachePolicy
-
+        config.timeoutIntervalForRequest = 30
         self.session = URLSession(configuration: config)
 
         // Raw data cache: 100 items, 80MB
@@ -60,11 +58,17 @@ final class FileCache: @unchecked Sendable {
         // Decoded image cache: 150 items, 60MB
         imageCache.countLimit = 150
         imageCache.totalCostLimit = 60 * 1024 * 1024
+
+        // Disk cache directory
+        let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        diskCacheDir = cacheDir.appendingPathComponent("FileCache", isDirectory: true)
+        try? FileManager.default.createDirectory(at: diskCacheDir, withIntermediateDirectories: true)
     }
 
     // MARK: - Public: Raw Data
 
-    /// Fetches file data with two-tier caching (in-memory + HTTP disk cache).
+    /// Fetches file data with three-tier caching:
+    /// in-memory → disk → network.
     func data(for url: URL) async throws -> Data {
         let key = url.absoluteString as NSString
 
@@ -73,7 +77,14 @@ final class FileCache: @unchecked Sendable {
             return cached as Data
         }
 
-        // 2. Fetch via URLSession (URLCache handles HTTP caching / 304s)
+        // 2. Check disk cache
+        let diskPath = diskFilePath(for: url)
+        if let diskData = try? Data(contentsOf: diskPath) {
+            dataCache.setObject(diskData as NSData, forKey: key, cost: diskData.count)
+            return diskData
+        }
+
+        // 3. Fetch from network
         var request = URLRequest(url: url)
         if let token = AuthManager.shared.accessToken {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -81,16 +92,17 @@ final class FileCache: @unchecked Sendable {
 
         let (data, _) = try await session.data(for: request)
 
-        // 3. Store in memory cache
+        // Store in both caches
         dataCache.setObject(data as NSData, forKey: key, cost: data.count)
+        try? data.write(to: diskPath)
 
         return data
     }
 
     // MARK: - Public: Decoded Image
 
-    /// Fetches and decodes an image with three-tier caching:
-    /// decoded image cache → raw data cache → HTTP disk cache.
+    /// Fetches and decodes an image with caching:
+    /// decoded image cache → raw data cache → disk → network.
     func image(for url: URL) async throws -> Image {
         let key = url.absoluteString as NSString
 
@@ -99,7 +111,7 @@ final class FileCache: @unchecked Sendable {
             return cached
         }
 
-        // 2. Get raw data (may hit data cache or network)
+        // 2. Get raw data (may hit data cache, disk cache, or network)
         let data = try await self.data(for: url)
 
         guard let image = Image(data: data) else {
@@ -110,6 +122,14 @@ final class FileCache: @unchecked Sendable {
         imageCache.setObject(image, forKey: key, cost: data.count)
 
         return image
+    }
+
+    // MARK: - Private: Disk Cache
+
+    private func diskFilePath(for url: URL) -> URL {
+        let hash = SHA256.hash(data: Data(url.absoluteString.utf8))
+        let filename = hash.compactMap { String(format: "%02x", $0) }.joined()
+        return diskCacheDir.appendingPathComponent(filename)
     }
 
     // MARK: - Error
