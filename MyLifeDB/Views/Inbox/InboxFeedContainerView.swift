@@ -20,6 +20,7 @@ struct InboxFeedContainerView: View {
     @State private var error: APIError?
     @State private var cursors: InboxCursors?
     @State private var hasMore = InboxHasMore(older: false, newer: false)
+    @State private var sseManager = InboxSSEManager()
 
     // MARK: - Body
 
@@ -63,6 +64,10 @@ struct InboxFeedContainerView: View {
         #endif
         .task {
             await loadInitialData()
+            setupSSE()
+        }
+        .onDisappear {
+            sseManager.stop()
         }
     }
 
@@ -140,6 +145,33 @@ struct InboxFeedContainerView: View {
         )
         .refreshable {
             await refresh()
+        }
+    }
+
+    // MARK: - SSE
+
+    private func setupSSE() {
+        sseManager.onInboxChanged = {
+            Task { await refreshItems() }
+        }
+        sseManager.onPinChanged = {
+            Task { await loadPinnedItems() }
+        }
+        sseManager.start()
+    }
+
+    /// Lightweight refresh that only reloads items (not pinned).
+    /// Used by SSE to avoid redundant pinned fetches on item changes.
+    private func refreshItems() async {
+        do {
+            let response = try await APIClient.shared.inbox.list()
+            withAnimation(.easeOut(duration: 0.35)) {
+                items = response.items
+            }
+            cursors = response.cursors
+            hasMore = response.hasMore
+        } catch {
+            print("[Inbox] SSE refresh failed: \(error)")
         }
     }
 
