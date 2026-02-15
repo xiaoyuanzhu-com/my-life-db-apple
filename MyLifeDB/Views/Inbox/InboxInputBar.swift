@@ -65,49 +65,7 @@ struct InboxInputBar: View {
                 }
 
                 // Bottom control bar
-                HStack {
-                    // Left: + button
-                    attachButton
-
-                    Spacer()
-
-                    // Center: search status
-                    if searchStatus.isSearching {
-                        HStack(spacing: 6) {
-                            ProgressView()
-                                .controlSize(.mini)
-                            Text("Searching...")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    } else if searchStatus.resultCount > 0 {
-                        Text("\(searchStatus.resultCount) results")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else if searchStatus.hasError {
-                        Text("Search failed")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-
-                    Spacer()
-
-                    // Right: send button
-                    if canSend {
-                        Button {
-                            send()
-                        } label: {
-                            Text("Send")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                        .disabled(isSending)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                bottomControlBar
             }
             .background(Color(.secondarySystemBackground))
             .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -130,6 +88,59 @@ struct InboxInputBar: View {
             allowsMultipleSelection: true
         ) { result in
             handleFileImporterResult(result)
+        }
+    }
+
+    // MARK: - Bottom Control Bar
+
+    private var bottomControlBar: some View {
+        HStack {
+            // Left: + button
+            attachButton
+
+            Spacer()
+
+            // Center: search status
+            searchStatusView
+
+            Spacer()
+
+            // Right: send button
+            if canSend {
+                Button {
+                    send()
+                } label: {
+                    Text("Send")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(isSending)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+    }
+
+    @ViewBuilder
+    private var searchStatusView: some View {
+        if searchStatus.isSearching {
+            HStack(spacing: 6) {
+                ProgressView()
+                    .controlSize(.mini)
+                Text("Searching...")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } else if searchStatus.resultCount > 0 {
+            Text("\(searchStatus.resultCount) results")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else if searchStatus.hasError {
+            Text("Search failed")
+                .font(.caption)
+                .foregroundStyle(.red)
         }
     }
 
