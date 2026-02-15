@@ -16,6 +16,7 @@ struct InboxFeedView: View {
     let pendingItems: [PendingInboxItem]
     let isLoadingMore: Bool
     let hasOlderItems: Bool
+    let scrollToBottomTrigger: Int
     let onLoadMore: () -> Void
     let onItemDelete: (InboxItem) -> Void
     let onItemPin: (InboxItem) -> Void
@@ -57,20 +58,8 @@ struct InboxFeedView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
             }
-            .onAppear {
-                // Scroll to bottom on initial load
-                scrollToBottom(proxy: proxy, animated: false)
-            }
-            .onChange(of: items.count) { oldCount, newCount in
-                // Auto-scroll to bottom when new items arrive (newer items prepended in API order)
-                if newCount > oldCount {
-                    scrollToBottom(proxy: proxy, animated: true)
-                }
-            }
-            .onChange(of: pendingItems.count) { oldCount, newCount in
-                if newCount > oldCount {
-                    scrollToBottom(proxy: proxy, animated: true)
-                }
+            .onChange(of: scrollToBottomTrigger) { _, _ in
+                scrollToBottom(proxy: proxy, animated: true)
             }
         }
     }
@@ -90,18 +79,16 @@ struct InboxFeedView: View {
     // MARK: - Top Sentinel (Infinite Scroll)
 
     private var topSentinel: some View {
-        Group {
+        VStack(spacing: 0) {
             if isLoadingMore {
                 ProgressView()
                     .padding(.vertical, 16)
                     .frame(maxWidth: .infinity)
-            } else {
-                Color.clear
-                    .frame(height: 1)
-                    .onAppear {
-                        onLoadMore()
-                    }
             }
+        }
+        .frame(maxWidth: .infinity, minHeight: 1)
+        .onAppear {
+            onLoadMore()
         }
     }
 

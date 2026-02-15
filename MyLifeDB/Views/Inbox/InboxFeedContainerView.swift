@@ -22,6 +22,8 @@ struct InboxFeedContainerView: View {
     @State private var hasMore = InboxHasMore(older: false, newer: false)
     @State private var sseManager = InboxSSEManager()
 
+    @State private var scrollToBottomTrigger = 0
+
     // Search state
     @State private var searchResults: [SearchResultItem] = []
     @State private var searchStatus = InboxSearchStatus()
@@ -143,6 +145,7 @@ struct InboxFeedContainerView: View {
             pendingItems: pendingItems,
             isLoadingMore: isLoadingMore,
             hasOlderItems: hasMore.older,
+            scrollToBottomTrigger: scrollToBottomTrigger,
             onLoadMore: {
                 Task { await loadOlderItems() }
             },
@@ -247,6 +250,7 @@ struct InboxFeedContainerView: View {
             }
             cursors = response.cursors
             hasMore = response.hasMore
+            scrollToBottomTrigger += 1
         } catch {
             print("[Inbox] SSE refresh failed: \(error)")
         }
@@ -271,6 +275,7 @@ struct InboxFeedContainerView: View {
             items = response.items
             cursors = response.cursors
             hasMore = response.hasMore
+            scrollToBottomTrigger += 1
         } catch let apiError as APIError {
             error = apiError
         } catch {
@@ -300,6 +305,7 @@ struct InboxFeedContainerView: View {
             cursors = itemsResponse.cursors
             hasMore = itemsResponse.hasMore
             pinnedItems = pinnedResponse.items
+            scrollToBottomTrigger += 1
             error = nil
         } catch let apiError as APIError {
             error = apiError
@@ -388,6 +394,7 @@ struct InboxFeedContainerView: View {
             status: .uploading
         )
         pendingItems.append(pending)
+        scrollToBottomTrigger += 1
 
         Task {
             await uploadPendingItem(pending)
