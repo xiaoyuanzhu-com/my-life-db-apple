@@ -12,11 +12,14 @@ import SwiftUI
 struct InboxFeedView: View {
 
     let items: [InboxItem]
+    let pendingItems: [PendingInboxItem]
     let isLoadingMore: Bool
     let hasOlderItems: Bool
     let onLoadMore: () -> Void
     let onItemDelete: (InboxItem) -> Void
     let onItemPin: (InboxItem) -> Void
+    let onPendingCancel: (PendingInboxItem) -> Void
+    let onPendingRetry: (PendingInboxItem) -> Void
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -32,6 +35,16 @@ struct InboxFeedView: View {
                         itemView(for: item)
                             .id(item.id)
                     }
+
+                    // Pending items at bottom (newest)
+                    ForEach(pendingItems) { pending in
+                        PendingItemView(
+                            item: pending,
+                            onCancel: { onPendingCancel(pending) },
+                            onRetry: { onPendingRetry(pending) }
+                        )
+                        .id("pending-\(pending.id)")
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -40,6 +53,13 @@ struct InboxFeedView: View {
                 if newCount > oldCount, let lastItem = items.first {
                     withAnimation(.easeOut(duration: 0.3)) {
                         proxy.scrollTo(lastItem.id, anchor: .bottom)
+                    }
+                }
+            }
+            .onChange(of: pendingItems.count) { oldCount, newCount in
+                if newCount > oldCount, let lastPending = pendingItems.last {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        proxy.scrollTo("pending-\(lastPending.id)", anchor: .bottom)
                     }
                 }
             }

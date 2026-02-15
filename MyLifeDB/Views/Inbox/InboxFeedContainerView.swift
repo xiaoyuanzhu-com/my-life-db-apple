@@ -3,7 +3,7 @@
 //  MyLifeDB
 //
 //  Main data-owning container for the inbox feed.
-//  Manages loading, pagination, and all inbox state.
+//  Manages loading, pagination, upload, and all inbox state.
 //
 
 import SwiftUI
@@ -14,6 +14,7 @@ struct InboxFeedContainerView: View {
 
     @State private var items: [InboxItem] = []
     @State private var pinnedItems: [PinnedItem] = []
+    @State private var pendingItems: [PendingInboxItem] = []
     @State private var isLoading = false
     @State private var isLoadingMore = false
     @State private var error: APIError?
@@ -23,15 +24,26 @@ struct InboxFeedContainerView: View {
     // MARK: - Body
 
     var body: some View {
-        Group {
-            if isLoading && items.isEmpty {
-                loadingView
-            } else if let error = error, items.isEmpty {
-                errorView(error)
-            } else if items.isEmpty && !isLoading {
-                emptyView
-            } else {
-                feedView
+        VStack(spacing: 0) {
+            // Main content area
+            Group {
+                if isLoading && items.isEmpty {
+                    loadingView
+                } else if let error = error, items.isEmpty {
+                    errorView(error)
+                } else if items.isEmpty && !isLoading && pendingItems.isEmpty {
+                    emptyView
+                } else {
+                    feedView
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            Divider()
+
+            // Input bar at bottom
+            InboxInputBar { text, files in
+                createItem(text: text, files: files)
             }
         }
         .navigationTitle("Inbox")
@@ -40,9 +52,6 @@ struct InboxFeedContainerView: View {
         #endif
         .task {
             await loadInitialData()
-        }
-        .refreshable {
-            await refresh()
         }
     }
 
@@ -99,6 +108,7 @@ struct InboxFeedContainerView: View {
     private var feedView: some View {
         InboxFeedView(
             items: items,
+            pendingItems: pendingItems,
             isLoadingMore: isLoadingMore,
             hasOlderItems: hasMore.older,
             onLoadMore: {
@@ -109,6 +119,12 @@ struct InboxFeedContainerView: View {
             },
             onItemPin: { item in
                 Task { await togglePin(item) }
+            },
+            onPendingCancel: { pending in
+                pendingItems.removeAll { $0.id == pending.id }
+            },
+            onPendingRetry: { pending in
+                Task { await retryPendingItem(pending) }
             }
         )
         .refreshable {
@@ -216,5 +232,70 @@ struct InboxFeedContainerView: View {
         } catch {
             print("[Inbox] Failed to toggle pin: \(error)")
         }
+    }
+
+    // MARK: - Upload
+
+    private func createItem(text: String, files: [InboxFileAttachment]) {
+        let pendingId = UUID().uuidString
+        let pending = PendingInboxItem(
+            id: pendingId,
+            text: text,
+            files: files,
+            status: .uploading
+        )
+        pendingItems.append(pending)
+
+        Task {
+            await uploadPendingItem(pending)
+        }
+    }
+
+    private func uploadPendingItem(_ item: PendingInboxItem) async {
+        do {
+            if !item.files.isEmpty {
+                let fileData = item.files.map {
+                    (filename: $0.filename, data: $0.data, mimeType: $0.mimeType)
+                }
+                _ = try await APIClient.shared.inbox.uploadFiles(
+                    fileData,
+                    text: item.text.isEmpty ? nil : item.text
+                )
+            } else if !item.text.isEmpty {
+                _ = try await APIClient.shared.inbox.createText(item.text)
+            }
+
+            // Success — remove pending item and refresh
+            pendingItems.removeAll { $0.id == item.id }
+            await refresh()
+        } catch {
+            // Mark as failed
+            if let index = pendingItems.firstIndex(where: { $0.id == item.id }) {
+                pendingItems[index].status = .failed
+                pendingItems[index].error = error.localizedDescription
+                pendingItems[index].retryCount += 1
+
+                // Auto-retry up to 3 times
+                if pendingItems[index].retryCount < 3 {
+                    let delay = Double(pendingItems[index].retryCount * pendingItems[index].retryCount) * 5
+                    pendingItems[index].status = .queued
+                    pendingItems[index].retryAt = Date().addingTimeInterval(delay)
+
+                    try? await Task.sleep(for: .seconds(delay))
+                    if let current = pendingItems.first(where: { $0.id == item.id }),
+                       current.status == .queued {
+                        await uploadPendingItem(current)
+                    }
+                }
+            }
+        }
+    }
+
+    private func retryPendingItem(_ item: PendingInboxItem) async {
+        if let index = pendingItems.firstIndex(where: { $0.id == item.id }) {
+            pendingItems[index].status = .uploading
+            pendingItems[index].error = nil
+        }
+        await uploadPendingItem(item)
     }
 }
