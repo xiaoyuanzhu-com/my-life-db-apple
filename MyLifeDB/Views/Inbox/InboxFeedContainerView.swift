@@ -41,6 +41,17 @@ struct InboxFeedContainerView: View {
 
             Divider()
 
+            // Pinned items bar
+            InboxPinnedBar(
+                items: pinnedItems,
+                onTap: { pinnedItem in
+                    Task { await navigateToPinnedItem(pinnedItem) }
+                },
+                onUnpin: { pinnedItem in
+                    Task { await unpinItem(pinnedItem) }
+                }
+            )
+
             // Input bar at bottom
             InboxInputBar { text, files in
                 createItem(text: text, files: files)
@@ -231,6 +242,32 @@ struct InboxFeedContainerView: View {
             await refresh()
         } catch {
             print("[Inbox] Failed to toggle pin: \(error)")
+        }
+    }
+
+    private func unpinItem(_ pinnedItem: PinnedItem) async {
+        // Optimistic update
+        pinnedItems.removeAll { $0.path == pinnedItem.path }
+
+        do {
+            try await APIClient.shared.library.unpin(path: pinnedItem.path)
+            await loadItems()
+        } catch {
+            print("[Inbox] Failed to unpin: \(error)")
+            await loadPinnedItems()
+        }
+    }
+
+    private func navigateToPinnedItem(_ pinnedItem: PinnedItem) async {
+        // Load items around the pinned item's cursor
+        do {
+            let response = try await APIClient.shared.inbox.list(around: pinnedItem.cursor)
+            items = response.items
+            cursors = response.cursors
+            hasMore = response.hasMore
+            // targetIndex is available for scrolling — handled by feed view
+        } catch {
+            print("[Inbox] Failed to navigate to pinned item: \(error)")
         }
     }
 
