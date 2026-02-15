@@ -86,18 +86,7 @@ struct ImageFileView: View {
                             lastOffset = offset
                         }
                 )
-                .onTapGesture(count: 2) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        if scale > 1.1 {
-                            scale = 1.0
-                            offset = .zero
-                            lastOffset = .zero
-                        } else {
-                            scale = 2.5
-                        }
-                    }
-                }
-                .onTapGesture(count: 1) {
+                .onTapGesture {
                     onDismiss?()
                 }
         } else {
@@ -131,18 +120,7 @@ struct ImageFileView: View {
                             }
                         }
                 )
-                .onTapGesture(count: 2) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        if scale > 1.1 {
-                            scale = 1.0
-                            offset = .zero
-                            lastOffset = .zero
-                        } else {
-                            scale = 2.5
-                        }
-                    }
-                }
-                .onTapGesture(count: 1) {
+                .onTapGesture {
                     onDismiss?()
                 }
         } else {
