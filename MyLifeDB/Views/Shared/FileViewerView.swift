@@ -63,9 +63,22 @@ struct FileViewerView: View {
                 loadingView
             }
         }
-        .navigationTitle(fileName)
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .topLeading) {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 36, height: 36)
+                    .background(.thinMaterial, in: Circle())
+            }
+            .padding(.leading, 16)
+            .padding(.top, 8)
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        #if !os(macOS)
+        .toolbar(.hidden, for: .tabBar)
         #endif
         .task {
             if needsFetch {
