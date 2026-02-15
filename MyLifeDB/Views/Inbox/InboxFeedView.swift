@@ -15,6 +15,7 @@ import SwiftUI
 struct InboxFeedView: View {
 
     let items: [InboxItem]
+    let pinnedItems: [PinnedItem]
     let pendingItems: [PendingInboxItem]
     let isLoadingMore: Bool
     let hasOlderItems: Bool
@@ -24,6 +25,8 @@ struct InboxFeedView: View {
     let onItemPin: (InboxItem) -> Void
     let onPendingCancel: (PendingInboxItem) -> Void
     let onPendingRetry: (PendingInboxItem) -> Void
+    let onPinnedTap: (PinnedItem) -> Void
+    let onPinnedUnpin: (PinnedItem) -> Void
 
     private let newestAnchorID = "feed-newest"
 
@@ -45,6 +48,17 @@ struct InboxFeedView: View {
                     Color.clear
                         .frame(height: 1)
                         .id(newestAnchorID)
+
+                    // Pinned items bar (scrolls with feed, visual bottom)
+                    if !pinnedItems.isEmpty {
+                        InboxPinnedBar(
+                            items: pinnedItems,
+                            onTap: onPinnedTap,
+                            onUnpin: onPinnedUnpin
+                        )
+                        .frame(maxWidth: .infinity)
+                        .flippedForChat()
+                    }
 
                     // Pending items (visual bottom, newest area)
                     ForEach(pendingItems.reversed()) { pending in

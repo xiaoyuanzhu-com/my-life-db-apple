@@ -50,30 +50,16 @@ struct InboxFeedContainerView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Bottom section: pins + input
-            VStack(spacing: 0) {
-                // Pinned items bar
-                InboxPinnedBar(
-                    items: pinnedItems,
-                    onTap: { pinnedItem in
-                        Task { await navigateToPinnedItem(pinnedItem) }
-                    },
-                    onUnpin: { pinnedItem in
-                        Task { await unpinItem(pinnedItem) }
-                    }
-                )
-
-                // Input bar at bottom
-                InboxInputBar(
-                    onSend: { text, files in
-                        createItem(text: text, files: files)
-                    },
-                    onTextChange: { text in
-                        handleTextChange(text)
-                    },
-                    searchStatus: searchStatus
-                )
-            }
+            // Input bar at bottom
+            InboxInputBar(
+                onSend: { text, files in
+                    createItem(text: text, files: files)
+                },
+                onTextChange: { text in
+                    handleTextChange(text)
+                },
+                searchStatus: searchStatus
+            )
             .background(.background)
         }
         #if os(iOS) || os(visionOS)
@@ -141,6 +127,7 @@ struct InboxFeedContainerView: View {
     private var feedView: some View {
         InboxFeedView(
             items: items,
+            pinnedItems: pinnedItems,
             pendingItems: pendingItems,
             isLoadingMore: isLoadingMore,
             hasOlderItems: hasMore.older,
@@ -159,6 +146,12 @@ struct InboxFeedContainerView: View {
             },
             onPendingRetry: { pending in
                 Task { await retryPendingItem(pending) }
+            },
+            onPinnedTap: { pinnedItem in
+                Task { await navigateToPinnedItem(pinnedItem) }
+            },
+            onPinnedUnpin: { pinnedItem in
+                Task { await unpinItem(pinnedItem) }
             }
         )
         .refreshable {
