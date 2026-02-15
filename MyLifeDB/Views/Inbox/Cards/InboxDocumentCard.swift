@@ -15,7 +15,6 @@ struct InboxDocumentCard: View {
             if let screenshotPath = item.screenshotSqlar {
                 AuthenticatedSqlarImage(path: screenshotPath)
                     .frame(maxHeight: 200)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
                 documentIconView
             }
@@ -25,7 +24,6 @@ struct InboxDocumentCard: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
-        .padding(12)
         .frame(maxWidth: 240)
     }
 
@@ -41,8 +39,6 @@ struct InboxDocumentCard: View {
                 .foregroundStyle(.secondary)
         }
         .frame(width: 120, height: 100)
-        .background(Color.secondary.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private var documentIcon: String {

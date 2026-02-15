@@ -3,7 +3,7 @@
 //  MyLifeDB
 //
 //  Card router that dispatches to the appropriate card type.
-//  Uses border + muted background (no shadow) to match web.
+//  Borderless, frameless — content renders directly.
 //
 
 import SwiftUI
@@ -13,12 +13,6 @@ struct InboxItemCard: View {
 
     var body: some View {
         cardContent
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color(.separator), lineWidth: 0.5)
-            )
     }
 
     @ViewBuilder

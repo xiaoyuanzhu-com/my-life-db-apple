@@ -12,14 +12,12 @@ struct InboxVideoCard: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.black)
+            Color.black
                 .frame(width: 200, height: 112)
 
             Image(systemName: "play.circle.fill")
                 .font(.title)
                 .foregroundStyle(.white)
         }
-        .padding(4)
     }
 }
