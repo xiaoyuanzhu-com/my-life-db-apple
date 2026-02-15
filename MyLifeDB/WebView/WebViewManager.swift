@@ -214,7 +214,6 @@ final class TabWebViewModel {
         guard let host = baseURL.host else { return }
 
         if let accessToken = AuthManager.shared.accessToken {
-            let secure = baseURL.scheme == "https" ? "; Secure" : ""
             let cookie = HTTPCookie(properties: [
                 .name: "access_token",
                 .value: accessToken,
