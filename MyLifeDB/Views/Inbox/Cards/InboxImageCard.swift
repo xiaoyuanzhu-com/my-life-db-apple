@@ -14,6 +14,7 @@ struct InboxImageCard: View {
 
     var body: some View {
         AuthenticatedImage(path: item.path)
-            .frame(maxWidth: 320, maxHeight: 200)
+            .frame(maxWidth: 320, maxHeight: 200, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .trailing)
     }
 }
