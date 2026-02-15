@@ -8,6 +8,14 @@
 
 import SwiftUI
 
+private extension View {
+    func cardFrame() -> some View {
+        self
+            .padding(12)
+            .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
 struct InboxItemCard: View {
     let item: InboxItem
 
@@ -20,16 +28,20 @@ struct InboxItemCard: View {
         switch contentType {
         case .image:
             InboxImageCard(item: item)
-        case .text:
-            InboxTextCard(item: item)
         case .video:
             InboxVideoCard(item: item)
+        case .text:
+            InboxTextCard(item: item)
+                .cardFrame()
         case .audio:
             InboxAudioCard(item: item)
+                .cardFrame()
         case .document:
             InboxDocumentCard(item: item)
+                .cardFrame()
         case .fallback:
             InboxFallbackCard(item: item)
+                .cardFrame()
         }
     }
 
