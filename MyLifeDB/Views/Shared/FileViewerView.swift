@@ -19,7 +19,7 @@ import SwiftUI
 
 // MARK: - File Preview Environment
 
-/// Identifiable wrapper for fullScreenCover presentation.
+/// Identifiable wrapper for preview presentation.
 struct FilePreviewDestination: Identifiable {
     let id = UUID()
     let path: String
@@ -30,10 +30,44 @@ private struct FilePreviewActionKey: EnvironmentKey {
     static var defaultValue: ((String, String) -> Void)? = nil
 }
 
+private struct PreviewNamespaceKey: EnvironmentKey {
+    static var defaultValue: Namespace.ID? = nil
+}
+
+private struct ActivePreviewPathKey: EnvironmentKey {
+    static var defaultValue: String? = nil
+}
+
 extension EnvironmentValues {
     var openFilePreview: ((String, String) -> Void)? {
         get { self[FilePreviewActionKey.self] }
         set { self[FilePreviewActionKey.self] = newValue }
+    }
+
+    var previewNamespace: Namespace.ID? {
+        get { self[PreviewNamespaceKey.self] }
+        set { self[PreviewNamespaceKey.self] = newValue }
+    }
+
+    var activePreviewPath: String? {
+        get { self[ActivePreviewPathKey.self] }
+        set { self[ActivePreviewPathKey.self] = newValue }
+    }
+}
+
+// MARK: - Preview Source Modifier
+
+extension View {
+    /// Apply to thumbnail/card views that serve as the zoom-animation source.
+    @ViewBuilder
+    func previewSource(path: String, namespace: Namespace.ID?, activePreviewPath: String?) -> some View {
+        if let ns = namespace {
+            self
+                .matchedGeometryEffect(id: "preview-\(path)", in: ns, isSource: true)
+                .opacity(activePreviewPath == path ? 0 : 1)
+        } else {
+            self
+        }
     }
 }
 
@@ -44,25 +78,28 @@ struct FileViewerView: View {
     // MARK: - Initializers
 
     /// Create a viewer when you already have file metadata.
-    init(file: FileRecord) {
+    init(file: FileRecord, onDismiss: (() -> Void)? = nil) {
         self._resolvedFile = State(initialValue: file)
         self.filePath = file.path
         self.fileName = file.name
         self._needsFetch = State(initialValue: false)
+        self.onDismiss = onDismiss
     }
 
     /// Create a viewer that fetches metadata on appear.
-    init(filePath: String, fileName: String) {
+    init(filePath: String, fileName: String, onDismiss: (() -> Void)? = nil) {
         self._resolvedFile = State(initialValue: nil)
         self.filePath = filePath
         self.fileName = fileName
         self._needsFetch = State(initialValue: true)
+        self.onDismiss = onDismiss
     }
 
     // MARK: - Properties
 
     private let filePath: String
     private let fileName: String
+    private let onDismiss: (() -> Void)?
 
     @State private var resolvedFile: FileRecord?
     @State private var needsFetch: Bool
@@ -89,9 +126,13 @@ struct FileViewerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .topLeading) {
             Button {
-                dismiss()
+                if let onDismiss {
+                    onDismiss()
+                } else {
+                    dismiss()
+                }
             } label: {
-                Image(systemName: "chevron.left")
+                Image(systemName: onDismiss != nil ? "xmark" : "chevron.left")
                     .font(.system(size: 17, weight: .semibold))
                     .frame(width: 36, height: 36)
                     .background(.thinMaterial, in: Circle())

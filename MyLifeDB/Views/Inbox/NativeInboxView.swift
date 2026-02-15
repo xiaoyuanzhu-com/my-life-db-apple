@@ -4,8 +4,7 @@
 //
 //  Root view for the native Inbox tab.
 //  Provides NavigationStack-based navigation with
-//  file detail drill-down via FileViewerView.
-//  Search is integrated into the input bar (no separate search bar).
+//  file preview presented as a zoom-animated overlay.
 //
 
 import SwiftUI
@@ -20,18 +19,45 @@ enum InboxDestination: Hashable {
 
 struct NativeInboxView: View {
 
+    @Namespace private var previewNamespace
     @State private var navigationPath = NavigationPath()
     @State private var filePreview: FilePreviewDestination?
 
     var body: some View {
-        NavigationStack(path: $navigationPath) {
-            InboxFeedContainerView()
-        }
-        .environment(\.openFilePreview) { path, name in
-            filePreview = FilePreviewDestination(path: path, name: name)
-        }
-        .fullScreenCover(item: $filePreview) { preview in
-            FileViewerView(filePath: preview.path, fileName: preview.name)
+        ZStack {
+            NavigationStack(path: $navigationPath) {
+                InboxFeedContainerView()
+            }
+            .environment(\.openFilePreview) { path, name in
+                withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
+                    filePreview = FilePreviewDestination(path: path, name: name)
+                }
+            }
+            .environment(\.previewNamespace, previewNamespace)
+            .environment(\.activePreviewPath, filePreview?.path)
+
+            if let preview = filePreview {
+                Color.black
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+
+                FileViewerView(
+                    filePath: preview.path,
+                    fileName: preview.name,
+                    onDismiss: {
+                        withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
+                            filePreview = nil
+                        }
+                    }
+                )
+                .matchedGeometryEffect(
+                    id: "preview-\(preview.path)",
+                    in: previewNamespace,
+                    isSource: false
+                )
+                .transition(.opacity)
+                .zIndex(1)
+            }
         }
     }
 }

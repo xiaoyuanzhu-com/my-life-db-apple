@@ -11,6 +11,8 @@ import SwiftUI
 struct InboxSearchView: View {
 
     @Environment(\.openFilePreview) private var openFilePreview
+    @Environment(\.previewNamespace) private var previewNamespace
+    @Environment(\.activePreviewPath) private var activePreviewPath
 
     let results: [SearchResultItem]
     let isSearching: Bool
@@ -65,6 +67,11 @@ struct InboxSearchView: View {
                 resultCard(for: result)
             }
             .buttonStyle(.plain)
+            .previewSource(
+                path: result.path,
+                namespace: previewNamespace,
+                activePreviewPath: activePreviewPath
+            )
 
             // Match context
             if let matchContext = result.matchContext, !matchContext.snippet.isEmpty {

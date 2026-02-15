@@ -11,6 +11,8 @@ import SwiftUI
 struct LibraryGridView: View {
 
     @Environment(\.openFilePreview) private var openFilePreview
+    @Environment(\.previewNamespace) private var previewNamespace
+    @Environment(\.activePreviewPath) private var activePreviewPath
 
     let children: [FileTreeNode]
     let folderPath: String
@@ -36,6 +38,11 @@ struct LibraryGridView: View {
                             LibraryGridItem(node: node)
                         }
                         .buttonStyle(.plain)
+                        .previewSource(
+                            path: fullPath,
+                            namespace: previewNamespace,
+                            activePreviewPath: activePreviewPath
+                        )
                     }
                 }
             }

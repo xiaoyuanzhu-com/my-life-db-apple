@@ -15,6 +15,8 @@ import SwiftUI
 struct InboxFeedView: View {
 
     @Environment(\.openFilePreview) private var openFilePreview
+    @Environment(\.previewNamespace) private var previewNamespace
+    @Environment(\.activePreviewPath) private var activePreviewPath
 
     let items: [InboxItem]
     let pinnedItems: [PinnedItem]
@@ -136,6 +138,11 @@ struct InboxFeedView: View {
                 InboxItemCard(item: item)
             }
             .buttonStyle(.plain)
+            .previewSource(
+                path: item.path,
+                namespace: previewNamespace,
+                activePreviewPath: activePreviewPath
+            )
             .contextMenu {
                 contextMenuContent(for: item)
             }

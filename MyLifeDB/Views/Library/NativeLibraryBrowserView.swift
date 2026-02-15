@@ -43,36 +43,63 @@ enum LibraryViewMode: String, CaseIterable {
 
 struct NativeLibraryBrowserView: View {
 
+    @Namespace private var previewNamespace
     @State private var navigationPath = NavigationPath()
     @State private var filePreview: FilePreviewDestination?
     @AppStorage("libraryViewMode") private var viewMode: LibraryViewMode = .grid
 
     var body: some View {
-        NavigationStack(path: $navigationPath) {
-            // Root folder (path = "")
-            LibraryFolderView(
-                folderPath: "",
-                folderName: "Library",
-                viewMode: $viewMode
-            )
-            .navigationDestination(for: LibraryDestination.self) { destination in
-                switch destination {
-                case .folder(let path, let name):
-                    LibraryFolderView(
-                        folderPath: path,
-                        folderName: name,
-                        viewMode: $viewMode
-                    )
-                case .file:
-                    EmptyView()
+        ZStack {
+            NavigationStack(path: $navigationPath) {
+                // Root folder (path = "")
+                LibraryFolderView(
+                    folderPath: "",
+                    folderName: "Library",
+                    viewMode: $viewMode
+                )
+                .navigationDestination(for: LibraryDestination.self) { destination in
+                    switch destination {
+                    case .folder(let path, let name):
+                        LibraryFolderView(
+                            folderPath: path,
+                            folderName: name,
+                            viewMode: $viewMode
+                        )
+                    case .file:
+                        EmptyView()
+                    }
                 }
             }
-        }
-        .environment(\.openFilePreview) { path, name in
-            filePreview = FilePreviewDestination(path: path, name: name)
-        }
-        .fullScreenCover(item: $filePreview) { preview in
-            FileViewerView(filePath: preview.path, fileName: preview.name)
+            .environment(\.openFilePreview) { path, name in
+                withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
+                    filePreview = FilePreviewDestination(path: path, name: name)
+                }
+            }
+            .environment(\.previewNamespace, previewNamespace)
+            .environment(\.activePreviewPath, filePreview?.path)
+
+            if let preview = filePreview {
+                Color.black
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+
+                FileViewerView(
+                    filePath: preview.path,
+                    fileName: preview.name,
+                    onDismiss: {
+                        withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
+                            filePreview = nil
+                        }
+                    }
+                )
+                .matchedGeometryEffect(
+                    id: "preview-\(preview.path)",
+                    in: previewNamespace,
+                    isSource: false
+                )
+                .transition(.opacity)
+                .zIndex(1)
+            }
         }
     }
 }
