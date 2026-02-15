@@ -38,7 +38,9 @@ struct MainTabView: View {
     /// Deep link path passed from MyLifeDBApp.
     @Binding var deepLinkPath: String?
 
+    @Namespace private var previewNamespace
     @State private var selectedTab: AppTab = .inbox
+    @State private var filePreview: FilePreviewDestination?
     @State private var claudeVM = TabWebViewModel(route: "/claude")
 
     @Environment(\.scenePhase) private var scenePhase
@@ -46,11 +48,38 @@ struct MainTabView: View {
     private var allViewModels: [TabWebViewModel] { [claudeVM] }
 
     var body: some View {
-        #if os(macOS)
-        macOSLayout
-        #else
-        iOSLayout
-        #endif
+        ZStack {
+            #if os(macOS)
+            macOSLayout
+            #else
+            iOSLayout
+            #endif
+
+            if let preview = filePreview {
+                Color.black
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+
+                FileViewerView(
+                    filePath: preview.path,
+                    fileName: preview.name,
+                    onDismiss: {
+                        withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
+                            filePreview = nil
+                        }
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(1)
+            }
+        }
+        .environment(\.openFilePreview) { path, name in
+            withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
+                filePreview = FilePreviewDestination(path: path, name: name)
+            }
+        }
+        .environment(\.previewNamespace, previewNamespace)
+        .environment(\.activePreviewPath, filePreview?.path)
     }
 
     // MARK: - iOS Layout
