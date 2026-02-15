@@ -225,7 +225,7 @@ final class APIClient {
     ) async throws -> T {
         let boundary = UUID().uuidString
 
-        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: true)
+        let components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: true)
         guard let url = components?.url else {
             throw APIError.invalidURL
         }
