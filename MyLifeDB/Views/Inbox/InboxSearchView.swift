@@ -32,11 +32,13 @@ struct InboxSearchView: View {
             LazyVStack(alignment: .trailing, spacing: 16) {
                 ForEach(results) { result in
                     resultView(for: result)
+                        .flippedForChat()
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
         }
+        .flippedForChat()
     }
 
     @ViewBuilder
@@ -137,5 +139,13 @@ struct InboxSearchView: View {
 
     private var emptyView: some View {
         ContentUnavailableView.search
+    }
+}
+
+// MARK: - Flipped Layout Helper
+
+private extension View {
+    func flippedForChat() -> some View {
+        scaleEffect(x: 1, y: -1)
     }
 }
