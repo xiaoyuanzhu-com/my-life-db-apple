@@ -54,6 +54,13 @@ struct InboxFeedView: View {
         }
         .scrollPosition($scrollPosition)
         .defaultScrollAnchor(.bottom)
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y < 1000
+        } action: { _, isNearTop in
+            if isNearTop && hasOlderItems && !isLoadingMore {
+                onLoadMore()
+            }
+        }
         .onChange(of: scrollToBottomTrigger) { _, _ in
             withAnimation(.easeOut(duration: 0.3)) {
                 scrollPosition.scrollTo(edge: .bottom)
