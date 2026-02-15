@@ -23,7 +23,6 @@ struct InboxFeedContainerView: View {
     @State private var sseManager = InboxSSEManager()
 
     @State private var scrollToBottomTrigger = 0
-    @State private var isReadyForPagination = false
 
     // Search state
     @State private var searchResults: [SearchResultItem] = []
@@ -142,7 +141,7 @@ struct InboxFeedContainerView: View {
             items: items,
             pendingItems: pendingItems,
             isLoadingMore: isLoadingMore,
-            hasOlderItems: hasMore.older && isReadyForPagination,
+            hasOlderItems: hasMore.older,
             scrollToBottomTrigger: scrollToBottomTrigger,
             onLoadMore: {
                 Task { await loadOlderItems() }
@@ -273,12 +272,7 @@ struct InboxFeedContainerView: View {
             items = response.items
             cursors = response.cursors
             hasMore = response.hasMore
-            // No scrollToBottomTrigger here — defaultScrollAnchor(.bottom) handles initial position.
-            // Enable pagination after a delay so the sentinel doesn't fire before scroll settles.
-            Task {
-                try? await Task.sleep(for: .milliseconds(500))
-                isReadyForPagination = true
-            }
+            // No scrollToBottomTrigger here — flipped ScrollView starts at offset 0 (visual bottom).
         } catch let apiError as APIError {
             error = apiError
         } catch {

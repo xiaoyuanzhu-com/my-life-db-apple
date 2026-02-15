@@ -2,10 +2,12 @@
 //  InboxFeedView.swift
 //  MyLifeDB
 //
-//  Chat-style feed for displaying inbox items.
-//  Items displayed oldest at top, newest at bottom.
-//  Infinite scroll: sentinel at top triggers loading older items.
-//  Stick-to-bottom: auto-scrolls to newest on new items.
+//  Chat-style feed using a flipped ScrollView pattern.
+//  The ScrollView is vertically inverted so that:
+//    - Internal top (offset 0) = visual bottom = newest items
+//    - Internal bottom = visual top = oldest items
+//  Loading older items appends to the internal bottom,
+//  which never shifts the scroll position. No anchoring needed.
 //
 
 import SwiftUI
@@ -23,54 +25,64 @@ struct InboxFeedView: View {
     let onPendingCancel: (PendingInboxItem) -> Void
     let onPendingRetry: (PendingInboxItem) -> Void
 
-    @State private var scrollPosition = ScrollPosition(edge: .bottom)
+    private let newestAnchorID = "feed-newest"
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .trailing, spacing: 16) {
-                // Top sentinel for loading older items
-                if hasOlderItems {
-                    topSentinel
-                }
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .trailing, spacing: 16) {
+                    // Newest anchor (internal top = visual bottom)
+                    Color.clear
+                        .frame(height: 1)
+                        .id(newestAnchorID)
 
-                // Items in reverse order (oldest first for chat layout)
-                ForEach(items.reversed()) { item in
-                    itemView(for: item)
-                        .id(item.id)
-                }
+                    // Pending items (visual bottom, newest area)
+                    ForEach(pendingItems.reversed()) { pending in
+                        PendingItemView(
+                            item: pending,
+                            onCancel: { onPendingCancel(pending) },
+                            onRetry: { onPendingRetry(pending) }
+                        )
+                        .id("pending-\(pending.id)")
+                        .flippedForChat()
+                    }
 
-                // Pending items at bottom (newest)
-                ForEach(pendingItems) { pending in
-                    PendingItemView(
-                        item: pending,
-                        onCancel: { onPendingCancel(pending) },
-                        onRetry: { onPendingRetry(pending) }
-                    )
-                    .id("pending-\(pending.id)")
+                    // Items: newest first (no .reversed() needed)
+                    ForEach(items) { item in
+                        itemView(for: item)
+                            .id(item.id)
+                            .flippedForChat()
+                    }
+
+                    // Sentinel (internal bottom = visual top, oldest area)
+                    if hasOlderItems {
+                        olderItemsSentinel
+                            .flippedForChat()
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                let maxOffset = geometry.contentSize.height - geometry.containerSize.height
+                return maxOffset > 0 && (maxOffset - geometry.contentOffset.y) < 1000
+            } action: { _, isNearOlderEnd in
+                if isNearOlderEnd && hasOlderItems && !isLoadingMore {
+                    onLoadMore()
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-        }
-        .scrollPosition($scrollPosition)
-        .defaultScrollAnchor(.bottom)
-        .onScrollGeometryChange(for: Bool.self) { geometry in
-            geometry.contentOffset.y < 1000
-        } action: { _, isNearTop in
-            if isNearTop && hasOlderItems && !isLoadingMore {
-                onLoadMore()
-            }
-        }
-        .onChange(of: scrollToBottomTrigger) { _, _ in
-            withAnimation(.easeOut(duration: 0.3)) {
-                scrollPosition.scrollTo(edge: .bottom)
+            .flippedForChat()
+            .onChange(of: scrollToBottomTrigger) { _, _ in
+                withAnimation(.easeOut(duration: 0.3)) {
+                    proxy.scrollTo(newestAnchorID, anchor: .top)
+                }
             }
         }
     }
 
-    // MARK: - Top Sentinel (Infinite Scroll)
+    // MARK: - Older Items Sentinel
 
-    private var topSentinel: some View {
+    private var olderItemsSentinel: some View {
         VStack(spacing: 0) {
             if isLoadingMore {
                 ProgressView()
@@ -99,10 +111,7 @@ struct InboxFeedView: View {
                 contextMenuContent(for: item)
             }
         }
-        .transition(.asymmetric(
-            insertion: .move(edge: .bottom).combined(with: .opacity),
-            removal: .opacity
-        ))
+        .transition(.opacity)
     }
 
     // MARK: - Context Menu
@@ -125,5 +134,14 @@ struct InboxFeedView: View {
         } label: {
             Label("Delete", systemImage: "trash")
         }
+    }
+}
+
+// MARK: - Flipped Layout Helper
+
+private extension View {
+    /// Flips a view vertically for inverted scroll layout (chat-style).
+    func flippedForChat() -> some View {
+        scaleEffect(x: 1, y: -1)
     }
 }
