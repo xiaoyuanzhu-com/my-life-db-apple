@@ -15,6 +15,7 @@ struct InboxFeedContainerView: View {
     @State private var items: [InboxItem] = []
     @State private var pinnedItems: [PinnedItem] = []
     @State private var isLoading = false
+    @State private var isLoadingMore = false
     @State private var error: APIError?
     @State private var cursors: InboxCursors?
     @State private var hasMore = InboxHasMore(older: false, newer: false)
@@ -30,7 +31,7 @@ struct InboxFeedContainerView: View {
             } else if items.isEmpty && !isLoading {
                 emptyView
             } else {
-                Text("Feed placeholder — \(items.count) items")
+                feedView
             }
         }
         .navigationTitle("Inbox")
@@ -93,6 +94,28 @@ struct InboxFeedContainerView: View {
         }
     }
 
+    // MARK: - Feed View
+
+    private var feedView: some View {
+        InboxFeedView(
+            items: items,
+            isLoadingMore: isLoadingMore,
+            hasOlderItems: hasMore.older,
+            onLoadMore: {
+                Task { await loadOlderItems() }
+            },
+            onItemDelete: { item in
+                Task { await deleteItem(item) }
+            },
+            onItemPin: { item in
+                Task { await togglePin(item) }
+            }
+        )
+        .refreshable {
+            await refresh()
+        }
+    }
+
     // MARK: - Data Loading
 
     private func loadInitialData() async {
@@ -146,6 +169,52 @@ struct InboxFeedContainerView: View {
             error = apiError
         } catch {
             self.error = .networkError(error)
+        }
+    }
+
+    private func loadOlderItems() async {
+        guard let lastCursor = cursors?.last, hasMore.older, !isLoadingMore else { return }
+        isLoadingMore = true
+
+        do {
+            let response = try await APIClient.shared.inbox.fetchOlder(cursor: lastCursor)
+            items.append(contentsOf: response.items)
+            cursors = response.cursors
+            hasMore = response.hasMore
+        } catch {
+            print("[Inbox] Failed to load more: \(error)")
+        }
+
+        isLoadingMore = false
+    }
+
+    // MARK: - Actions
+
+    private func deleteItem(_ item: InboxItem) async {
+        withAnimation(.easeOut(duration: 0.3)) {
+            items.removeAll { $0.id == item.id }
+        }
+        pinnedItems.removeAll { $0.path == item.path }
+
+        let id = InboxAPI.idFromPath(item.path)
+        do {
+            try await APIClient.shared.inbox.delete(id: id)
+        } catch {
+            print("[Inbox] Failed to delete item: \(error)")
+            await loadItems()
+        }
+    }
+
+    private func togglePin(_ item: InboxItem) async {
+        do {
+            if item.isPinned {
+                try await APIClient.shared.library.unpin(path: item.path)
+            } else {
+                _ = try await APIClient.shared.library.pin(path: item.path)
+            }
+            await refresh()
+        } catch {
+            print("[Inbox] Failed to toggle pin: \(error)")
         }
     }
 }
