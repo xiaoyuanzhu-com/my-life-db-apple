@@ -4,7 +4,8 @@
 //
 //  Chat-style feed for displaying inbox items.
 //  Items displayed oldest at top, newest at bottom.
-//  Scroll up to load older items.
+//  Infinite scroll: sentinel at top triggers loading older items.
+//  Stick-to-bottom: auto-scrolls to newest on new items.
 //
 
 import SwiftUI
@@ -21,13 +22,15 @@ struct InboxFeedView: View {
     let onPendingCancel: (PendingInboxItem) -> Void
     let onPendingRetry: (PendingInboxItem) -> Void
 
+    private let bottomAnchorID = "feed-bottom"
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .trailing, spacing: 16) {
-                    // Load more section at top
+                    // Top sentinel for loading older items
                     if hasOlderItems {
-                        loadMoreSection
+                        topSentinel
                     }
 
                     // Items in reverse order (oldest first for chat layout)
@@ -45,23 +48,59 @@ struct InboxFeedView: View {
                         )
                         .id("pending-\(pending.id)")
                     }
+
+                    // Bottom anchor for stick-to-bottom
+                    Color.clear
+                        .frame(height: 1)
+                        .id(bottomAnchorID)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
             }
+            .onAppear {
+                // Scroll to bottom on initial load
+                scrollToBottom(proxy: proxy, animated: false)
+            }
             .onChange(of: items.count) { oldCount, newCount in
-                if newCount > oldCount, let lastItem = items.first {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        proxy.scrollTo(lastItem.id, anchor: .bottom)
-                    }
+                // Auto-scroll to bottom when new items arrive (newer items prepended in API order)
+                if newCount > oldCount {
+                    scrollToBottom(proxy: proxy, animated: true)
                 }
             }
             .onChange(of: pendingItems.count) { oldCount, newCount in
-                if newCount > oldCount, let lastPending = pendingItems.last {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        proxy.scrollTo("pending-\(lastPending.id)", anchor: .bottom)
-                    }
+                if newCount > oldCount {
+                    scrollToBottom(proxy: proxy, animated: true)
                 }
+            }
+        }
+    }
+
+    // MARK: - Scroll Helpers
+
+    private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool) {
+        if animated {
+            withAnimation(.easeOut(duration: 0.3)) {
+                proxy.scrollTo(bottomAnchorID, anchor: .bottom)
+            }
+        } else {
+            proxy.scrollTo(bottomAnchorID, anchor: .bottom)
+        }
+    }
+
+    // MARK: - Top Sentinel (Infinite Scroll)
+
+    private var topSentinel: some View {
+        Group {
+            if isLoadingMore {
+                ProgressView()
+                    .padding(.vertical, 16)
+                    .frame(maxWidth: .infinity)
+            } else {
+                Color.clear
+                    .frame(height: 1)
+                    .onAppear {
+                        onLoadMore()
+                    }
             }
         }
     }
@@ -116,31 +155,6 @@ struct InboxFeedView: View {
             onItemDelete(item)
         } label: {
             Label("Delete", systemImage: "trash")
-        }
-    }
-
-    // MARK: - Load More
-
-    private var loadMoreSection: some View {
-        VStack(spacing: 8) {
-            if isLoadingMore {
-                ProgressView()
-                    .padding(.vertical, 16)
-            } else {
-                Button {
-                    onLoadMore()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "arrow.up")
-                        Text("Load older items")
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.plain)
-            }
         }
     }
 }
