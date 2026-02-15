@@ -58,20 +58,17 @@ struct InboxFeedView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
             }
+            .defaultScrollAnchor(.bottom)
             .onChange(of: scrollToBottomTrigger) { _, _ in
-                scrollToBottom(proxy: proxy, animated: true)
+                scrollToBottom(proxy: proxy)
             }
         }
     }
 
     // MARK: - Scroll Helpers
 
-    private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool) {
-        if animated {
-            withAnimation(.easeOut(duration: 0.3)) {
-                proxy.scrollTo(bottomAnchorID, anchor: .bottom)
-            }
-        } else {
+    private func scrollToBottom(proxy: ScrollViewProxy) {
+        withAnimation(.easeOut(duration: 0.3)) {
             proxy.scrollTo(bottomAnchorID, anchor: .bottom)
         }
     }
