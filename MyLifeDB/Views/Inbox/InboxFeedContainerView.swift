@@ -76,10 +76,7 @@ struct InboxFeedContainerView: View {
             }
             .background(Color(.systemBackground))
         }
-        .navigationTitle("Inbox")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.large)
-        #endif
+        .toolbar(.hidden, for: .navigationBar)
         .task {
             await loadInitialData()
             setupSSE()
