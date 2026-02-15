@@ -23,53 +23,41 @@ struct InboxFeedView: View {
     let onPendingCancel: (PendingInboxItem) -> Void
     let onPendingRetry: (PendingInboxItem) -> Void
 
-    private let bottomAnchorID = "feed-bottom"
+    @State private var scrollPosition = ScrollPosition(edge: .bottom)
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .trailing, spacing: 16) {
-                    // Top sentinel for loading older items
-                    if hasOlderItems {
-                        topSentinel
-                    }
-
-                    // Items in reverse order (oldest first for chat layout)
-                    ForEach(items.reversed()) { item in
-                        itemView(for: item)
-                            .id(item.id)
-                    }
-
-                    // Pending items at bottom (newest)
-                    ForEach(pendingItems) { pending in
-                        PendingItemView(
-                            item: pending,
-                            onCancel: { onPendingCancel(pending) },
-                            onRetry: { onPendingRetry(pending) }
-                        )
-                        .id("pending-\(pending.id)")
-                    }
-
-                    // Bottom anchor for stick-to-bottom
-                    Color.clear
-                        .frame(height: 1)
-                        .id(bottomAnchorID)
+        ScrollView {
+            LazyVStack(alignment: .trailing, spacing: 16) {
+                // Top sentinel for loading older items
+                if hasOlderItems {
+                    topSentinel
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+
+                // Items in reverse order (oldest first for chat layout)
+                ForEach(items.reversed()) { item in
+                    itemView(for: item)
+                        .id(item.id)
+                }
+
+                // Pending items at bottom (newest)
+                ForEach(pendingItems) { pending in
+                    PendingItemView(
+                        item: pending,
+                        onCancel: { onPendingCancel(pending) },
+                        onRetry: { onPendingRetry(pending) }
+                    )
+                    .id("pending-\(pending.id)")
+                }
             }
-            .defaultScrollAnchor(.bottom)
-            .onChange(of: scrollToBottomTrigger) { _, _ in
-                scrollToBottom(proxy: proxy)
-            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
         }
-    }
-
-    // MARK: - Scroll Helpers
-
-    private func scrollToBottom(proxy: ScrollViewProxy) {
-        withAnimation(.easeOut(duration: 0.3)) {
-            proxy.scrollTo(bottomAnchorID, anchor: .bottom)
+        .scrollPosition($scrollPosition)
+        .defaultScrollAnchor(.bottom)
+        .onChange(of: scrollToBottomTrigger) { _, _ in
+            withAnimation(.easeOut(duration: 0.3)) {
+                scrollPosition.scrollTo(edge: .bottom)
+            }
         }
     }
 
