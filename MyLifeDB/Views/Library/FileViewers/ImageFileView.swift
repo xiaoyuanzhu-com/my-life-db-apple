@@ -11,6 +11,7 @@ import SwiftUI
 struct ImageFileView: View {
 
     let path: String
+    var onDismiss: (() -> Void)?
 
     @State private var imageData: Data?
     @State private var isLoading = true
@@ -78,6 +79,9 @@ struct ImageFileView: View {
                         }
                     }
                 }
+                .onTapGesture(count: 1) {
+                    onDismiss?()
+                }
             }
         } else {
             ContentUnavailableView("Invalid Image", systemImage: "photo")
@@ -94,6 +98,9 @@ struct ImageFileView: View {
                 withAnimation(.easeInOut(duration: 0.3)) {
                     scale = scale > 1.1 ? 1.0 : 2.5
                 }
+            }
+            .onTapGesture(count: 1) {
+                onDismiss?()
             }
         } else {
             ContentUnavailableView("Invalid Image", systemImage: "photo")

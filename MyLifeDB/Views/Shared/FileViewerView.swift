@@ -180,20 +180,34 @@ struct FileViewerView: View {
 
     // MARK: - Content Dispatch
 
+    private var dismissAction: () -> Void {
+        if let onDismiss { onDismiss } else { { dismiss() } }
+    }
+
     @ViewBuilder
     private func fileContentView(_ file: FileRecord) -> some View {
         if file.isImage {
-            ImageFileView(path: filePath)
+            ImageFileView(path: filePath, onDismiss: dismissAction)
         } else if file.isText {
             TextFileView(path: filePath)
+                .contentShape(Rectangle())
+                .onTapGesture { dismissAction() }
         } else if file.isPDF {
             PDFFileView(path: filePath)
+                .contentShape(Rectangle())
+                .onTapGesture { dismissAction() }
         } else if file.isVideo {
             VideoFileView(path: filePath)
+                .contentShape(Rectangle())
+                .onTapGesture { dismissAction() }
         } else if file.isAudio {
             AudioFileView(path: filePath, fileName: fileName)
+                .contentShape(Rectangle())
+                .onTapGesture { dismissAction() }
         } else {
             GenericFileInfoView(file: file, filePath: filePath)
+                .contentShape(Rectangle())
+                .onTapGesture { dismissAction() }
         }
     }
 
