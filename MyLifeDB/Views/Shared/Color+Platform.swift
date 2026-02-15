@@ -73,4 +73,15 @@ extension Color {
         return Color.gray.opacity(0.03)
         #endif
     }
+
+    /// Separator color that works on all platforms
+    static var platformSeparator: Color {
+        #if os(iOS)
+        return Color(uiColor: .separator)
+        #elseif os(macOS)
+        return Color(nsColor: .separatorColor)
+        #else
+        return Color.gray.opacity(0.3)
+        #endif
+    }
 }

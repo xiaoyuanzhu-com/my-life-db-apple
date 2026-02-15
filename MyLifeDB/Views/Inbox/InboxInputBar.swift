@@ -71,7 +71,7 @@ struct InboxInputBar: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color(.separator), lineWidth: 0.5)
+                    .stroke(Color.platformSeparator, lineWidth: 0.5)
             )
             .padding(.horizontal, 16)
             .padding(.vertical, 8)

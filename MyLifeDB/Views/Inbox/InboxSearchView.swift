@@ -90,7 +90,7 @@ struct InboxSearchView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(.separator), lineWidth: 0.5)
+                .stroke(Color.platformSeparator, lineWidth: 0.5)
         )
     }
 
