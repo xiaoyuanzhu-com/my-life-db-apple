@@ -12,7 +12,7 @@ private extension View {
     func cardFrame() -> some View {
         self
             .padding(12)
-            .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))
+            .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 6))
     }
 }
 
