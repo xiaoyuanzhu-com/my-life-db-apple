@@ -12,9 +12,17 @@ import SwiftUI
 struct InboxImageCard: View {
     let item: InboxItem
 
+    private var screenHeight: CGFloat {
+        #if os(iOS) || os(visionOS)
+        UIScreen.main.bounds.height
+        #elseif os(macOS)
+        NSScreen.main?.frame.height ?? 800
+        #endif
+    }
+
     var body: some View {
         AuthenticatedImage(path: item.path)
-            .frame(maxWidth: 320, maxHeight: 200, alignment: .leading)
+            .frame(maxWidth: 320, maxHeight: screenHeight * 0.2, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .trailing)
     }
 }
