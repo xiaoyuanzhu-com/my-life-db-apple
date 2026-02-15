@@ -11,34 +11,28 @@ struct InboxDocumentCard: View {
     let item: InboxItem
 
     var body: some View {
-        VStack(spacing: 8) {
-            if let screenshotPath = item.screenshotSqlar {
-                AuthenticatedSqlarImage(path: screenshotPath)
-                    .frame(maxHeight: 200)
-            } else {
-                documentIconView
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.name)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+
+                if let size = item.formattedSize {
+                    Text(size)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
+            .padding(.vertical, 4)
 
-            Text(item.name)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: 240)
-    }
+            Spacer(minLength: 8)
 
-    private var documentIconView: some View {
-        VStack(spacing: 8) {
             Image(systemName: documentIcon)
-                .font(.system(size: 48))
+                .font(.title2)
                 .foregroundStyle(documentColor)
-
-            Text(fileExtension.uppercased())
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
         }
-        .frame(width: 120, height: 100)
+        .frame(maxWidth: 320)
     }
 
     private var documentIcon: String {
