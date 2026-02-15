@@ -3,12 +3,12 @@
 //  MyLifeDB
 //
 //  Root navigation view with four tabs:
-//  - Inbox: WebView (web frontend "/")
+//  - Inbox: Native SwiftUI inbox feed
 //  - Library: Native SwiftUI file browser
 //  - Claude: Native session list → WebView detail per session
 //  - Me: Native SwiftUI (profile and settings)
 //
-//  Inbox and Claude web tabs own independent WebPage instances via TabWebViewModel.
+//  Claude web tab owns an independent WebPage instance via TabWebViewModel.
 //  Uses native SwiftUI TabView on iOS/iPadOS and NavigationSplitView on macOS.
 //
 
@@ -39,12 +39,11 @@ struct MainTabView: View {
     @Binding var deepLinkPath: String?
 
     @State private var selectedTab: AppTab = .inbox
-    @State private var inboxVM = TabWebViewModel(route: "/")
     @State private var claudeVM = TabWebViewModel(route: "/claude")
 
     @Environment(\.scenePhase) private var scenePhase
 
-    private var allViewModels: [TabWebViewModel] { [inboxVM, claudeVM] }
+    private var allViewModels: [TabWebViewModel] { [claudeVM] }
 
     var body: some View {
         #if os(macOS)
@@ -60,7 +59,7 @@ struct MainTabView: View {
     private var iOSLayout: some View {
         TabView(selection: $selectedTab) {
             Tab(AppTab.inbox.rawValue, systemImage: AppTab.inbox.icon, value: .inbox) {
-                tabContent(viewModel: inboxVM)
+                NativeInboxView()
             }
             Tab(AppTab.library.rawValue, systemImage: AppTab.library.icon, value: .library) {
                 NativeLibraryBrowserView()
@@ -94,7 +93,7 @@ struct MainTabView: View {
         } detail: {
             switch selectedTab {
             case .inbox:
-                tabContent(viewModel: inboxVM)
+                NativeInboxView()
             case .library:
                 NativeLibraryBrowserView()
             case .claude:
@@ -112,69 +111,13 @@ struct MainTabView: View {
     }
     #endif
 
-    // MARK: - Tab Content
-
-    private func tabContent(viewModel: TabWebViewModel) -> some View {
-        ZStack {
-            WebViewContainer(viewModel: viewModel)
-
-            if !viewModel.isLoaded {
-                loadingOverlay
-            }
-
-            if let error = viewModel.loadError {
-                errorOverlay(error, viewModel: viewModel)
-            }
-        }
-    }
-
-    // MARK: - Loading & Error Overlays
-
-    private var loadingOverlay: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-                .controlSize(.large)
-            Text("Loading...")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.platformBackground)
-    }
-
-    private func errorOverlay(_ error: Error, viewModel: TabWebViewModel) -> some View {
-        VStack(spacing: 16) {
-            Image(systemName: "wifi.slash")
-                .font(.largeTitle)
-                .foregroundStyle(.secondary)
-
-            Text("Unable to Connect")
-                .font(.headline)
-
-            Text(error.localizedDescription)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-
-            Button("Retry") {
-                viewModel.reload()
-            }
-            .buttonStyle(.borderedProminent)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.platformBackground)
-    }
-
     // MARK: - Deep Link → Tab Mapping
 
     private func viewModel(for path: String) -> (AppTab, TabWebViewModel)? {
-        if path == "/" || path.hasPrefix("/inbox") {
-            return (.inbox, inboxVM)
-        } else if path.hasPrefix("/claude") {
+        if path.hasPrefix("/claude") {
             return (.claude, claudeVM)
         }
-        // Library is now native and doesn't use a WebView model
+        // Inbox and Library are now native and don't use WebView models
         return nil
     }
 }
@@ -227,6 +170,8 @@ private struct SharedModifiers: ViewModifier {
     private func handleDeepLink(_ path: String) {
         if path == "/" || path.hasPrefix("/inbox") {
             selectedTab = .inbox
+            // Inbox is now native; no WebView navigation needed
+            return
         } else if path.hasPrefix("/library") || path.hasPrefix("/file") {
             selectedTab = .library
             // Library is now native; deep path navigation handled by NativeLibraryBrowserView
@@ -239,7 +184,7 @@ private struct SharedModifiers: ViewModifier {
         }
 
         // Navigate within the selected tab's WebView if it's a sub-path
-        if let vm = allViewModels.first(where: { path.hasPrefix($0.route) || (path.hasPrefix("/inbox") && $0.route == "/") }) {
+        if let vm = allViewModels.first(where: { path.hasPrefix($0.route) }) {
             vm.navigateTo(path: path)
         }
     }
