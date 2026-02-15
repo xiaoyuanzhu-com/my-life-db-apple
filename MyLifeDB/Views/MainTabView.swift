@@ -60,22 +60,14 @@ struct MainTabView: View {
                     .ignoresSafeArea()
                     .transition(.opacity)
 
-                FileViewerView(
-                    filePath: preview.path,
-                    fileName: preview.name,
-                    onDismiss: {
-                        withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
-                            filePreview = nil
-                        }
-                    }
-                )
-                .transition(.opacity)
-                .zIndex(1)
+                fileViewerView(for: preview)
+                    .transition(.opacity)
+                    .zIndex(1)
             }
         }
-        .environment(\.openFilePreview) { path, name in
+        .environment(\.openFilePreview) { path, name, file in
             withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
-                filePreview = FilePreviewDestination(path: path, name: name)
+                filePreview = FilePreviewDestination(path: path, name: name, file: file)
             }
         }
         .environment(\.previewNamespace, previewNamespace)
@@ -139,6 +131,22 @@ struct MainTabView: View {
         ))
     }
     #endif
+
+    // MARK: - File Viewer
+
+    @ViewBuilder
+    private func fileViewerView(for preview: FilePreviewDestination) -> some View {
+        let dismiss = {
+            withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
+                filePreview = nil
+            }
+        }
+        if let file = preview.file {
+            FileViewerView(file: file, onDismiss: dismiss)
+        } else {
+            FileViewerView(filePath: preview.path, fileName: preview.name, onDismiss: dismiss)
+        }
+    }
 
     // MARK: - Deep Link → Tab Mapping
 

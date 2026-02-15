@@ -134,7 +134,7 @@ struct InboxFeedView: View {
             InboxTimestampView(dateString: item.createdAt)
 
             Button {
-                openFilePreview?(item.path, item.name)
+                openFilePreview?(item.path, item.name, item.asFileRecord)
             } label: {
                 InboxItemCard(item: item)
             }

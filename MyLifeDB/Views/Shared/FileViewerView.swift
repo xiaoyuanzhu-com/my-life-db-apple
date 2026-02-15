@@ -24,10 +24,17 @@ struct FilePreviewDestination: Identifiable {
     let id = UUID()
     let path: String
     let name: String
+    let file: FileRecord?
+
+    init(path: String, name: String, file: FileRecord? = nil) {
+        self.path = path
+        self.name = name
+        self.file = file
+    }
 }
 
 private struct FilePreviewActionKey: EnvironmentKey {
-    static var defaultValue: ((String, String) -> Void)? = nil
+    static var defaultValue: ((String, String, FileRecord?) -> Void)? = nil
 }
 
 private struct PreviewNamespaceKey: EnvironmentKey {
@@ -39,7 +46,7 @@ private struct ActivePreviewPathKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-    var openFilePreview: ((String, String) -> Void)? {
+    var openFilePreview: ((String, String, FileRecord?) -> Void)? {
         get { self[FilePreviewActionKey.self] }
         set { self[FilePreviewActionKey.self] = newValue }
     }

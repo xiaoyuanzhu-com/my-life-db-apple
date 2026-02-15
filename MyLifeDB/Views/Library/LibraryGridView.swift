@@ -33,7 +33,7 @@ struct LibraryGridView: View {
                         .buttonStyle(.plain)
                     } else {
                         Button {
-                            openFilePreview?(fullPath, node.name)
+                            openFilePreview?(fullPath, node.name, nil)
                         } label: {
                             LibraryGridItem(node: node)
                         }
