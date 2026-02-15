@@ -106,7 +106,7 @@ struct InboxSearchView: View {
 
     private func imageResultCard(_ result: SearchResultItem) -> some View {
         AuthenticatedImage(path: result.path)
-            .frame(maxHeight: 200)
+            .frame(maxWidth: maxCardWidth, maxHeight: 200)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .padding(8)
     }
