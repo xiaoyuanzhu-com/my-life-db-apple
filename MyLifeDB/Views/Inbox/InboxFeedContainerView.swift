@@ -74,7 +74,7 @@ struct InboxFeedContainerView: View {
                     searchStatus: searchStatus
                 )
             }
-            .background(Color(.systemBackground))
+            .background(.background)
         }
         .toolbar(.hidden, for: .navigationBar)
         .task {
