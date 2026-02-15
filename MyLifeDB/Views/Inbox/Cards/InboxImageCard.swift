@@ -23,5 +23,6 @@ struct InboxImageCard: View {
     var body: some View {
         AuthenticatedImage(path: item.path)
             .frame(maxWidth: 320, maxHeight: screenHeight * 0.2, alignment: .trailing)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }

@@ -19,5 +19,6 @@ struct InboxVideoCard: View {
                 .font(.title)
                 .foregroundStyle(.white)
         }
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
