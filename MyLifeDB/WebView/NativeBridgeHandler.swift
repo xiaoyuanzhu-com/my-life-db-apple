@@ -98,11 +98,12 @@ final class NativeBridgeHandler: URLSchemeHandler {
         let activityVC = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
 
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let rootVC = scene.windows.first?.rootViewController else { return }
+              let rootVC = scene.keyWindow?.rootViewController else { return }
 
         if let popover = activityVC.popoverPresentationController {
             popover.sourceView = rootVC.view
-            popover.sourceRect = CGRect(x: UIScreen.main.bounds.midX, y: UIScreen.main.bounds.midY, width: 0, height: 0)
+            let bounds = rootVC.view.bounds
+            popover.sourceRect = CGRect(x: bounds.midX, y: bounds.midY, width: 0, height: 0)
             popover.permittedArrowDirections = []
         }
 

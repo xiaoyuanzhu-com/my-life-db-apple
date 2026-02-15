@@ -73,7 +73,7 @@ struct OAuthWebView: View {
 
                 #if os(iOS)
                 if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                   let window = windowScene.windows.first {
+                   let window = windowScene.keyWindow {
                     holder.contextProvider = iOSContextProvider(anchor: window)
                     session.presentationContextProvider = holder.contextProvider
                 }
