@@ -89,7 +89,6 @@ struct InboxFeedView: View {
                 }
             }
         }
-        }
     }
 
     // MARK: - Older Items Sentinel

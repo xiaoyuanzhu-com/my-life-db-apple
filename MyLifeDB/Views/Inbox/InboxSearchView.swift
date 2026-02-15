@@ -13,6 +13,16 @@ struct InboxSearchView: View {
     let results: [SearchResultItem]
     let isSearching: Bool
 
+    private var maxCardWidth: CGFloat {
+        #if os(iOS) || os(visionOS)
+        let scene = UIApplication.shared.connectedScenes
+            .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+        return (scene?.screen.bounds.width ?? 393) * 0.8
+        #elseif os(macOS)
+        return (NSScreen.main?.frame.width ?? 800) * 0.8
+        #endif
+    }
+
     var body: some View {
         Group {
             if isSearching && results.isEmpty {
@@ -28,12 +38,11 @@ struct InboxSearchView: View {
     // MARK: - Results List
 
     private var resultsList: some View {
-        GeometryReader { geo in
         ScrollView {
             LazyVStack(alignment: .trailing, spacing: 16) {
                 ForEach(results) { result in
                     resultView(for: result)
-                        .frame(maxWidth: geo.size.width * 0.8)
+                        .frame(maxWidth: maxCardWidth)
                         .flippedForChat()
                 }
             }
@@ -41,7 +50,6 @@ struct InboxSearchView: View {
             .padding(.vertical, 8)
         }
         .flippedForChat()
-        }
     }
 
     @ViewBuilder
