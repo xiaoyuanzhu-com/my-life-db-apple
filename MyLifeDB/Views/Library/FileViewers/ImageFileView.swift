@@ -108,7 +108,8 @@ struct ImageFileView: View {
         error = nil
 
         do {
-            imageData = try await APIClient.shared.library.getRawContent(path: path)
+            let url = APIClient.shared.rawFileURL(path: path)
+            imageData = try await FileCache.shared.data(for: url)
         } catch {
             self.error = error
         }

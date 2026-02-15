@@ -3,7 +3,7 @@
 //  MyLifeDB
 //
 //  Image view that loads from the backend with auth headers.
-//  Uses ImageCache for two-tier caching (in-memory decoded + HTTP disk cache).
+//  Uses FileCache for two-tier caching (in-memory decoded + HTTP disk cache).
 //
 
 import SwiftUI
@@ -11,7 +11,7 @@ import SwiftUI
 struct AuthenticatedImage: View {
     let path: String
 
-    @State private var image: ImageCache.Image?
+    @State private var image: FileCache.Image?
     @State private var loadState: LoadState = .loading
 
     private enum LoadState {
@@ -70,7 +70,7 @@ struct AuthenticatedImage: View {
         let url = APIClient.shared.rawFileURL(path: path)
 
         do {
-            image = try await ImageCache.shared.image(for: url)
+            image = try await FileCache.shared.image(for: url)
             loadState = .loaded
         } catch {
             loadState = .failed
@@ -82,7 +82,7 @@ struct AuthenticatedImage: View {
 struct AuthenticatedSqlarImage: View {
     let path: String
 
-    @State private var image: ImageCache.Image?
+    @State private var image: FileCache.Image?
     @State private var loadState: LoadState = .loading
 
     private enum LoadState {
@@ -134,7 +134,7 @@ struct AuthenticatedSqlarImage: View {
         let url = APIClient.shared.sqlarFileURL(path: path)
 
         do {
-            image = try await ImageCache.shared.image(for: url)
+            image = try await FileCache.shared.image(for: url)
             loadState = .loaded
         } catch {
             loadState = .failed

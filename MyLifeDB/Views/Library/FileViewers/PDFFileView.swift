@@ -45,7 +45,8 @@ struct PDFFileView: View {
         error = nil
 
         do {
-            let data = try await APIClient.shared.library.getRawContent(path: path)
+            let url = APIClient.shared.rawFileURL(path: path)
+            let data = try await FileCache.shared.data(for: url)
             pdfDocument = PDFDocument(data: data)
             if pdfDocument == nil {
                 self.error = NSError(

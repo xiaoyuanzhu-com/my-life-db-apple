@@ -49,7 +49,8 @@ struct TextFileView: View {
         error = nil
 
         do {
-            let data = try await APIClient.shared.library.getRawContent(path: path)
+            let url = APIClient.shared.rawFileURL(path: path)
+            let data = try await FileCache.shared.data(for: url)
             content = String(data: data, encoding: .utf8)
             if content == nil {
                 // Try Latin-1 as fallback for non-UTF8 files
