@@ -67,7 +67,7 @@ struct InboxInputBar: View {
                 // Bottom control bar
                 bottomControlBar
             }
-            .background(Color(.secondarySystemBackground))
+            .background(Color.platformSecondaryBackground)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
@@ -231,7 +231,7 @@ struct InboxInputBar: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Color(.tertiarySystemBackground))
+        .background(Color.platformTertiaryBackground)
         .clipShape(Capsule())
     }
 

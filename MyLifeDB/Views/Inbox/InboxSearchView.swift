@@ -86,7 +86,7 @@ struct InboxSearchView: View {
                 fallbackResultCard(result)
             }
         }
-        .background(Color(.secondarySystemBackground))
+        .background(Color.platformSecondaryBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)

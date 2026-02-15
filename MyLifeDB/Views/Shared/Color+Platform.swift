@@ -51,4 +51,26 @@ extension Color {
         return Color.gray.opacity(0.1)
         #endif
     }
+
+    /// Secondary background color that works on all platforms
+    static var platformSecondaryBackground: Color {
+        #if os(iOS)
+        return Color(uiColor: .secondarySystemBackground)
+        #elseif os(macOS)
+        return Color(nsColor: .controlBackgroundColor)
+        #else
+        return Color.gray.opacity(0.06)
+        #endif
+    }
+
+    /// Tertiary background color that works on all platforms
+    static var platformTertiaryBackground: Color {
+        #if os(iOS)
+        return Color(uiColor: .tertiarySystemBackground)
+        #elseif os(macOS)
+        return Color(nsColor: .textBackgroundColor)
+        #else
+        return Color.gray.opacity(0.03)
+        #endif
+    }
 }
