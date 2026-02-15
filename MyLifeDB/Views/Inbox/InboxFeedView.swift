@@ -119,16 +119,6 @@ struct InboxFeedView: View {
             .contextMenu {
                 contextMenuContent(for: item)
             }
-
-            if item.isPinned {
-                HStack(spacing: 4) {
-                    Image(systemName: "pin.fill")
-                        .font(.caption2)
-                    Text("Pinned")
-                        .font(.caption2)
-                }
-                .foregroundStyle(.orange)
-            }
         }
         .transition(.asymmetric(
             insertion: .move(edge: .bottom).combined(with: .opacity),

@@ -3,8 +3,9 @@
 //  MyLifeDB
 //
 //  Input bar for creating new inbox items.
-//  Supports text input, file attachments via photo picker
-//  or file importer, and send action.
+//  Matches web OmniInput layout: textarea on top,
+//  file chips, bottom control bar [+ | search status | send].
+//  Text changes trigger search via onTextChange callback.
 //
 
 import SwiftUI
@@ -25,10 +26,20 @@ struct InboxFileAttachment: Identifiable {
     }
 }
 
+// MARK: - Search Status
+
+struct InboxSearchStatus {
+    var isSearching: Bool = false
+    var resultCount: Int = 0
+    var hasError: Bool = false
+}
+
 // MARK: - Input Bar
 
 struct InboxInputBar: View {
     let onSend: (String, [InboxFileAttachment]) -> Void
+    let onTextChange: (String) -> Void
+    var searchStatus: InboxSearchStatus = InboxSearchStatus()
 
     @State private var text = ""
     @State private var attachments: [InboxFileAttachment] = []
@@ -38,27 +49,78 @@ struct InboxInputBar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !attachments.isEmpty {
-                attachmentsPreview
-            }
-
-            HStack(alignment: .bottom, spacing: 12) {
-                attachButton
-
+            // Rounded container matching web's OmniInput
+            VStack(spacing: 0) {
+                // Textarea
                 TextField("What's up?", text: $text, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(1...6)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.platformGray6)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, attachments.isEmpty ? 4 : 0)
 
-                sendButton
+                // File attachment chips
+                if !attachments.isEmpty {
+                    attachmentsPreview
+                }
+
+                // Bottom control bar
+                HStack {
+                    // Left: + button
+                    attachButton
+
+                    Spacer()
+
+                    // Center: search status
+                    if searchStatus.isSearching {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .controlSize(.mini)
+                            Text("Searching...")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else if searchStatus.resultCount > 0 {
+                        Text("\(searchStatus.resultCount) results")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else if searchStatus.hasError {
+                        Text("Search failed")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+
+                    Spacer()
+
+                    // Right: send button
+                    if canSend {
+                        Button {
+                            send()
+                        } label: {
+                            Text("Send")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .disabled(isSending)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
             }
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color(.separator), lineWidth: 0.5)
+            )
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.vertical, 8)
         }
-        .background(Color.platformBackground)
+        .onChange(of: text) { _, newValue in
+            onTextChange(newValue)
+        }
         .onChange(of: photoPickerItems) { _, newItems in
             Task { await handlePhotoPickerSelection(newItems) }
         }
@@ -89,23 +151,12 @@ struct InboxInputBar: View {
                 Label("Files", systemImage: "folder")
             }
         } label: {
-            Image(systemName: "plus.circle.fill")
-                .font(.title2)
+            Image(systemName: "plus")
+                .font(.body)
+                .fontWeight(.medium)
                 .foregroundStyle(.secondary)
+                .frame(width: 28, height: 28)
         }
-    }
-
-    // MARK: - Send Button
-
-    private var sendButton: some View {
-        Button {
-            send()
-        } label: {
-            Image(systemName: "arrow.up.circle.fill")
-                .font(.title)
-                .foregroundStyle(canSend ? .blue : .secondary)
-        }
-        .disabled(!canSend || isSending)
     }
 
     private var canSend: Bool {
@@ -122,7 +173,7 @@ struct InboxInputBar: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.vertical, 6)
         }
     }
 
@@ -134,7 +185,7 @@ struct InboxInputBar: View {
                     Image(uiImage: uiImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 24, height: 24)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 } else {
                     fileIcon(for: attachment.mimeType)
@@ -144,7 +195,7 @@ struct InboxInputBar: View {
                     Image(nsImage: nsImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 24, height: 24)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 } else {
                     fileIcon(for: attachment.mimeType)
@@ -155,21 +206,21 @@ struct InboxInputBar: View {
             }
 
             Text(attachment.filename)
-                .font(.caption)
+                .font(.caption2)
                 .lineLimit(1)
-                .frame(maxWidth: 100)
+                .frame(maxWidth: 80)
 
             Button {
                 attachments.removeAll { $0.id == attachment.id }
             } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
             }
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(Color.platformGray5)
+        .padding(.vertical, 4)
+        .background(Color(.tertiarySystemBackground))
         .clipShape(Capsule())
     }
 
@@ -183,9 +234,9 @@ struct InboxInputBar: View {
         }()
 
         return Image(systemName: iconName)
-            .font(.body)
+            .font(.caption)
             .foregroundStyle(.secondary)
-            .frame(width: 32, height: 32)
+            .frame(width: 24, height: 24)
     }
 
     // MARK: - Actions

@@ -2,8 +2,8 @@
 //  InboxItemCard.swift
 //  MyLifeDB
 //
-//  Card router that dispatches to the appropriate card type
-//  based on the inbox item's content type.
+//  Card router that dispatches to the appropriate card type.
+//  Uses border + muted background (no shadow) to match web.
 //
 
 import SwiftUI
@@ -13,9 +13,12 @@ struct InboxItemCard: View {
 
     var body: some View {
         cardContent
-            .background(Color.platformBackground)
+            .background(Color(.secondarySystemBackground))
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color(.separator), lineWidth: 0.5)
+            )
     }
 
     @ViewBuilder

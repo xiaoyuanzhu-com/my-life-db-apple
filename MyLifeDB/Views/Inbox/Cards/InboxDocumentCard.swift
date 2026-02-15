@@ -3,7 +3,6 @@
 //  MyLifeDB
 //
 //  Card component for displaying document items (PDF, Office docs).
-//  Shows screenshot thumbnail if available, otherwise a document icon.
 //
 
 import SwiftUI
@@ -14,40 +13,17 @@ struct InboxDocumentCard: View {
     var body: some View {
         VStack(spacing: 8) {
             if let screenshotPath = item.screenshotSqlar {
-                AsyncImage(url: APIClient.shared.sqlarFileURL(path: screenshotPath)) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: 200)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-
-                    case .failure, .empty:
-                        documentIconView
-
-                    @unknown default:
-                        documentIconView
-                    }
-                }
+                AuthenticatedSqlarImage(path: screenshotPath)
+                    .frame(maxHeight: 200)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
                 documentIconView
             }
 
-            HStack {
-                Text(item.name)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                Spacer()
-
-                if let size = item.formattedSize {
-                    Text(size)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            Text(item.name)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
         .padding(12)
         .frame(maxWidth: 240)

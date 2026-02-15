@@ -3,7 +3,7 @@
 //  MyLifeDB
 //
 //  Main data-owning container for the inbox feed.
-//  Manages loading, pagination, upload, and all inbox state.
+//  Manages loading, pagination, upload, search, and all inbox state.
 //
 
 import SwiftUI
@@ -22,16 +22,24 @@ struct InboxFeedContainerView: View {
     @State private var hasMore = InboxHasMore(older: false, newer: false)
     @State private var sseManager = InboxSSEManager()
 
+    // Search state
+    @State private var searchResults: [SearchResultItem] = []
+    @State private var searchStatus = InboxSearchStatus()
+    @State private var isShowingSearch = false
+    @State private var searchTask: Task<Void, Never>?
+
     // MARK: - Body
 
     var body: some View {
         VStack(spacing: 0) {
-            // Main content area
+            // Main content area — feed or search results
             Group {
                 if isLoading && items.isEmpty {
                     loadingView
                 } else if let error = error, items.isEmpty {
                     errorView(error)
+                } else if isShowingSearch {
+                    searchResultsView
                 } else if items.isEmpty && !isLoading && pendingItems.isEmpty {
                     emptyView
                 } else {
@@ -40,23 +48,31 @@ struct InboxFeedContainerView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            Divider()
+            // Bottom section: pins + input
+            VStack(spacing: 0) {
+                // Pinned items bar
+                InboxPinnedBar(
+                    items: pinnedItems,
+                    onTap: { pinnedItem in
+                        Task { await navigateToPinnedItem(pinnedItem) }
+                    },
+                    onUnpin: { pinnedItem in
+                        Task { await unpinItem(pinnedItem) }
+                    }
+                )
 
-            // Pinned items bar
-            InboxPinnedBar(
-                items: pinnedItems,
-                onTap: { pinnedItem in
-                    Task { await navigateToPinnedItem(pinnedItem) }
-                },
-                onUnpin: { pinnedItem in
-                    Task { await unpinItem(pinnedItem) }
-                }
-            )
-
-            // Input bar at bottom
-            InboxInputBar { text, files in
-                createItem(text: text, files: files)
+                // Input bar at bottom
+                InboxInputBar(
+                    onSend: { text, files in
+                        createItem(text: text, files: files)
+                    },
+                    onTextChange: { text in
+                        handleTextChange(text)
+                    },
+                    searchStatus: searchStatus
+                )
             }
+            .background(Color(.systemBackground))
         }
         .navigationTitle("Inbox")
         #if os(iOS)
@@ -148,6 +164,69 @@ struct InboxFeedContainerView: View {
         }
     }
 
+    // MARK: - Search Results View
+
+    private var searchResultsView: some View {
+        InboxSearchView(results: searchResults, isSearching: searchStatus.isSearching)
+    }
+
+    // MARK: - Search
+
+    private func handleTextChange(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Cancel previous search
+        searchTask?.cancel()
+
+        if trimmed.count < 2 {
+            isShowingSearch = false
+            searchResults = []
+            searchStatus = InboxSearchStatus()
+            return
+        }
+
+        // Debounce search
+        let delay: UInt64 = trimmed.count <= 2 ? 500_000_000 : 100_000_000
+
+        searchTask = Task {
+            try? await Task.sleep(nanoseconds: delay)
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                searchStatus.isSearching = true
+            }
+
+            do {
+                let response = try await APIClient.shared.search.search(
+                    query: trimmed,
+                    limit: 20,
+                    offset: 0
+                )
+                guard !Task.isCancelled else { return }
+
+                await MainActor.run {
+                    searchResults = response.results
+                    searchStatus = InboxSearchStatus(
+                        isSearching: false,
+                        resultCount: response.results.count,
+                        hasError: false
+                    )
+                    isShowingSearch = true
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    searchStatus = InboxSearchStatus(
+                        isSearching: false,
+                        resultCount: 0,
+                        hasError: true
+                    )
+                    isShowingSearch = true
+                }
+            }
+        }
+    }
+
     // MARK: - SSE
 
     private func setupSSE() {
@@ -160,8 +239,6 @@ struct InboxFeedContainerView: View {
         sseManager.start()
     }
 
-    /// Lightweight refresh that only reloads items (not pinned).
-    /// Used by SSE to avoid redundant pinned fetches on item changes.
     private func refreshItems() async {
         do {
             let response = try await APIClient.shared.inbox.list()
@@ -278,7 +355,6 @@ struct InboxFeedContainerView: View {
     }
 
     private func unpinItem(_ pinnedItem: PinnedItem) async {
-        // Optimistic update
         pinnedItems.removeAll { $0.path == pinnedItem.path }
 
         do {
@@ -291,13 +367,11 @@ struct InboxFeedContainerView: View {
     }
 
     private func navigateToPinnedItem(_ pinnedItem: PinnedItem) async {
-        // Load items around the pinned item's cursor
         do {
             let response = try await APIClient.shared.inbox.list(around: pinnedItem.cursor)
             items = response.items
             cursors = response.cursors
             hasMore = response.hasMore
-            // targetIndex is available for scrolling — handled by feed view
         } catch {
             print("[Inbox] Failed to navigate to pinned item: \(error)")
         }
@@ -334,17 +408,14 @@ struct InboxFeedContainerView: View {
                 _ = try await APIClient.shared.inbox.createText(item.text)
             }
 
-            // Success — remove pending item and refresh
             pendingItems.removeAll { $0.id == item.id }
             await refresh()
         } catch {
-            // Mark as failed
             if let index = pendingItems.firstIndex(where: { $0.id == item.id }) {
                 pendingItems[index].status = .failed
                 pendingItems[index].error = error.localizedDescription
                 pendingItems[index].retryCount += 1
 
-                // Auto-retry up to 3 times
                 if pendingItems[index].retryCount < 3 {
                     let delay = Double(pendingItems[index].retryCount * pendingItems[index].retryCount) * 5
                     pendingItems[index].status = .queued

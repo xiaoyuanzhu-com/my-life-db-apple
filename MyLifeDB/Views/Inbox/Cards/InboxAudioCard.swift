@@ -3,7 +3,6 @@
 //  MyLifeDB
 //
 //  Card component for displaying audio items.
-//  Shows play icon with waveform placeholder.
 //
 
 import SwiftUI
@@ -26,19 +25,6 @@ struct InboxAudioCard: View {
             }
 
             Spacer(minLength: 0)
-
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(item.name)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                if let size = item.formattedSize {
-                    Text(size)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
         }
         .padding(12)
         .frame(maxWidth: 280)

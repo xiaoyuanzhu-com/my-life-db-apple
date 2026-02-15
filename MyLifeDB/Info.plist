@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>MyLifeDB needs access to your photo library to attach photos and videos to inbox items.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>MyLifeDB reads health data to sync it to your personal life database. Data is only sent to your own server.</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
