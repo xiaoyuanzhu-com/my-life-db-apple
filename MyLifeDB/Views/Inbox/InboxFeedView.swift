@@ -14,6 +14,8 @@ import SwiftUI
 
 struct InboxFeedView: View {
 
+    @Environment(\.openFilePreview) private var openFilePreview
+
     let items: [InboxItem]
     let pinnedItems: [PinnedItem]
     let pendingItems: [PendingInboxItem]
@@ -128,7 +130,9 @@ struct InboxFeedView: View {
         VStack(alignment: .trailing, spacing: 4) {
             InboxTimestampView(dateString: item.createdAt)
 
-            NavigationLink(value: InboxDestination.file(path: item.path, name: item.name)) {
+            Button {
+                openFilePreview?(item.path, item.name)
+            } label: {
                 InboxItemCard(item: item)
             }
             .buttonStyle(.plain)

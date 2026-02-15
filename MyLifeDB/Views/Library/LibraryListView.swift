@@ -10,14 +10,27 @@ import SwiftUI
 
 struct LibraryListView: View {
 
+    @Environment(\.openFilePreview) private var openFilePreview
+
     let children: [FileTreeNode]
     let folderPath: String
 
     var body: some View {
-        List(children) { node in
-            let fullPath = buildFullPath(for: node)
-            NavigationLink(value: destination(for: node, fullPath: fullPath)) {
-                LibraryListRow(node: node)
+        List {
+            ForEach(children) { node in
+                let fullPath = buildFullPath(for: node)
+                if node.isFolder {
+                    NavigationLink(value: LibraryDestination.folder(path: fullPath, name: node.name)) {
+                        LibraryListRow(node: node)
+                    }
+                } else {
+                    Button {
+                        openFilePreview?(fullPath, node.name)
+                    } label: {
+                        LibraryListRow(node: node)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
         #if os(iOS)
@@ -31,14 +44,6 @@ struct LibraryListView: View {
 
     private func buildFullPath(for node: FileTreeNode) -> String {
         folderPath.isEmpty ? node.name : "\(folderPath)/\(node.name)"
-    }
-
-    private func destination(for node: FileTreeNode, fullPath: String) -> LibraryDestination {
-        if node.isFolder {
-            return .folder(path: fullPath, name: node.name)
-        } else {
-            return .file(path: fullPath, name: node.name)
-        }
     }
 }
 

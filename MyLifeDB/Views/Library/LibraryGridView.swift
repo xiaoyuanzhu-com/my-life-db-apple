@@ -10,6 +10,8 @@ import SwiftUI
 
 struct LibraryGridView: View {
 
+    @Environment(\.openFilePreview) private var openFilePreview
+
     let children: [FileTreeNode]
     let folderPath: String
 
@@ -22,10 +24,19 @@ struct LibraryGridView: View {
             LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(children) { node in
                     let fullPath = buildFullPath(for: node)
-                    NavigationLink(value: destination(for: node, fullPath: fullPath)) {
-                        LibraryGridItem(node: node)
+                    if node.isFolder {
+                        NavigationLink(value: LibraryDestination.folder(path: fullPath, name: node.name)) {
+                            LibraryGridItem(node: node)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button {
+                            openFilePreview?(fullPath, node.name)
+                        } label: {
+                            LibraryGridItem(node: node)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 16)
@@ -37,13 +48,5 @@ struct LibraryGridView: View {
 
     private func buildFullPath(for node: FileTreeNode) -> String {
         folderPath.isEmpty ? node.name : "\(folderPath)/\(node.name)"
-    }
-
-    private func destination(for node: FileTreeNode, fullPath: String) -> LibraryDestination {
-        if node.isFolder {
-            return .folder(path: fullPath, name: node.name)
-        } else {
-            return .file(path: fullPath, name: node.name)
-        }
     }
 }

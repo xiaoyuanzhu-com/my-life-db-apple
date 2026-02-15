@@ -21,16 +21,17 @@ enum InboxDestination: Hashable {
 struct NativeInboxView: View {
 
     @State private var navigationPath = NavigationPath()
+    @State private var filePreview: FilePreviewDestination?
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
             InboxFeedContainerView()
-                .navigationDestination(for: InboxDestination.self) { destination in
-                    switch destination {
-                    case .file(let path, let name):
-                        FileViewerView(filePath: path, fileName: name)
-                    }
-                }
+        }
+        .environment(\.openFilePreview) { path, name in
+            filePreview = FilePreviewDestination(path: path, name: name)
+        }
+        .fullScreenCover(item: $filePreview) { preview in
+            FileViewerView(filePath: preview.path, fileName: preview.name)
         }
     }
 }

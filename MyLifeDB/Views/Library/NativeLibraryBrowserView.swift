@@ -44,6 +44,7 @@ enum LibraryViewMode: String, CaseIterable {
 struct NativeLibraryBrowserView: View {
 
     @State private var navigationPath = NavigationPath()
+    @State private var filePreview: FilePreviewDestination?
     @AppStorage("libraryViewMode") private var viewMode: LibraryViewMode = .grid
 
     var body: some View {
@@ -62,10 +63,16 @@ struct NativeLibraryBrowserView: View {
                         folderName: name,
                         viewMode: $viewMode
                     )
-                case .file(let path, let name):
-                    LibraryFileDetailView(filePath: path, fileName: name)
+                case .file:
+                    EmptyView()
                 }
             }
+        }
+        .environment(\.openFilePreview) { path, name in
+            filePreview = FilePreviewDestination(path: path, name: name)
+        }
+        .fullScreenCover(item: $filePreview) { preview in
+            FileViewerView(filePath: preview.path, fileName: preview.name)
         }
     }
 }

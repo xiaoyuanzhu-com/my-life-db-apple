@@ -17,6 +17,28 @@
 
 import SwiftUI
 
+// MARK: - File Preview Environment
+
+/// Identifiable wrapper for fullScreenCover presentation.
+struct FilePreviewDestination: Identifiable {
+    let id = UUID()
+    let path: String
+    let name: String
+}
+
+private struct FilePreviewActionKey: EnvironmentKey {
+    static var defaultValue: ((String, String) -> Void)? = nil
+}
+
+extension EnvironmentValues {
+    var openFilePreview: ((String, String) -> Void)? {
+        get { self[FilePreviewActionKey.self] }
+        set { self[FilePreviewActionKey.self] = newValue }
+    }
+}
+
+// MARK: - FileViewerView
+
 struct FileViewerView: View {
 
     // MARK: - Initializers
@@ -76,10 +98,6 @@ struct FileViewerView: View {
             .padding(.leading, 16)
             .padding(.top, 8)
         }
-        .toolbar(.hidden, for: .navigationBar)
-        #if !os(macOS)
-        .toolbar(.hidden, for: .tabBar)
-        #endif
         .task {
             if needsFetch {
                 await loadFileInfo()

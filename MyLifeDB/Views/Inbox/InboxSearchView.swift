@@ -10,6 +10,8 @@ import SwiftUI
 
 struct InboxSearchView: View {
 
+    @Environment(\.openFilePreview) private var openFilePreview
+
     let results: [SearchResultItem]
     let isSearching: Bool
 
@@ -57,7 +59,9 @@ struct InboxSearchView: View {
         VStack(alignment: .trailing, spacing: 4) {
             InboxTimestampView(dateString: result.createdAt)
 
-            NavigationLink(value: InboxDestination.file(path: result.path, name: result.name)) {
+            Button {
+                openFilePreview?(result.path, result.name)
+            } label: {
                 resultCard(for: result)
             }
             .buttonStyle(.plain)
