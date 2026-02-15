@@ -3,8 +3,7 @@
 //  MyLifeDB
 //
 //  Image view that loads from the backend with auth headers.
-//  AsyncImage doesn't support custom headers, so this fetches
-//  the data via URLSession and displays it as a SwiftUI Image.
+//  Uses ImageCache for two-tier caching (in-memory decoded + HTTP disk cache).
 //
 
 import SwiftUI
@@ -12,7 +11,7 @@ import SwiftUI
 struct AuthenticatedImage: View {
     let path: String
 
-    @State private var imageData: Data?
+    @State private var image: ImageCache.Image?
     @State private var loadState: LoadState = .loading
 
     private enum LoadState {
@@ -32,23 +31,15 @@ struct AuthenticatedImage: View {
                 .aspectRatio(contentMode: .fit)
 
             case .loaded:
-                if let data = imageData {
-                    #if os(iOS)
-                    if let uiImage = UIImage(data: data) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    } else {
-                        failedView
-                    }
+                if let image {
+                    #if os(iOS) || os(visionOS)
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
                     #elseif os(macOS)
-                    if let nsImage = NSImage(data: data) {
-                        Image(nsImage: nsImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    } else {
-                        failedView
-                    }
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
                     #endif
                 } else {
                     failedView
@@ -78,14 +69,8 @@ struct AuthenticatedImage: View {
         loadState = .loading
         let url = APIClient.shared.rawFileURL(path: path)
 
-        var request = URLRequest(url: url)
-        if let token = AuthManager.shared.accessToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
         do {
-            let (data, _) = try await URLSession.shared.data(for: request)
-            imageData = data
+            image = try await ImageCache.shared.image(for: url)
             loadState = .loaded
         } catch {
             loadState = .failed
@@ -97,7 +82,7 @@ struct AuthenticatedImage: View {
 struct AuthenticatedSqlarImage: View {
     let path: String
 
-    @State private var imageData: Data?
+    @State private var image: ImageCache.Image?
     @State private var loadState: LoadState = .loading
 
     private enum LoadState {
@@ -116,19 +101,15 @@ struct AuthenticatedSqlarImage: View {
                 .frame(minWidth: 80, minHeight: 60)
 
             case .loaded:
-                if let data = imageData {
-                    #if os(iOS)
-                    if let uiImage = UIImage(data: data) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    }
+                if let image {
+                    #if os(iOS) || os(visionOS)
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
                     #elseif os(macOS)
-                    if let nsImage = NSImage(data: data) {
-                        Image(nsImage: nsImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    }
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
                     #endif
                 }
 
@@ -152,14 +133,8 @@ struct AuthenticatedSqlarImage: View {
         loadState = .loading
         let url = APIClient.shared.sqlarFileURL(path: path)
 
-        var request = URLRequest(url: url)
-        if let token = AuthManager.shared.accessToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
         do {
-            let (data, _) = try await URLSession.shared.data(for: request)
-            imageData = data
+            image = try await ImageCache.shared.image(for: url)
             loadState = .loaded
         } catch {
             loadState = .failed

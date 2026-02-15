@@ -45,6 +45,12 @@ final class APIClient {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 30
         configuration.timeoutIntervalForResource = 60
+        // Honor HTTP cache headers (Cache-Control, ETag, Last-Modified)
+        configuration.requestCachePolicy = .useProtocolCachePolicy
+        configuration.urlCache = URLCache(
+            memoryCapacity: 10 * 1024 * 1024,  // 10MB memory
+            diskCapacity: 100 * 1024 * 1024     // 100MB disk
+        )
 
         self.session = URLSession(configuration: configuration)
 
