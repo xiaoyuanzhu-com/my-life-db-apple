@@ -7,11 +7,18 @@
 //
 
 import SwiftUI
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 struct GenericFileInfoView: View {
 
     let file: FileRecord
     let filePath: String
+
+    @State private var isDownloading = false
 
     var body: some View {
         ScrollView {
@@ -58,12 +65,32 @@ struct GenericFileInfoView: View {
                 .padding(.horizontal)
 
                 // Share / Open in button
-                ShareLink(item: APIClient.shared.library.rawFileURL(path: filePath)) {
-                    Label("Share", systemImage: "square.and.arrow.up")
-                        .frame(maxWidth: .infinity)
+                Button {
+                    guard !isDownloading else { return }
+                    isDownloading = true
+                    Task {
+                        defer { isDownloading = false }
+                        do {
+                            let data = try await APIClient.shared.getRawFile(path: filePath)
+                            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(file.name)
+                            try data.write(to: tempURL)
+                            presentShareSheet(items: [tempURL])
+                        } catch {
+                            print("[Share] Failed to download file: \(error)")
+                        }
+                    }
+                } label: {
+                    if isDownloading {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                            .frame(maxWidth: .infinity)
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+                .disabled(isDownloading)
                 .padding(.horizontal, 32)
 
                 Spacer()

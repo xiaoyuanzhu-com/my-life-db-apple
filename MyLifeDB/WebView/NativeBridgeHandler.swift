@@ -85,6 +85,30 @@ final class NativeBridgeHandler: URLSchemeHandler {
         let url = body["url"] as? String
         let text = body["text"] as? String
 
+        // Check if the URL points to a backend raw file — download and share the actual file
+        if let urlString = url, let shareURL = URL(string: urlString) {
+            let rawPrefix = APIClient.shared.baseURL.appendingPathComponent("raw").absoluteString
+            if shareURL.absoluteString.hasPrefix(rawPrefix) {
+                let relativePath = String(shareURL.absoluteString.dropFirst(rawPrefix.count))
+                    .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                Task { @MainActor in
+                    do {
+                        let data = try await APIClient.shared.getRawFile(path: relativePath)
+                        let filename = shareURL.lastPathComponent
+                        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+                        try data.write(to: tempURL)
+                        presentShareSheet(items: [tempURL])
+                    } catch {
+                        // Fallback: share the URL as-is
+                        print("[NativeBridge] Failed to download file for sharing: \(error)")
+                        presentShareSheet(items: [shareURL])
+                    }
+                }
+                return
+            }
+        }
+
+        // Non-file share: share text/URL directly
         var activityItems: [Any] = []
         if !title.isEmpty { activityItems.append(title) }
         if let text = text, !text.isEmpty { activityItems.append(text) }
@@ -93,26 +117,7 @@ final class NativeBridgeHandler: URLSchemeHandler {
         }
 
         guard !activityItems.isEmpty else { return }
-
-        #if os(iOS)
-        let activityVC = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
-
-        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let rootVC = scene.keyWindow?.rootViewController else { return }
-
-        if let popover = activityVC.popoverPresentationController {
-            popover.sourceView = rootVC.view
-            let bounds = rootVC.view.bounds
-            popover.sourceRect = CGRect(x: bounds.midX, y: bounds.midY, width: 0, height: 0)
-            popover.permittedArrowDirections = []
-        }
-
-        rootVC.present(activityVC, animated: true)
-        #elseif os(macOS)
-        guard let window = NSApp?.mainWindow else { return }
-        let picker = NSSharingServicePicker(items: activityItems)
-        picker.show(relativeTo: .zero, of: window.contentView!, preferredEdge: .minY)
-        #endif
+        presentShareSheet(items: activityItems)
     }
 
     @MainActor
