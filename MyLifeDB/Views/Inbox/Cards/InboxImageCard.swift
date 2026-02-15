@@ -14,7 +14,9 @@ struct InboxImageCard: View {
 
     private var screenHeight: CGFloat {
         #if os(iOS) || os(visionOS)
-        UIScreen.main.bounds.height
+        let scene = UIApplication.shared.connectedScenes
+            .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+        return scene?.screen.bounds.height ?? 800
         #elseif os(macOS)
         NSScreen.main?.frame.height ?? 800
         #endif
