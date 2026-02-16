@@ -133,9 +133,7 @@ struct FileViewerView: View {
                 }
             } label: {
                 Image(systemName: onDismiss != nil ? "xmark" : "chevron.left")
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(width: 36, height: 36)
-                    .background(.thinMaterial, in: Circle())
+                    .glassEffect(.regular.interactive, in: .circle)
             }
             .padding(.leading, 16)
             .padding(.top, 8)
@@ -161,11 +159,9 @@ struct FileViewerView: View {
                         ProgressView()
                     } else {
                         Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 17, weight: .semibold))
                     }
                 }
-                .frame(width: 36, height: 36)
-                .background(.thinMaterial, in: Circle())
+                .glassEffect(.regular.interactive, in: .circle)
             }
             .disabled(isDownloadingForShare)
             .padding(.trailing, 16)
