@@ -30,6 +30,8 @@ struct ClaudeSessionListView: View {
 
     /// ID of the session that was just viewed — drives the return highlight animation
     @State private var highlightedSessionId: String?
+    /// Explicit opacity for the breath highlight (0 = invisible, 1 = full)
+    @State private var highlightOpacity: Double = 0
 
     var body: some View {
         NavigationStack {
@@ -76,11 +78,22 @@ struct ClaudeSessionListView: View {
         }
         .onChange(of: destination) { oldValue, newValue in
             if newValue == nil, let old = oldValue {
-                // Returned from a destination — refresh the list
-                Task { await refresh() }
-                // If returning from a session detail, trigger the breath highlight
-                if case .session(let session) = old {
-                    highlightedSessionId = session.id
+                Task {
+                    await refresh()
+                    if case .session(let session) = old {
+                        // Set ID first (no animation), then animate opacity in
+                        highlightedSessionId = session.id
+                        try? await Task.sleep(for: .milliseconds(50))
+                        withAnimation(.smooth(duration: 0.4)) {
+                            highlightOpacity = 1
+                        }
+                        try? await Task.sleep(for: .seconds(1.0))
+                        withAnimation(.smooth(duration: 0.8)) {
+                            highlightOpacity = 0
+                        }
+                        try? await Task.sleep(for: .seconds(0.8))
+                        highlightedSessionId = nil
+                    }
                 }
             }
         }
@@ -203,44 +216,12 @@ struct ClaudeSessionListView: View {
 
     // MARK: - Return Highlight ("breath" effect)
 
-    /// Phases: idle → breathe in → hold → breathe out → clear highlight ID
-    private enum HighlightPhase: CaseIterable {
-        case idle, breatheIn, hold, breatheOut
-
-        var opacity: Double {
-            switch self {
-            case .idle:       0
-            case .breatheIn:  0.18
-            case .hold:       0.12
-            case .breatheOut: 0
-            }
-        }
-    }
-
     @ViewBuilder
     private func returnHighlight(for id: String) -> some View {
         if highlightedSessionId == id {
-            // PhaseAnimator cycles through all phases once per trigger change
-            PhaseAnimator(HighlightPhase.allCases, trigger: highlightedSessionId) { phase in
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.accentColor.opacity(phase.opacity))
-                    .allowsHitTesting(false)
-            } animation: { phase in
-                switch phase {
-                case .idle:       .smooth(duration: 0.01)   // instant reset
-                case .breatheIn:  .smooth(duration: 0.4)    // gentle fade in
-                case .hold:       .smooth(duration: 0.6)    // subtle dim while holding
-                case .breatheOut: .smooth(duration: 0.8)    // long, gentle fade out
-                }
-            }
-            .onDisappear {
-                highlightedSessionId = nil
-            }
-            // Auto-clear after the full cycle so PhaseAnimator doesn't loop
-            .task {
-                try? await Task.sleep(for: .seconds(2.0))
-                highlightedSessionId = nil
-            }
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.accentColor.opacity(0.20 * highlightOpacity))
+                .allowsHitTesting(false)
         }
     }
 
