@@ -12,7 +12,6 @@ struct InboxSearchView: View {
 
     @Environment(\.openFilePreview) private var openFilePreview
     @Environment(\.previewNamespace) private var previewNamespace
-    @Environment(\.activePreviewPath) private var activePreviewPath
 
     let results: [SearchResultItem]
     let isSearching: Bool
@@ -69,8 +68,7 @@ struct InboxSearchView: View {
             .buttonStyle(.plain)
             .previewSource(
                 path: result.path,
-                namespace: previewNamespace,
-                activePreviewPath: activePreviewPath
+                namespace: previewNamespace
             )
 
             // Match context

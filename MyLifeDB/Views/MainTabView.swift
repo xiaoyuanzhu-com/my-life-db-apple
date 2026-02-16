@@ -55,23 +55,35 @@ struct MainTabView: View {
             iOSLayout
             #endif
 
+            #if os(macOS)
+            // macOS: overlay approach (fullScreenCover / zoom not available)
             if let preview = filePreview {
                 Color.black
                     .ignoresSafeArea()
                     .transition(.opacity)
 
                 fileViewerView(for: preview)
-                    .transition(.opacity)
                     .zIndex(1)
             }
+            #endif
         }
+        #if !os(macOS)
+        .fullScreenCover(item: $filePreview) { preview in
+            fileViewerView(for: preview)
+                .presentationBackground(.black)
+                .navigationTransition(.zoom(sourceID: preview.path, in: previewNamespace))
+        }
+        #endif
         .environment(\.openFilePreview) { path, name, file in
+            #if os(macOS)
             withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
                 filePreview = FilePreviewDestination(path: path, name: name, file: file)
             }
+            #else
+            filePreview = FilePreviewDestination(path: path, name: name, file: file)
+            #endif
         }
         .environment(\.previewNamespace, previewNamespace)
-        .environment(\.activePreviewPath, filePreview?.path)
     }
 
     // MARK: - iOS Layout
@@ -137,9 +149,13 @@ struct MainTabView: View {
     @ViewBuilder
     private func fileViewerView(for preview: FilePreviewDestination) -> some View {
         let dismiss = {
+            #if os(macOS)
             withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
                 filePreview = nil
             }
+            #else
+            filePreview = nil
+            #endif
         }
         if let file = preview.file {
             FileViewerView(file: file, onDismiss: dismiss)

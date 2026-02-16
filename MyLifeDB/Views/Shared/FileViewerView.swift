@@ -41,10 +41,6 @@ private struct PreviewNamespaceKey: EnvironmentKey {
     static var defaultValue: Namespace.ID? = nil
 }
 
-private struct ActivePreviewPathKey: EnvironmentKey {
-    static var defaultValue: String? = nil
-}
-
 extension EnvironmentValues {
     var openFilePreview: ((String, String, FileRecord?) -> Void)? {
         get { self[FilePreviewActionKey.self] }
@@ -55,11 +51,6 @@ extension EnvironmentValues {
         get { self[PreviewNamespaceKey.self] }
         set { self[PreviewNamespaceKey.self] = newValue }
     }
-
-    var activePreviewPath: String? {
-        get { self[ActivePreviewPathKey.self] }
-        set { self[ActivePreviewPathKey.self] = newValue }
-    }
 }
 
 // MARK: - Preview Source Modifier
@@ -67,14 +58,16 @@ extension EnvironmentValues {
 extension View {
     /// Apply to thumbnail/card views that serve as the zoom-animation source.
     @ViewBuilder
-    func previewSource(path: String, namespace: Namespace.ID?, activePreviewPath: String?) -> some View {
+    func previewSource(path: String, namespace: Namespace.ID?) -> some View {
+        #if os(macOS)
+        self
+        #else
         if let ns = namespace {
-            self
-                .matchedGeometryEffect(id: "preview-\(path)", in: ns, isSource: true)
-                .opacity(activePreviewPath == path ? 0 : 1)
+            self.matchedTransitionSource(id: path, in: ns)
         } else {
             self
         }
+        #endif
     }
 }
 

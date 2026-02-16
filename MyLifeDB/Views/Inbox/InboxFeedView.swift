@@ -16,7 +16,6 @@ struct InboxFeedView: View {
 
     @Environment(\.openFilePreview) private var openFilePreview
     @Environment(\.previewNamespace) private var previewNamespace
-    @Environment(\.activePreviewPath) private var activePreviewPath
 
     let items: [InboxItem]
     let pinnedItems: [PinnedItem]
@@ -141,8 +140,7 @@ struct InboxFeedView: View {
             .buttonStyle(.plain)
             .previewSource(
                 path: item.path,
-                namespace: previewNamespace,
-                activePreviewPath: activePreviewPath
+                namespace: previewNamespace
             )
             .contextMenu {
                 contextMenuContent(for: item)
