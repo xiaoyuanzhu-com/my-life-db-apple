@@ -54,7 +54,6 @@ struct ClaudeSessionListView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        claudeVM.loadPath("/claude")
                         destination = .newSession
                     } label: {
                         Image(systemName: "plus")
@@ -359,6 +358,9 @@ private struct NewClaudeSessionView: View {
         #else
         .navigationTitle("New Session")
         #endif
+        .onAppear {
+            claudeVM.navigateTo(path: "/claude")
+        }
         .onDisappear {
             claudeVM.navigateTo(path: "/claude")
         }

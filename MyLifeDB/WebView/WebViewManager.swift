@@ -51,6 +51,10 @@ final class TabWebViewModel {
     /// Whether the bridge polyfill has been injected for the current page load.
     private var bridgeInjected = false
 
+    /// Queued path to navigate to once the page finishes loading.
+    /// Set when `navigateTo` is called while `isLoaded` is false.
+    private var pendingNavigation: String?
+
     // MARK: - Bridge
 
     let bridgeHandler = NativeBridgeHandler()
@@ -117,6 +121,11 @@ final class TabWebViewModel {
                         // Signal the web frontend to re-check auth
                         _ = try? await self.webPage.callJavaScript("window.__nativeBridge?.recheckAuth()")
 
+                        // Flush any navigation that was queued while loading
+                        if let pending = self.pendingNavigation {
+                            self.navigateTo(path: pending)
+                        }
+
                     default:
                         break
                     }
@@ -160,9 +169,15 @@ final class TabWebViewModel {
 
     /// Navigate the React Router to a given path (no page reload).
     /// Used for deep links that target a sub-path within this tab's route.
+    /// If the page hasn't finished loading yet, the navigation is queued
+    /// and will be dispatched automatically once the load completes.
     @MainActor
     func navigateTo(path: String) {
-        guard isLoaded else { return }
+        guard isLoaded else {
+            pendingNavigation = path
+            return
+        }
+        pendingNavigation = nil
 
         let js = "window.__nativeBridge?.navigateTo('\(path.escapedForJS)')"
         Task {
@@ -181,6 +196,7 @@ final class TabWebViewModel {
         } else {
             url = baseURL.appendingPathComponent(path)
         }
+        pendingNavigation = nil
         bridgeInjected = false
         webPage.load(URLRequest(url: url))
     }
