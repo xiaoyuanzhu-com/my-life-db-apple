@@ -48,14 +48,6 @@ struct ShareView: View {
                         Button("Cancel") { onDismiss() }
                     }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    if viewModel.state == .ready {
-                        Button("Send") {
-                            Task { await viewModel.upload() }
-                        }
-                        .fontWeight(.semibold)
-                    }
-                }
             }
         }
     }
@@ -77,18 +69,27 @@ struct ShareView: View {
     private var composeView: some View {
         Form {
             Section {
-                TextField("Add a note...", text: $viewModel.userNote, axis: .vertical)
-                    .lineLimit(3...8)
-            } header: {
-                Text("Note")
-            }
-
-            Section {
                 ForEach(viewModel.items) { item in
                     contentPreviewRow(for: item)
                 }
-            } header: {
-                Text("Content")
+            }
+
+            Section {
+                TextField("Add a note...", text: $viewModel.userNote, axis: .vertical)
+                    .lineLimit(3...8)
+            }
+
+            Section {
+                Button {
+                    Task { await viewModel.upload() }
+                } label: {
+                    Text("Send")
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
             }
         }
     }
@@ -123,6 +124,7 @@ struct ShareView: View {
     private func urlPreview(url: URL) -> some View {
         LinkPreviewView(url: url)
             .frame(minHeight: 60, maxHeight: 200)
+            .frame(maxWidth: .infinity, alignment: .center)
             .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
     }
 
@@ -133,12 +135,14 @@ struct ShareView: View {
             .font(.callout)
             .foregroundStyle(.secondary)
             .lineLimit(8)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, alignment: .center)
     }
 
     // MARK: - Image Preview
 
     private func imagePreview(thumbnail: UIImage, fileSize: Int) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(spacing: 6) {
             Image(uiImage: thumbnail)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
@@ -149,13 +153,14 @@ struct ShareView: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
+        .frame(maxWidth: .infinity, alignment: .center)
         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
     }
 
     // MARK: - Video Preview
 
     private func videoPreview(thumbnail: UIImage?, filename: String, fileSize: Int) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(spacing: 6) {
             if let thumbnail {
                 ZStack {
                     Image(uiImage: thumbnail)
@@ -185,6 +190,7 @@ struct ShareView: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
+        .frame(maxWidth: .infinity, alignment: .center)
         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
     }
 
