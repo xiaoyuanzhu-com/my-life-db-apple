@@ -115,6 +115,16 @@ self.items = response.items
 - `Task { }` for async API calls
 - Show loading/error states appropriately
 
+## Git Workflow
+
+Prefer using **git worktrees** for code changes to avoid conflicts with concurrent sessions:
+
+    git worktree add -b <branch> .worktrees/<name> main
+    # work and commit on the branch, then merge when done
+    git checkout main && git pull && git merge <branch> && git push
+    # clean up
+    git worktree remove .worktrees/<name> && git branch -d <branch>
+
 ## Naming Conventions
 
 | Category | Convention | Example |
