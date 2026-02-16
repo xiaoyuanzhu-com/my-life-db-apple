@@ -15,6 +15,7 @@ struct ClaudeSession: Codable, Identifiable, Hashable {
     let workingDir: String
     let createdAt: Date
     let lastActivity: Date
+    let lastUserActivity: Date?  // Last user (not Claude) interaction — used for stable list ordering
     let messageCount: Int
     let isSidechain: Bool
     var status: String        // "active" or "archived"

@@ -9,6 +9,13 @@
 
 import SwiftUI
 
+// MARK: - Navigation Destination
+
+enum ClaudeDestination: Hashable {
+    case session(ClaudeSession)
+    case newSession
+}
+
 struct ClaudeSessionListView: View {
 
     let claudeVM: TabWebViewModel
@@ -18,8 +25,7 @@ struct ClaudeSessionListView: View {
     @State private var error: Error?
     @State private var hasMore = false
     @State private var nextCursor: String?
-    @State private var showNewSession = false
-    @State private var selectedSession: ClaudeSession?
+    @State private var destination: ClaudeDestination?
     @State private var sseManager = ClaudeSessionSSEManager()
 
     /// ID of the session that was just viewed — drives the return highlight animation
@@ -40,18 +46,19 @@ struct ClaudeSessionListView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .navigationDestination(item: $selectedSession) { session in
-                ClaudeSessionDetailView(session: session, claudeVM: claudeVM)
-            }
-            .navigationDestination(isPresented: $showNewSession) {
-                NewClaudeSessionView(claudeVM: claudeVM)
+            .navigationDestination(item: $destination) { dest in
+                switch dest {
+                case .session(let session):
+                    ClaudeSessionDetailView(session: session, claudeVM: claudeVM)
+                case .newSession:
+                    NewClaudeSessionView(claudeVM: claudeVM)
+                }
             }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        selectedSession = nil
                         claudeVM.loadPath("/claude")
-                        showNewSession = true
+                        destination = .newSession
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -67,21 +74,17 @@ struct ClaudeSessionListView: View {
         .onDisappear {
             sseManager.stop()
         }
-        .onChange(of: showNewSession) { wasShowing, isShowing in
-            if wasShowing && !isShowing {
-                // Returned from new session view — refresh list
+        .onChange(of: destination) { oldValue, newValue in
+            if newValue == nil, let old = oldValue {
+                // Returned from a destination — refresh the list
                 Task { await refresh() }
-            }
-        }
-        .onChange(of: selectedSession) { oldValue, newValue in
-            if let old = oldValue, newValue == nil {
-                // Returned from session detail — highlight the row briefly, then refresh
-                highlightedSessionId = old.id
-                Task { await refresh() }
-                // Fade out the highlight after a short delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    withAnimation(.easeOut(duration: 0.6)) {
-                        highlightedSessionId = nil
+                // If returning from a session detail, highlight that row briefly
+                if case .session(let session) = old {
+                    highlightedSessionId = session.id
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        withAnimation(.easeOut(duration: 0.6)) {
+                            highlightedSessionId = nil
+                        }
                     }
                 }
             }
@@ -107,7 +110,7 @@ struct ClaudeSessionListView: View {
         var earlier: [ClaudeSession] = []
 
         for session in sessions {
-            let date = session.lastActivity
+            let date = session.lastUserActivity ?? session.lastActivity
             if date >= startOfToday {
                 today.append(session)
             } else if date >= startOfYesterday {
@@ -160,7 +163,7 @@ struct ClaudeSessionListView: View {
 
     private func sessionButton(_ session: ClaudeSession) -> some View {
         Button {
-            selectedSession = session
+            destination = .session(session)
         } label: {
             SessionRow(session: session)
                 .contentShape(Rectangle())
@@ -394,7 +397,16 @@ private struct SessionRow: View {
 
             Spacer()
 
-            Text(shortRelativeTime(session.lastActivity))
+            // Show activity indicator if Claude is actively working
+            // (lastActivity is more recent than lastUserActivity by > 10s)
+            if let userTime = session.lastUserActivity,
+               session.lastActivity.timeIntervalSince(userTime) > 10 {
+                Image(systemName: "bolt.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
+
+            Text(shortRelativeTime(session.lastUserActivity ?? session.lastActivity))
                 .foregroundStyle(.secondary)
                 .font(.callout)
         }
