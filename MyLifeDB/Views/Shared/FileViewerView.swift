@@ -215,7 +215,9 @@ struct FileViewerView: View {
     @ViewBuilder
     private func fileContentView(_ file: FileRecord) -> some View {
         if file.isImage {
-            ImageFileView(path: filePath, onDismiss: dismissAction)
+            // No onTapGesture — tap gestures block TabView swipe in pager mode.
+            // Dismiss via the X button overlay instead.
+            ImageFileView(path: filePath)
         } else if file.isText {
             TextFileView(path: filePath)
                 .contentShape(Rectangle())
@@ -225,9 +227,9 @@ struct FileViewerView: View {
                 .contentShape(Rectangle())
                 .onTapGesture { dismissAction() }
         } else if file.isVideo {
+            // No onTapGesture — tap gestures block TabView swipe in pager mode.
+            // Dismiss via the X button overlay instead.
             VideoFileView(path: filePath)
-                .contentShape(Rectangle())
-                .onTapGesture { dismissAction() }
         } else if file.isAudio {
             AudioFileView(path: filePath, fileName: fileName)
                 .contentShape(Rectangle())

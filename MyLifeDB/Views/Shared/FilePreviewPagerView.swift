@@ -14,7 +14,7 @@ struct FilePreviewPagerView: View {
     let onDismiss: () -> Void
 
     @State private var items: [PreviewItem]
-    @State private var currentIndex: Int
+    @State private var currentID: String
     @State private var isLoadingMore = false
 
     private let hasMoreOlder: Bool
@@ -25,31 +25,37 @@ struct FilePreviewPagerView: View {
         self.hasMoreOlder = context.hasMoreOlder
         self.loadMore = context.loadMore
         self._items = State(initialValue: context.items)
-        self._currentIndex = State(initialValue: context.startIndex)
+        // Use the item's stable ID (path) for selection, not an Int index
+        let startID = context.items.indices.contains(context.startIndex)
+            ? context.items[context.startIndex].id
+            : (context.items.first?.id ?? "")
+        self._currentID = State(initialValue: startID)
     }
 
     var body: some View {
         #if os(macOS)
         // macOS: no page-style TabView, fall back to single file viewer
-        if let item = items[safe: currentIndex] {
+        if let item = items.first(where: { $0.id == currentID }) {
             FileViewerView(filePath: item.path, fileName: item.name, onDismiss: onDismiss)
         }
         #else
-        TabView(selection: $currentIndex) {
-            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+        TabView(selection: $currentID) {
+            ForEach(items) { item in
                 if let file = item.file {
                     FileViewerView(file: file, onDismiss: onDismiss)
-                        .tag(index)
+                        .tag(item.id)
                 } else {
                     FileViewerView(filePath: item.path, fileName: item.name, onDismiss: onDismiss)
-                        .tag(index)
+                        .tag(item.id)
                 }
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
         .ignoresSafeArea()
-        .onChange(of: currentIndex) { _, newIndex in
-            if newIndex >= items.count - 3 && hasMoreOlder && !isLoadingMore {
+        .onChange(of: currentID) { _, _ in
+            // Load more when approaching the end of the list
+            if let idx = items.firstIndex(where: { $0.id == currentID }),
+               idx >= items.count - 3 && hasMoreOlder && !isLoadingMore {
                 Task { await loadMoreItems() }
             }
         }
@@ -63,13 +69,5 @@ struct FilePreviewPagerView: View {
             items.append(contentsOf: newItems)
         }
         isLoadingMore = false
-    }
-}
-
-// MARK: - Safe Collection Subscript
-
-private extension Collection {
-    subscript(safe index: Index) -> Element? {
-        indices.contains(index) ? self[index] : nil
     }
 }
