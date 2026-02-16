@@ -155,49 +155,40 @@ struct FileViewerView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .topLeading) {
-            Button {
+            GlassCircleButton(systemName: onDismiss != nil ? "xmark" : "chevron.left") {
                 if let onDismiss {
                     onDismiss()
                 } else {
                     dismiss()
                 }
-            } label: {
-                Image(systemName: onDismiss != nil ? "xmark" : "chevron.left")
-                    .glassEffect(.regular.interactive(), in: .circle)
             }
-            .buttonStyle(.plain)
             .padding(.leading, 16)
             .padding(.top, 8)
         }
         .overlay(alignment: .topTrailing) {
-            Button {
-                guard !isDownloadingForShare else { return }
-                isDownloadingForShare = true
-                Task {
-                    defer { isDownloadingForShare = false }
-                    do {
-                        let data = try await APIClient.shared.getRawFile(path: filePath)
-                        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
-                        try data.write(to: tempURL)
-                        presentShareSheet(items: [tempURL])
-                    } catch {
-                        print("[FileViewer] Failed to download file for sharing: \(error)")
+            if isDownloadingForShare {
+                ProgressView()
+                    .frame(width: 44, height: 44)
+                    .padding(.trailing, 16)
+                    .padding(.top, 8)
+            } else {
+                GlassCircleButton(systemName: "square.and.arrow.up") {
+                    isDownloadingForShare = true
+                    Task {
+                        defer { isDownloadingForShare = false }
+                        do {
+                            let data = try await APIClient.shared.getRawFile(path: filePath)
+                            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+                            try data.write(to: tempURL)
+                            presentShareSheet(items: [tempURL])
+                        } catch {
+                            print("[FileViewer] Failed to download file for sharing: \(error)")
+                        }
                     }
                 }
-            } label: {
-                Group {
-                    if isDownloadingForShare {
-                        ProgressView()
-                    } else {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-                }
-                .glassEffect(.regular.interactive(), in: .circle)
+                .padding(.trailing, 16)
+                .padding(.top, 8)
             }
-            .buttonStyle(.plain)
-            .disabled(isDownloadingForShare)
-            .padding(.trailing, 16)
-            .padding(.top, 8)
         }
         .task {
             if needsFetch {
