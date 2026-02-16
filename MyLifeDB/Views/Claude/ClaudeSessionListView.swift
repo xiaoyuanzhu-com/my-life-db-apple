@@ -22,6 +22,9 @@ struct ClaudeSessionListView: View {
     @State private var selectedSession: ClaudeSession?
     @State private var sseManager = ClaudeSessionSSEManager()
 
+    /// ID of the session that was just viewed — drives the return highlight animation
+    @State private var highlightedSessionId: String?
+
     var body: some View {
         NavigationStack {
             Group {
@@ -71,9 +74,16 @@ struct ClaudeSessionListView: View {
             }
         }
         .onChange(of: selectedSession) { oldValue, newValue in
-            if oldValue != nil && newValue == nil {
-                // Returned from session detail — refresh list
+            if let old = oldValue, newValue == nil {
+                // Returned from session detail — highlight the row briefly, then refresh
+                highlightedSessionId = old.id
                 Task { await refresh() }
+                // Fade out the highlight after a short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    withAnimation(.easeOut(duration: 0.6)) {
+                        highlightedSessionId = nil
+                    }
+                }
             }
         }
     }
@@ -156,6 +166,12 @@ struct ClaudeSessionListView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .listRowBackground(
+            highlightedSessionId == session.id
+                ? Color.accentColor.opacity(0.15)
+                : Color.clear
+        )
+        .animation(.easeOut(duration: 0.6), value: highlightedSessionId)
         #if os(iOS)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             if session.isArchived {
@@ -297,9 +313,11 @@ struct ClaudeSessionListView: View {
     // MARK: - Archive / Unarchive
 
     private func archiveSession(_ session: ClaudeSession) async {
-        // Optimistic update — remove from list (always showing active)
+        // Optimistic update — remove from list with animation
         if let index = sessions.firstIndex(where: { $0.id == session.id }) {
-            sessions.remove(at: index)
+            let _ = withAnimation(.easeInOut(duration: 0.35)) {
+                sessions.remove(at: index)
+            }
         }
 
         do {
