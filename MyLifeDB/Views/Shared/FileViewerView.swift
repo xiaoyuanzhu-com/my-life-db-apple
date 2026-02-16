@@ -133,7 +133,7 @@ struct FileViewerView: View {
                 }
             } label: {
                 Image(systemName: onDismiss != nil ? "xmark" : "chevron.left")
-                    .glassEffect(.regular.interactive, in: .circle)
+                    .glassEffect(.regular.interactive(), in: .circle)
             }
             .padding(.leading, 16)
             .padding(.top, 8)
@@ -161,7 +161,7 @@ struct FileViewerView: View {
                         Image(systemName: "square.and.arrow.up")
                     }
                 }
-                .glassEffect(.regular.interactive, in: .circle)
+                .glassEffect(.regular.interactive(), in: .circle)
             }
             .disabled(isDownloadingForShare)
             .padding(.trailing, 16)
