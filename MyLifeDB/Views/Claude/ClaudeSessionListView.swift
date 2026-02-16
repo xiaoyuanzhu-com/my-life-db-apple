@@ -78,14 +78,9 @@ struct ClaudeSessionListView: View {
             if newValue == nil, let old = oldValue {
                 // Returned from a destination — refresh the list
                 Task { await refresh() }
-                // If returning from a session detail, highlight that row briefly
+                // If returning from a session detail, trigger the breath highlight
                 if case .session(let session) = old {
                     highlightedSessionId = session.id
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        withAnimation(.easeOut(duration: 0.6)) {
-                            highlightedSessionId = nil
-                        }
-                    }
                 }
             }
         }
@@ -167,14 +162,9 @@ struct ClaudeSessionListView: View {
         } label: {
             SessionRow(session: session)
                 .contentShape(Rectangle())
+                .overlay(returnHighlight(for: session.id))
         }
         .buttonStyle(.plain)
-        .listRowBackground(
-            highlightedSessionId == session.id
-                ? Color.accentColor.opacity(0.15)
-                : Color.clear
-        )
-        .animation(.easeOut(duration: 0.6), value: highlightedSessionId)
         #if os(iOS)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             if session.isArchived {
@@ -207,6 +197,49 @@ struct ClaudeSessionListView: View {
                 } label: {
                     Label("Archive", systemImage: "archivebox")
                 }
+            }
+        }
+    }
+
+    // MARK: - Return Highlight ("breath" effect)
+
+    /// Phases: idle → breathe in → hold → breathe out → clear highlight ID
+    private enum HighlightPhase: CaseIterable {
+        case idle, breatheIn, hold, breatheOut
+
+        var opacity: Double {
+            switch self {
+            case .idle:       0
+            case .breatheIn:  0.18
+            case .hold:       0.12
+            case .breatheOut: 0
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func returnHighlight(for id: String) -> some View {
+        if highlightedSessionId == id {
+            // PhaseAnimator cycles through all phases once per trigger change
+            PhaseAnimator(HighlightPhase.allCases, trigger: highlightedSessionId) { phase in
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.accentColor.opacity(phase.opacity))
+                    .allowsHitTesting(false)
+            } animation: { phase in
+                switch phase {
+                case .idle:       .smooth(duration: 0.01)   // instant reset
+                case .breatheIn:  .smooth(duration: 0.4)    // gentle fade in
+                case .hold:       .smooth(duration: 0.6)    // subtle dim while holding
+                case .breatheOut: .smooth(duration: 0.8)    // long, gentle fade out
+                }
+            }
+            .onDisappear {
+                highlightedSessionId = nil
+            }
+            // Auto-clear after the full cycle so PhaseAnimator doesn't loop
+            .task {
+                try? await Task.sleep(for: .seconds(2.0))
+                highlightedSessionId = nil
             }
         }
     }
@@ -316,9 +349,9 @@ struct ClaudeSessionListView: View {
     // MARK: - Archive / Unarchive
 
     private func archiveSession(_ session: ClaudeSession) async {
-        // Optimistic update — remove from list with animation
+        // Optimistic update — remove from list with spring animation
         if let index = sessions.firstIndex(where: { $0.id == session.id }) {
-            let _ = withAnimation(.easeInOut(duration: 0.35)) {
+            let _ = withAnimation(.snappy(duration: 0.35)) {
                 sessions.remove(at: index)
             }
         }
