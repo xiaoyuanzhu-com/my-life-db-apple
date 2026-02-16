@@ -151,6 +151,15 @@ final class NativeBridgeHandler: URLSchemeHandler {
         window.isNativeApp = true;
         window.nativePlatform = '\(nativePlatform)';
 
+        // Lock viewport to prevent orientation-change zoom bug in WKWebView.
+        // Only applied in native app context — browser users keep normal zoom.
+        (function() {
+            var meta = document.querySelector('meta[name="viewport"]');
+            if (meta) {
+                meta.content = 'width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+            }
+        })();
+
         // Polyfill: map window.webkit.messageHandlers.native.postMessage → fetch
         if (!window.webkit) window.webkit = {};
         if (!window.webkit.messageHandlers) window.webkit.messageHandlers = {};
