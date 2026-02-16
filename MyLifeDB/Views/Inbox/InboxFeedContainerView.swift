@@ -152,7 +152,8 @@ struct InboxFeedContainerView: View {
             },
             onPinnedUnpin: { pinnedItem in
                 Task { await unpinItem(pinnedItem) }
-            }
+            },
+            onLoadMoreForPreview: { await loadOlderMediaItemsForPreview() }
         )
         .refreshable {
             await refresh()
@@ -320,6 +321,26 @@ struct InboxFeedContainerView: View {
         }
 
         isLoadingMore = false
+    }
+
+    /// Loads older items for the media preview pager.
+    /// Returns only image/video items from the newly loaded batch.
+    private func loadOlderMediaItemsForPreview() async -> [PreviewItem] {
+        guard let lastCursor = cursors?.last, hasMore.older else { return [] }
+
+        do {
+            let response = try await APIClient.shared.inbox.fetchOlder(cursor: lastCursor)
+            items.append(contentsOf: response.items)
+            cursors = response.cursors
+            hasMore = response.hasMore
+
+            return response.items
+                .filter { $0.isImage || $0.isVideo }
+                .map { PreviewItem(path: $0.path, name: $0.name, file: $0.asFileRecord) }
+        } catch {
+            print("[Inbox] Failed to load more for preview: \(error)")
+            return []
+        }
     }
 
     // MARK: - Actions

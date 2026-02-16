@@ -71,8 +71,8 @@ struct MainTabView: View {
                     .navigationTransition(.zoom(sourceID: preview.path, in: previewNamespace))
             }
             #endif
-            .environment(\.openFilePreview) { path, name, file in
-                filePreview = FilePreviewDestination(path: path, name: name, file: file)
+            .environment(\.openFilePreview) { path, name, file, pagerContext in
+                filePreview = FilePreviewDestination(path: path, name: name, file: file, pagerContext: pagerContext)
             }
             .environment(\.previewNamespace, previewNamespace)
     }
@@ -144,7 +144,9 @@ struct MainTabView: View {
     @ViewBuilder
     private func fileViewerView(for preview: FilePreviewDestination) -> some View {
         let dismiss = { filePreview = nil }
-        if let file = preview.file {
+        if let context = preview.pagerContext {
+            FilePreviewPagerView(context: context, onDismiss: dismiss)
+        } else if let file = preview.file {
             FileViewerView(file: file, onDismiss: dismiss)
         } else {
             FileViewerView(filePath: preview.path, fileName: preview.name, onDismiss: dismiss)

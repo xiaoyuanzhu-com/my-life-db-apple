@@ -26,7 +26,7 @@ struct LibraryListView: View {
                     }
                 } else {
                     Button {
-                        openFilePreview?(fullPath, node.name, nil)
+                        openFilePreview?(fullPath, node.name, nil, nil)
                     } label: {
                         LibraryListRow(node: node)
                     }

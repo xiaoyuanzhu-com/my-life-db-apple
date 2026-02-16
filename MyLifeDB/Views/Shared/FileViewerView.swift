@@ -17,6 +17,34 @@
 
 import SwiftUI
 
+// MARK: - Preview Item (lightweight reference for paging)
+
+/// Lightweight item reference used by the media pager.
+struct PreviewItem: Identifiable, Hashable {
+    var id: String { path }
+    let path: String
+    let name: String
+    let file: FileRecord?
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(path)
+    }
+
+    static func == (lhs: PreviewItem, rhs: PreviewItem) -> Bool {
+        lhs.path == rhs.path
+    }
+}
+
+// MARK: - File Preview Pager Context
+
+/// Paging context for swipeable media preview (images and videos only).
+struct FilePreviewPagerContext {
+    let items: [PreviewItem]
+    let startIndex: Int
+    let hasMoreOlder: Bool
+    let loadMore: () async -> [PreviewItem]
+}
+
 // MARK: - File Preview Environment
 
 /// Identifiable wrapper for preview presentation.
@@ -25,16 +53,18 @@ struct FilePreviewDestination: Identifiable {
     let path: String
     let name: String
     let file: FileRecord?
+    let pagerContext: FilePreviewPagerContext?
 
-    init(path: String, name: String, file: FileRecord? = nil) {
+    init(path: String, name: String, file: FileRecord? = nil, pagerContext: FilePreviewPagerContext? = nil) {
         self.path = path
         self.name = name
         self.file = file
+        self.pagerContext = pagerContext
     }
 }
 
 private struct FilePreviewActionKey: EnvironmentKey {
-    static var defaultValue: ((String, String, FileRecord?) -> Void)? = nil
+    static var defaultValue: ((String, String, FileRecord?, FilePreviewPagerContext?) -> Void)? = nil
 }
 
 private struct PreviewNamespaceKey: EnvironmentKey {
@@ -42,7 +72,7 @@ private struct PreviewNamespaceKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-    var openFilePreview: ((String, String, FileRecord?) -> Void)? {
+    var openFilePreview: ((String, String, FileRecord?, FilePreviewPagerContext?) -> Void)? {
         get { self[FilePreviewActionKey.self] }
         set { self[FilePreviewActionKey.self] = newValue }
     }

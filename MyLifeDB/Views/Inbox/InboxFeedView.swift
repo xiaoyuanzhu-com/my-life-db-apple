@@ -30,6 +30,7 @@ struct InboxFeedView: View {
     let onPendingRetry: (PendingInboxItem) -> Void
     let onPinnedTap: (PinnedItem) -> Void
     let onPinnedUnpin: (PinnedItem) -> Void
+    let onLoadMoreForPreview: () async -> [PreviewItem]
 
     private let newestAnchorID = "feed-newest"
 
@@ -134,7 +135,8 @@ struct InboxFeedView: View {
             InboxTimestampView(dateString: item.createdAt)
 
             Button {
-                openFilePreview?(item.path, item.name, item.asFileRecord)
+                let pagerContext = mediaPagerContext(for: item)
+                openFilePreview?(item.path, item.name, item.asFileRecord, pagerContext)
             } label: {
                 InboxItemCard(item: item)
             }
@@ -148,6 +150,30 @@ struct InboxFeedView: View {
             }
         }
         .transition(.opacity)
+    }
+
+    // MARK: - Media Pager Context
+
+    /// Builds a pager context for media (image/video) items only.
+    /// Returns nil for non-media items so they open as standalone previews.
+    private func mediaPagerContext(for item: InboxItem) -> FilePreviewPagerContext? {
+        guard item.isImage || item.isVideo else { return nil }
+
+        let mediaItems = items.filter { $0.isImage || $0.isVideo }
+        let previewItems = mediaItems.map {
+            PreviewItem(path: $0.path, name: $0.name, file: $0.asFileRecord)
+        }
+
+        guard let startIndex = mediaItems.firstIndex(where: { $0.path == item.path }) else {
+            return nil
+        }
+
+        return FilePreviewPagerContext(
+            items: previewItems,
+            startIndex: startIndex,
+            hasMoreOlder: hasOlderItems,
+            loadMore: onLoadMoreForPreview
+        )
     }
 
     // MARK: - Context Menu

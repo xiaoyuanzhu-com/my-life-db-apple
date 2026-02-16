@@ -73,18 +73,10 @@ struct ImageFileView: View {
                             }
                         }
                 )
-                .simultaneousGesture(
-                    DragGesture()
-                        .onChanged { value in
-                            guard scale > 1.0 else { return }
-                            offset = CGSize(
-                                width: lastOffset.width + value.translation.width,
-                                height: lastOffset.height + value.translation.height
-                            )
-                        }
-                        .onEnded { _ in
-                            lastOffset = offset
-                        }
+                .conditionalPanGesture(
+                    isActive: scale > 1.0,
+                    offset: $offset,
+                    lastOffset: $lastOffset
                 )
                 .onTapGesture {
                     onDismiss?()
@@ -143,5 +135,48 @@ struct ImageFileView: View {
         }
 
         isLoading = false
+    }
+}
+
+// MARK: - Conditional Pan Gesture
+
+/// Only attaches the DragGesture when active, so that TabView page
+/// swiping is not blocked at 1x zoom.
+private struct ConditionalPanGestureModifier: ViewModifier {
+    let isActive: Bool
+    @Binding var offset: CGSize
+    @Binding var lastOffset: CGSize
+
+    func body(content: Content) -> some View {
+        if isActive {
+            content.simultaneousGesture(
+                DragGesture()
+                    .onChanged { value in
+                        offset = CGSize(
+                            width: lastOffset.width + value.translation.width,
+                            height: lastOffset.height + value.translation.height
+                        )
+                    }
+                    .onEnded { _ in
+                        lastOffset = offset
+                    }
+            )
+        } else {
+            content
+        }
+    }
+}
+
+private extension View {
+    func conditionalPanGesture(
+        isActive: Bool,
+        offset: Binding<CGSize>,
+        lastOffset: Binding<CGSize>
+    ) -> some View {
+        modifier(ConditionalPanGestureModifier(
+            isActive: isActive,
+            offset: offset,
+            lastOffset: lastOffset
+        ))
     }
 }

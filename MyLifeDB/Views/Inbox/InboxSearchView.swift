@@ -61,7 +61,7 @@ struct InboxSearchView: View {
             InboxTimestampView(dateString: result.createdAt)
 
             Button {
-                openFilePreview?(result.path, result.name, nil)
+                openFilePreview?(result.path, result.name, nil, nil)
             } label: {
                 resultCard(for: result)
             }
