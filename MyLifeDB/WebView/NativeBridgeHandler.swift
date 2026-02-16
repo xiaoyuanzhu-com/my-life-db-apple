@@ -151,8 +151,7 @@ final class NativeBridgeHandler: URLSchemeHandler {
         window.isNativeApp = true;
         window.nativePlatform = '\(nativePlatform)';
 
-        // Lock viewport to prevent orientation-change zoom bug in WKWebView.
-        // Only applied in native app context — browser users keep normal zoom.
+        // Lock viewport to prevent zoom — keep viewport-fit=cover for safe-area insets.
         (function() {
             var meta = document.querySelector('meta[name="viewport"]');
             if (meta) {
