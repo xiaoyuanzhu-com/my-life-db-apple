@@ -20,6 +20,7 @@ struct ClaudeSessionListView: View {
     @State private var nextCursor: String?
     @State private var showNewSession = false
     @State private var selectedSession: ClaudeSession?
+    @State private var sseManager = ClaudeSessionSSEManager()
 
     var body: some View {
         NavigationStack {
@@ -57,6 +58,22 @@ struct ClaudeSessionListView: View {
         .task {
             if sessions.isEmpty {
                 await fetchSessions()
+            }
+            setupSSE()
+        }
+        .onDisappear {
+            sseManager.stop()
+        }
+        .onChange(of: showNewSession) { wasShowing, isShowing in
+            if wasShowing && !isShowing {
+                // Returned from new session view — refresh list
+                Task { await refresh() }
+            }
+        }
+        .onChange(of: selectedSession) { oldValue, newValue in
+            if oldValue != nil && newValue == nil {
+                // Returned from session detail — refresh list
+                Task { await refresh() }
             }
         }
     }
@@ -209,6 +226,15 @@ struct ClaudeSessionListView: View {
             .buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - SSE
+
+    private func setupSSE() {
+        sseManager.onSessionUpdated = {
+            Task { await refresh() }
+        }
+        sseManager.start()
     }
 
     // MARK: - Data Fetching
