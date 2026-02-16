@@ -48,68 +48,61 @@ struct MainTabView: View {
     private var allViewModels: [TabWebViewModel] { [claudeVM] }
 
     var body: some View {
-        ZStack {
-            #if os(macOS)
-            macOSLayout
-            #else
-            iOSLayout
-            #endif
+        #if os(macOS)
+        macOSLayout
+        #else
+        iOSLayout
+        #endif
+    }
 
+    /// Shared modifiers for file preview presentation.
+    private func withFilePreview<V: View>(_ content: V) -> some View {
+        content
             #if os(macOS)
-            // macOS: overlay approach (fullScreenCover / zoom not available)
-            if let preview = filePreview {
-                Color.black
-                    .ignoresSafeArea()
-                    .transition(.opacity)
-
+            .sheet(item: $filePreview) { preview in
                 fileViewerView(for: preview)
-                    .zIndex(1)
+                    .presentationBackground(.black)
+                    .frame(minWidth: 600, minHeight: 500)
+            }
+            #else
+            .fullScreenCover(item: $filePreview) { preview in
+                fileViewerView(for: preview)
+                    .presentationBackground(.black)
+                    .navigationTransition(.zoom(sourceID: preview.path, in: previewNamespace))
             }
             #endif
-        }
-        #if !os(macOS)
-        .fullScreenCover(item: $filePreview) { preview in
-            fileViewerView(for: preview)
-                .presentationBackground(.black)
-                .navigationTransition(.zoom(sourceID: preview.path, in: previewNamespace))
-        }
-        #endif
-        .environment(\.openFilePreview) { path, name, file in
-            #if os(macOS)
-            withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
+            .environment(\.openFilePreview) { path, name, file in
                 filePreview = FilePreviewDestination(path: path, name: name, file: file)
             }
-            #else
-            filePreview = FilePreviewDestination(path: path, name: name, file: file)
-            #endif
-        }
-        .environment(\.previewNamespace, previewNamespace)
+            .environment(\.previewNamespace, previewNamespace)
     }
 
     // MARK: - iOS Layout
 
     #if !os(macOS)
     private var iOSLayout: some View {
-        TabView(selection: $selectedTab) {
-            Tab(AppTab.inbox.rawValue, systemImage: AppTab.inbox.icon, value: .inbox) {
-                NativeInboxView()
+        withFilePreview(
+            TabView(selection: $selectedTab) {
+                Tab(AppTab.inbox.rawValue, systemImage: AppTab.inbox.icon, value: .inbox) {
+                    NativeInboxView()
+                }
+                Tab(AppTab.library.rawValue, systemImage: AppTab.library.icon, value: .library) {
+                    NativeLibraryBrowserView()
+                }
+                Tab(AppTab.claude.rawValue, systemImage: AppTab.claude.icon, value: .claude) {
+                    ClaudeSessionListView(claudeVM: claudeVM)
+                }
+                Tab(AppTab.me.rawValue, systemImage: AppTab.me.icon, value: .me) {
+                    MeView()
+                }
             }
-            Tab(AppTab.library.rawValue, systemImage: AppTab.library.icon, value: .library) {
-                NativeLibraryBrowserView()
-            }
-            Tab(AppTab.claude.rawValue, systemImage: AppTab.claude.icon, value: .claude) {
-                ClaudeSessionListView(claudeVM: claudeVM)
-            }
-            Tab(AppTab.me.rawValue, systemImage: AppTab.me.icon, value: .me) {
-                MeView()
-            }
-        }
-        .modifier(SharedModifiers(
-            allViewModels: allViewModels,
-            selectedTab: $selectedTab,
-            deepLinkPath: $deepLinkPath,
-            scenePhase: scenePhase
-        ))
+            .modifier(SharedModifiers(
+                allViewModels: allViewModels,
+                selectedTab: $selectedTab,
+                deepLinkPath: $deepLinkPath,
+                scenePhase: scenePhase
+            ))
+        )
     }
     #endif
 
@@ -117,30 +110,32 @@ struct MainTabView: View {
 
     #if os(macOS)
     private var macOSLayout: some View {
-        NavigationSplitView {
-            List(AppTab.allCases, id: \.self, selection: $selectedTab) { tab in
-                Label(tab.rawValue, systemImage: tab.icon)
-                    .tag(tab)
+        withFilePreview(
+            NavigationSplitView {
+                List(AppTab.allCases, id: \.self, selection: $selectedTab) { tab in
+                    Label(tab.rawValue, systemImage: tab.icon)
+                        .tag(tab)
+                }
+                .navigationSplitViewColumnWidth(min: 180, ideal: 200)
+            } detail: {
+                switch selectedTab {
+                case .inbox:
+                    NativeInboxView()
+                case .library:
+                    NativeLibraryBrowserView()
+                case .claude:
+                    ClaudeSessionListView(claudeVM: claudeVM)
+                case .me:
+                    MeView()
+                }
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-        } detail: {
-            switch selectedTab {
-            case .inbox:
-                NativeInboxView()
-            case .library:
-                NativeLibraryBrowserView()
-            case .claude:
-                ClaudeSessionListView(claudeVM: claudeVM)
-            case .me:
-                MeView()
-            }
-        }
-        .modifier(SharedModifiers(
-            allViewModels: allViewModels,
-            selectedTab: $selectedTab,
-            deepLinkPath: $deepLinkPath,
-            scenePhase: scenePhase
-        ))
+            .modifier(SharedModifiers(
+                allViewModels: allViewModels,
+                selectedTab: $selectedTab,
+                deepLinkPath: $deepLinkPath,
+                scenePhase: scenePhase
+            ))
+        )
     }
     #endif
 
@@ -148,15 +143,7 @@ struct MainTabView: View {
 
     @ViewBuilder
     private func fileViewerView(for preview: FilePreviewDestination) -> some View {
-        let dismiss = {
-            #if os(macOS)
-            withAnimation(.spring(duration: 0.4, bounce: 0.15)) {
-                filePreview = nil
-            }
-            #else
-            filePreview = nil
-            #endif
-        }
+        let dismiss = { filePreview = nil }
         if let file = preview.file {
             FileViewerView(file: file, onDismiss: dismiss)
         } else {
