@@ -430,15 +430,6 @@ private struct SessionRow: View {
 
             Spacer()
 
-            // Show activity indicator if Claude is actively working
-            // (lastActivity is more recent than lastUserActivity by > 10s)
-            if let userTime = session.lastUserActivity,
-               session.lastActivity.timeIntervalSince(userTime) > 10 {
-                Image(systemName: "bolt.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-            }
-
             Text(shortRelativeTime(session.lastUserActivity ?? session.lastActivity))
                 .foregroundStyle(.secondary)
                 .font(.callout)
