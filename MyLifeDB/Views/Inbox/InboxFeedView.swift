@@ -60,6 +60,7 @@ struct InboxFeedView: View {
                                 onUnpin: onPinnedUnpin
                             )
                             .frame(maxWidth: .infinity)
+                            .padding(.bottom, -8)
                         }
                     }
                     .flippedForChat()

@@ -24,7 +24,7 @@ struct InboxPinnedBar: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .padding(.vertical, 4)
             }
         }
     }
@@ -42,7 +42,7 @@ struct InboxPinnedBar: View {
                 .foregroundStyle(.primary)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 6)
         .background(Color.orange.opacity(0.12))
         .clipShape(Capsule())
         .overlay(
