@@ -28,11 +28,6 @@ struct ClaudeSessionListView: View {
     @State private var destination: ClaudeDestination?
     @State private var sseManager = ClaudeSessionSSEManager()
 
-    /// ID of the session that was just viewed — drives the return highlight animation
-    @State private var highlightedSessionId: String?
-    /// Explicit opacity for the breath highlight (0 = invisible, 1 = full)
-    @State private var highlightOpacity: Double = 0
-
     var body: some View {
         NavigationStack {
             Group {
@@ -77,24 +72,8 @@ struct ClaudeSessionListView: View {
             sseManager.stop()
         }
         .onChange(of: destination) { oldValue, newValue in
-            if newValue == nil, let old = oldValue {
-                Task {
-                    await refresh()
-                    if case .session(let session) = old {
-                        // Set ID first (no animation), then animate opacity in
-                        highlightedSessionId = session.id
-                        try? await Task.sleep(for: .milliseconds(50))
-                        withAnimation(.smooth(duration: 0.4)) {
-                            highlightOpacity = 1
-                        }
-                        try? await Task.sleep(for: .seconds(1.0))
-                        withAnimation(.smooth(duration: 0.8)) {
-                            highlightOpacity = 0
-                        }
-                        try? await Task.sleep(for: .seconds(0.8))
-                        highlightedSessionId = nil
-                    }
-                }
+            if newValue == nil {
+                Task { await refresh() }
             }
         }
     }
@@ -175,7 +154,6 @@ struct ClaudeSessionListView: View {
         } label: {
             SessionRow(session: session)
                 .contentShape(Rectangle())
-                .overlay(returnHighlight(for: session.id))
         }
         .buttonStyle(.plain)
         #if os(iOS)
@@ -211,17 +189,6 @@ struct ClaudeSessionListView: View {
                     Label("Archive", systemImage: "archivebox")
                 }
             }
-        }
-    }
-
-    // MARK: - Return Highlight ("breath" effect)
-
-    @ViewBuilder
-    private func returnHighlight(for id: String) -> some View {
-        if highlightedSessionId == id {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.accentColor.opacity(0.20 * highlightOpacity))
-                .allowsHitTesting(false)
         }
     }
 
