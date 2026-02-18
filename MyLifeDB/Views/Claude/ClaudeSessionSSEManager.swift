@@ -16,7 +16,7 @@ final class ClaudeSessionSSEManager {
 
     private var task: URLSessionDataTask?
     private var session: URLSession?
-    private var isRunning = false
+    fileprivate var isRunning = false
     private var reconnectDelay: TimeInterval = 1
 
     func start() {
@@ -120,13 +120,22 @@ private class ClaudeSSESessionDelegate: NSObject, URLSessionDataDelegate {
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        if let http = response as? HTTPURLResponse, http.statusCode == 401 {
+            // Don't reset backoff on auth failure — cancel so didCompleteWithError
+            // triggers reconnect with proper backoff.
+            completionHandler(.cancel)
+            return
+        }
         manager?.handleConnected()
         completionHandler(.allow)
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if let error = error as? NSError, error.code == NSURLErrorCancelled {
-            return // Intentional cancellation
+        // .cancel from didReceive arrives as NSURLErrorCancelled — but only
+        // treat it as intentional if the manager itself called stop().
+        if let error = error as? NSError, error.code == NSURLErrorCancelled,
+           manager?.isRunning != true {
+            return // Intentional cancellation via stop()
         }
         manager?.handleDisconnect()
     }
