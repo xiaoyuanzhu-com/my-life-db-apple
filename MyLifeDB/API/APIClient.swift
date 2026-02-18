@@ -112,19 +112,24 @@ final class APIClient {
         method: HTTPMethod = .get,
         queryItems: [URLQueryItem]? = nil,
         body: Encodable? = nil,
-        allowRetryOn401: Bool = true
+        allowRetryOn401: Bool = true,
+        ignoreCache: Bool = false
     ) async throws -> T {
         var bodyData: Data? = nil
         if let body = body {
             bodyData = try encoder.encode(body)
         }
 
-        let request = try buildRequest(
+        var request = try buildRequest(
             path: path,
             method: method,
             queryItems: queryItems,
             body: bodyData
         )
+
+        if ignoreCache {
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+        }
 
         let (data, response) = try await session.data(for: request)
 

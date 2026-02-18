@@ -34,11 +34,13 @@ struct InboxAPI {
     ///   - before: Cursor for fetching older items
     ///   - after: Cursor for fetching newer items
     ///   - around: Cursor for fetching items around a specific item
+    ///   - ignoreCache: Bypass URLCache (use for pull-to-refresh)
     func list(
         limit: Int = 30,
         before: String? = nil,
         after: String? = nil,
-        around: String? = nil
+        around: String? = nil,
+        ignoreCache: Bool = false
     ) async throws -> InboxResponse {
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "limit", value: String(limit))
@@ -56,13 +58,14 @@ struct InboxAPI {
 
         return try await client.request(
             path: "/api/inbox",
-            queryItems: queryItems
+            queryItems: queryItems,
+            ignoreCache: ignoreCache
         )
     }
 
     /// List pinned inbox items
-    func listPinned() async throws -> PinnedInboxResponse {
-        try await client.request(path: "/api/inbox/pinned")
+    func listPinned(ignoreCache: Bool = false) async throws -> PinnedInboxResponse {
+        try await client.request(path: "/api/inbox/pinned", ignoreCache: ignoreCache)
     }
 
     // MARK: - CRUD Operations

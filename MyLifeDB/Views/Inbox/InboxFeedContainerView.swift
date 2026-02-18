@@ -289,8 +289,9 @@ struct InboxFeedContainerView: View {
 
     private func refresh() async {
         do {
-            async let itemsTask = APIClient.shared.inbox.list()
-            async let pinnedTask = APIClient.shared.inbox.listPinned()
+            // ignoreCache: bypass URLCache so pull-to-refresh always hits the network
+            async let itemsTask = APIClient.shared.inbox.list(ignoreCache: true)
+            async let pinnedTask = APIClient.shared.inbox.listPinned(ignoreCache: true)
 
             let (itemsResponse, pinnedResponse) = try await (itemsTask, pinnedTask)
 
