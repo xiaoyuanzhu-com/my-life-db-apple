@@ -9,6 +9,14 @@
 import Foundation
 import Observation
 
+// MARK: - Notifications
+
+extension Notification.Name {
+    /// Posted after AuthManager successfully refreshes tokens or completes OAuth login.
+    /// WebView models observe this to push fresh cookies to the web layer.
+    static let authTokensDidChange = Notification.Name("authTokensDidChange")
+}
+
 @Observable
 final class AuthManager {
 
@@ -60,6 +68,25 @@ final class AuthManager {
                 KeychainHelper.delete(key: Self.refreshTokenKey)
             }
         }
+    }
+
+    // MARK: - Cookie Helpers (used by TabWebViewModel for cookie injection)
+
+    /// The refresh token for WebView cookie injection.
+    /// The refresh token is primarily managed by native; the cookie is a fallback
+    /// so the web-side fetchWithRefresh can work independently if needed.
+    var refreshTokenForCookie: String? { refreshToken }
+
+    /// Seconds until the access token expires (for cookie max-age). Defaults to 3600.
+    var accessTokenMaxAge: Int {
+        guard let token = accessToken, let exp = jwtExpiration(token) else { return 3600 }
+        return max(Int(exp.timeIntervalSinceNow), 0)
+    }
+
+    /// The access token's expiry date (for cookie .expires property).
+    var accessTokenExpiry: Date? {
+        guard let token = accessToken else { return nil }
+        return jwtExpiration(token)
     }
 
     // MARK: - Refresh Timer
@@ -141,6 +168,7 @@ final class AuthManager {
                 state = .authenticated("User")
                 scheduleRefresh()
             }
+            NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
         }
     }
 
@@ -188,6 +216,7 @@ final class AuthManager {
                 if case .valid(let username) = result {
                     state = .authenticated(username)
                     scheduleRefresh()
+                    NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
                     return true
                 }
             }
@@ -195,6 +224,7 @@ final class AuthManager {
             // Even if validation fails, if we got new tokens, consider it success
             if self.accessToken != nil {
                 scheduleRefresh()
+                NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
                 return true
             }
 

@@ -159,6 +159,13 @@ final class NativeBridgeHandler: URLSchemeHandler {
             }
         })();
 
+        // Standalone auth re-check function — callable by native at any time,
+        // independent of window.__nativeBridge (which is set up later by React).
+        // Dispatches the same event that React's AuthProvider listens for.
+        window.__nativeRecheckAuth = function() {
+            window.dispatchEvent(new Event('native-recheck-auth'));
+        };
+
         // Polyfill: map window.webkit.messageHandlers.native.postMessage → fetch
         if (!window.webkit) window.webkit = {};
         if (!window.webkit.messageHandlers) window.webkit.messageHandlers = {};

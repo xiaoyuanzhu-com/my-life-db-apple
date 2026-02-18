@@ -83,8 +83,8 @@ final class TabWebViewModel {
 
         self.baseURL = baseURL
 
-        // Inject auth cookies before loading
-        await injectAuthCookies(for: baseURL)
+        // Inject auth cookies via cookie store before loading (awaited for sync)
+        injectAuthCookiesViaStore(for: baseURL)
 
         // Load the SPA at this tab's route
         let loadURL: URL
@@ -111,6 +111,10 @@ final class TabWebViewModel {
                         // Inject bridge polyfill and platform detection as soon as content starts loading
                         await self.injectBridgePolyfill()
 
+                        // Inject auth cookies via JS immediately — ensures cookies are present
+                        // before React's first fetch, bypassing HTTPCookieStorage sync delay
+                        await self.injectAuthCookiesViaJS()
+
                     case .finished:
                         self.isLoaded = true
                         self.loadError = nil
@@ -118,8 +122,14 @@ final class TabWebViewModel {
                         // Sync theme on load
                         self.syncTheme()
 
-                        // Signal the web frontend to re-check auth
-                        _ = try? await self.webPage.callJavaScript("window.__nativeBridge?.recheckAuth()")
+                        // Signal the web frontend to re-check auth after a short delay.
+                        // The delay ensures React has mounted and registered its
+                        // "native-recheck-auth" event listener.
+                        Task { @MainActor [weak self] in
+                            try? await Task.sleep(for: .milliseconds(200))
+                            guard !Task.isCancelled else { return }
+                            _ = try? await self?.webPage.callJavaScript("window.__nativeRecheckAuth?.()")
+                        }
 
                         // Flush any navigation that was queued while loading
                         if let pending = self.pendingNavigation {
@@ -140,6 +150,10 @@ final class TabWebViewModel {
                     print("[TabWebViewModel:\(self.route)] WebView process terminated, reloading...")
                     self.isLoaded = false
                     self.bridgeInjected = false
+                    // Re-inject cookies via store before reload (JS not available after crash)
+                    if let baseURL = self.baseURL {
+                        self.injectAuthCookiesViaStore(for: baseURL)
+                    }
                     self.webPage.reload()
                 default:
                     self.loadError = error
@@ -224,30 +238,70 @@ final class TabWebViewModel {
 
     // MARK: - Auth Cookie Management
 
-    /// Inject the current auth tokens as cookies via JavaScript.
+    /// Inject auth cookies via `document.cookie` JavaScript evaluation.
+    /// This is the preferred runtime method — takes effect immediately in the
+    /// WebView's JS context, bypassing HTTPCookieStorage sync delays.
+    /// Requires a loaded page (JS evaluation needs a document).
     @MainActor
-    func injectAuthCookies(for baseURL: URL) async {
-        guard let host = baseURL.host else { return }
+    private func injectAuthCookiesViaJS() async {
+        let auth = AuthManager.shared
+        let isSecure = baseURL?.scheme == "https"
+        let secureFlag = isSecure ? " secure;" : ""
 
-        if let accessToken = AuthManager.shared.accessToken {
+        if let accessToken = auth.accessToken {
+            let maxAge = auth.accessTokenMaxAge
+            let js = "document.cookie = 'access_token=\(accessToken.escapedForJS); path=/; max-age=\(maxAge);\(secureFlag) samesite=lax'"
+            _ = try? await webPage.callJavaScript(js)
+        }
+
+        if let refreshToken = auth.refreshTokenForCookie {
+            let js = "document.cookie = 'refresh_token=\(refreshToken.escapedForJS); path=/api/oauth; max-age=2592000;\(secureFlag) samesite=lax'"
+            _ = try? await webPage.callJavaScript(js)
+        }
+    }
+
+    /// Inject auth cookies via HTTPCookieStorage (system cookie store).
+    /// Used before initial page load when JS evaluation is not yet available.
+    /// Sets both cookies with explicit expiry (never session cookies).
+    @MainActor
+    func injectAuthCookiesViaStore(for baseURL: URL) {
+        guard let host = baseURL.host else { return }
+        let auth = AuthManager.shared
+        let isSecure = baseURL.scheme == "https"
+
+        if let accessToken = auth.accessToken {
+            let expiry = auth.accessTokenExpiry ?? Date().addingTimeInterval(3600)
             let cookie = HTTPCookie(properties: [
                 .name: "access_token",
                 .value: accessToken,
                 .domain: host,
                 .path: "/",
-                .secure: baseURL.scheme == "https" ? "TRUE" : "FALSE",
+                .expires: expiry,
+                .secure: isSecure ? "TRUE" : "FALSE",
             ])
-            if let cookie {
-                HTTPCookieStorage.shared.setCookie(cookie)
-            }
+            if let cookie { HTTPCookieStorage.shared.setCookie(cookie) }
+        }
+
+        if let refreshToken = auth.refreshTokenForCookie {
+            let cookie = HTTPCookie(properties: [
+                .name: "refresh_token",
+                .value: refreshToken,
+                .domain: host,
+                .path: "/api/oauth",
+                .expires: Date().addingTimeInterval(60 * 60 * 24 * 30), // 30 days
+                .secure: isSecure ? "TRUE" : "FALSE",
+            ])
+            if let cookie { HTTPCookieStorage.shared.setCookie(cookie) }
         }
     }
 
-    /// Update auth cookies after a token refresh.
+    /// Push fresh auth cookies to the WebView via JS and signal re-check.
+    /// Call this after token refresh or on foreground resume.
     @MainActor
-    func updateAuthCookies() async {
-        guard let baseURL = baseURL else { return }
-        await injectAuthCookies(for: baseURL)
+    func pushAuthCookiesAndRecheck() async {
+        guard baseURL != nil else { return }
+        await injectAuthCookiesViaJS()
+        _ = try? await webPage.callJavaScript("window.__nativeRecheckAuth?.()")
     }
 
     // MARK: - Reload
@@ -274,7 +328,7 @@ final class TabWebViewModel {
         self.webPage = WebPage(configuration: config)
 
         self.baseURL = baseURL
-        await injectAuthCookies(for: baseURL)
+        injectAuthCookiesViaStore(for: baseURL)
 
         let loadURL: URL
         if route == "/" {

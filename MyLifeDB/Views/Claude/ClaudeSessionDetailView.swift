@@ -53,8 +53,11 @@ struct ClaudeSessionDetailView: View {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 webVM.syncTheme()
-                Task { await webVM.updateAuthCookies() }
+                Task { await webVM.pushAuthCookiesAndRecheck() }
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .authTokensDidChange)) { _ in
+            Task { await webVM.pushAuthCookiesAndRecheck() }
         }
     }
 }
