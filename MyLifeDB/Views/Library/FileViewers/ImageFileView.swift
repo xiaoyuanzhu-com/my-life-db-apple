@@ -21,6 +21,7 @@ struct ImageFileView: View {
     @State private var lastScale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
+    @State private var viewSize: CGSize = .zero
 
     private let zoomTarget: CGFloat = 2.5
 
@@ -58,19 +59,28 @@ struct ImageFileView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
                 .contentShape(Rectangle())
-                // Double-tap: toggle between 1× and 2.5× zoom
-                .onTapGesture(count: 2) {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        if scale > 1.0 {
-                            scale = 1.0
-                            offset = .zero
-                            lastOffset = .zero
-                        } else {
-                            scale = zoomTarget
+                .background(GeometryReader { geo in Color.clear.preference(key: ViewSizeKey.self, value: geo.size) })
+                .onPreferenceChange(ViewSizeKey.self) { viewSize = $0 }
+                // Double-tap: toggle between 1× and 2.5× zoom (centered on tap point)
+                .gesture(
+                    SpatialTapGesture(count: 2)
+                        .onEnded { value in
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                if scale > 1.0 {
+                                    scale = 1.0
+                                    offset = .zero
+                                    lastOffset = .zero
+                                } else {
+                                    let dx = value.location.x - viewSize.width / 2
+                                    let dy = value.location.y - viewSize.height / 2
+                                    scale = zoomTarget
+                                    offset = CGSize(width: -dx * zoomTarget, height: -dy * zoomTarget)
+                                    lastOffset = offset
+                                }
+                            }
                         }
-                    }
-                }
-                // Single-tap: dismiss (deferred automatically when double-tap fires)
+                )
+                // Single-tap: dismiss
                 .onTapGesture(count: 1) {
                     onTap?()
                 }
@@ -84,7 +94,7 @@ struct ImageFileView: View {
                         .onEnded { _ in
                             lastScale = 1.0
                             if scale <= 1.0 {
-                                withAnimation(.easeOut(duration: 0.2)) {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                                     scale = 1.0
                                     offset = .zero
                                     lastOffset = .zero
@@ -110,18 +120,27 @@ struct ImageFileView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
                 .contentShape(Rectangle())
-                // Double-tap: toggle between 1× and 2.5× zoom
-                .onTapGesture(count: 2) {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        if scale > 1.0 {
-                            scale = 1.0
-                            offset = .zero
-                            lastOffset = .zero
-                        } else {
-                            scale = zoomTarget
+                .background(GeometryReader { geo in Color.clear.preference(key: ViewSizeKey.self, value: geo.size) })
+                .onPreferenceChange(ViewSizeKey.self) { viewSize = $0 }
+                // Double-tap: toggle between 1× and 2.5× zoom (centered on tap point)
+                .gesture(
+                    SpatialTapGesture(count: 2)
+                        .onEnded { value in
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                if scale > 1.0 {
+                                    scale = 1.0
+                                    offset = .zero
+                                    lastOffset = .zero
+                                } else {
+                                    let dx = value.location.x - viewSize.width / 2
+                                    let dy = value.location.y - viewSize.height / 2
+                                    scale = zoomTarget
+                                    offset = CGSize(width: -dx * zoomTarget, height: -dy * zoomTarget)
+                                    lastOffset = offset
+                                }
+                            }
                         }
-                    }
-                }
+                )
                 // Single-tap: dismiss
                 .onTapGesture(count: 1) {
                     onTap?()
@@ -136,7 +155,7 @@ struct ImageFileView: View {
                         .onEnded { _ in
                             lastScale = 1.0
                             if scale <= 1.0 {
-                                withAnimation(.easeOut(duration: 0.2)) {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                                     scale = 1.0
                                     offset = .zero
                                     lastOffset = .zero
@@ -165,6 +184,13 @@ struct ImageFileView: View {
 
         isLoading = false
     }
+}
+
+// MARK: - View Size Preference Key
+
+private struct ViewSizeKey: PreferenceKey {
+    static var defaultValue: CGSize = .zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) { value = nextValue() }
 }
 
 // MARK: - Conditional Pan Gesture

@@ -50,31 +50,38 @@ struct FilePreviewPagerView: View {
             FileViewerView(filePath: item.path, fileName: item.name, onDismiss: onDismiss)
         }
         #else
-        ScrollView(.horizontal) {
-            LazyHStack(spacing: 0) {
-                ForEach(items) { item in
-                    Group {
-                        if let file = item.file {
-                            FileViewerView(file: file, onDismiss: onDismiss)
-                        } else {
-                            FileViewerView(filePath: item.path, fileName: item.name, onDismiss: onDismiss)
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                LazyHStack(spacing: 0) {
+                    ForEach(items) { item in
+                        Group {
+                            if let file = item.file {
+                                FileViewerView(file: file, onDismiss: onDismiss)
+                            } else {
+                                FileViewerView(filePath: item.path, fileName: item.name, onDismiss: onDismiss)
+                            }
                         }
+                        .containerRelativeFrame(.horizontal)
+                        .id(item.id)
                     }
-                    .containerRelativeFrame(.horizontal)
-                    .id(item.id)
                 }
             }
-        }
-        .scrollTargetBehavior(.paging)
-        .scrollPosition(id: $currentID)
-        .scrollIndicators(.hidden)
-        .ignoresSafeArea()
-        .onChange(of: currentID) { _, newID in
-            guard let newID else { return }
-            // Load more older items when approaching the left end (oldest side).
-            if let idx = items.firstIndex(where: { $0.id == newID }),
-               idx <= 2 && hasMoreOlder && !isLoadingMore {
-                Task { await loadMoreItems() }
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: $currentID)
+            .scrollIndicators(.hidden)
+            .ignoresSafeArea()
+            .onAppear {
+                if let id = currentID {
+                    proxy.scrollTo(id, anchor: .center)
+                }
+            }
+            .onChange(of: currentID) { _, newID in
+                guard let newID else { return }
+                // Load more older items when approaching the left end (oldest side).
+                if let idx = items.firstIndex(where: { $0.id == newID }),
+                   idx <= 2 && hasMoreOlder && !isLoadingMore {
+                    Task { await loadMoreItems() }
+                }
             }
         }
         #endif
