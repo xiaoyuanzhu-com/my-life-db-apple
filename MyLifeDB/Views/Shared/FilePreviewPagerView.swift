@@ -7,11 +7,12 @@
 //  each item sits side by side at full width. Non-media files are
 //  excluded from the pager.
 //
-//  Items are displayed in reverse-chronological order (newest on the left)
-//  so swiping left goes toward older items and swiping right toward newer.
+//  Items are displayed in chronological order (oldest on the left,
+//  newest on the right) so swiping left goes toward newer items
+//  and swiping right toward older.
 //
-//  The context.items array arrives newest-first from the feed, which is
-//  already the correct left-to-right order for the pager.
+//  The context.items array arrives newest-first from the feed, so it
+//  is reversed here to get oldest-first (left-to-right chronological).
 //
 
 import SwiftUI
@@ -20,8 +21,8 @@ struct FilePreviewPagerView: View {
 
     let onDismiss: () -> Void
 
-    // Items in reverse-chronological order (newest first / leftmost).
-    // The array arrives newest-first from the feed — no reversal needed.
+    // Items in chronological order (oldest first / leftmost).
+    // Reversed from the feed's newest-first order.
     @State private var items: [PreviewItem]
     @State private var currentID: String?
     @State private var isLoadingMore = false
@@ -32,8 +33,8 @@ struct FilePreviewPagerView: View {
     init(context: FilePreviewPagerContext, onDismiss: @escaping () -> Void) {
         self.onDismiss = onDismiss
         self.loadMore = context.loadMore
-        // Items are already newest-first from the feed — use as-is.
-        self._items = State(initialValue: context.items)
+        // Reverse so oldest is first (leftmost in the pager).
+        self._items = State(initialValue: context.items.reversed())
         self._hasMoreOlder = State(initialValue: context.hasMoreOlder)
         // Use the item's stable ID (path) for selection, not an Int index.
         let startID = context.items.indices.contains(context.startIndex)
@@ -70,9 +71,9 @@ struct FilePreviewPagerView: View {
         .ignoresSafeArea()
         .onChange(of: currentID) { _, newID in
             guard let newID else { return }
-            // Load more older items when approaching the right end (oldest side).
+            // Load more older items when approaching the left end (oldest side).
             if let idx = items.firstIndex(where: { $0.id == newID }),
-               idx >= items.count - 3 && hasMoreOlder && !isLoadingMore {
+               idx <= 2 && hasMoreOlder && !isLoadingMore {
                 Task { await loadMoreItems() }
             }
         }
@@ -83,9 +84,9 @@ struct FilePreviewPagerView: View {
         isLoadingMore = true
         let newItems = await loadMore()
         if !newItems.isEmpty {
-            // Append to the end (right / older side). Items arrive newest-first
-            // within the batch, all older than existing items — correct order.
-            items.append(contentsOf: newItems)
+            // Prepend to the start (left / older side).
+            // New items arrive newest-first from the API, reverse to oldest-first.
+            items.insert(contentsOf: newItems.reversed(), at: 0)
         } else {
             hasMoreOlder = false
         }
