@@ -22,17 +22,11 @@ struct ImageFileView: View {
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
     @State private var viewSize: CGSize = .zero
-    @State private var pendingSingleTapToken: UUID?
-    @State private var lastTapAt: Date = .distantPast
-    @State private var lastTapLocation: CGPoint = .zero
 
     private let zoomTarget: CGFloat = 1.5
     private let doubleTapZoomInDuration: TimeInterval = 0.55
     private let doubleTapZoomOutDuration: TimeInterval = 0.28
     private let pinchResetDuration: TimeInterval = 0.24
-    private let doubleTapInterval: TimeInterval = 0.25
-    private let doubleTapMaxDistance: CGFloat = 44
-    private var singleTapDelay: TimeInterval { doubleTapInterval + 0.05 }
 
     var body: some View {
         Group {
@@ -52,10 +46,6 @@ struct ImageFileView: View {
         .task {
             await loadImage()
         }
-        .onDisappear {
-            pendingSingleTapToken = nil
-            lastTapAt = .distantPast
-        }
     }
 
     // MARK: - Image Content
@@ -74,12 +64,7 @@ struct ImageFileView: View {
                 .contentShape(Rectangle())
                 .background(GeometryReader { geo in Color.clear.preference(key: ViewSizeKey.self, value: geo.size) })
                 .onPreferenceChange(ViewSizeKey.self) { viewSize = $0 }
-                .gesture(
-                    SpatialTapGesture(count: 1)
-                        .onEnded { value in
-                            handleTap(at: value.location)
-                        }
-                )
+                .highPriorityGesture(tapGesture)
                 .gesture(
                     MagnifyGesture()
                         .onChanged { value in
@@ -118,12 +103,7 @@ struct ImageFileView: View {
                 .contentShape(Rectangle())
                 .background(GeometryReader { geo in Color.clear.preference(key: ViewSizeKey.self, value: geo.size) })
                 .onPreferenceChange(ViewSizeKey.self) { viewSize = $0 }
-                .gesture(
-                    SpatialTapGesture(count: 1)
-                        .onEnded { value in
-                            handleTap(at: value.location)
-                        }
-                )
+                .highPriorityGesture(tapGesture)
                 .gesture(
                     MagnifyGesture()
                         .onChanged { value in
@@ -164,32 +144,18 @@ struct ImageFileView: View {
         isLoading = false
     }
 
-    private func handleTap(at location: CGPoint) {
-        let now = Date()
-        let distance = hypot(
-            location.x - lastTapLocation.x,
-            location.y - lastTapLocation.y
-        )
-        let isDoubleTap = now.timeIntervalSince(lastTapAt) <= doubleTapInterval && distance <= doubleTapMaxDistance
-
-        lastTapAt = now
-        lastTapLocation = location
-
-        if isDoubleTap {
-            pendingSingleTapToken = nil
-            handleDoubleTap(at: location)
-            lastTapAt = .distantPast
-            return
-        }
-
-        let token = UUID()
-        pendingSingleTapToken = token
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + singleTapDelay) {
-            guard pendingSingleTapToken == token else { return }
-            pendingSingleTapToken = nil
-            onTap?()
-        }
+    private var tapGesture: some Gesture {
+        SpatialTapGesture(count: 2)
+            .exclusively(before: SpatialTapGesture(count: 1))
+            .onEnded { value in
+                switch value {
+                case .first(let doubleTap):
+                    handleDoubleTap(at: doubleTap.location)
+                case .second:
+                    guard scale <= 1.0 else { return }
+                    onTap?()
+                }
+            }
     }
 
     private func handleDoubleTap(at location: CGPoint) {
@@ -238,30 +204,29 @@ private struct ViewSizeKey: PreferenceKey {
 
 // MARK: - Conditional Pan Gesture
 
-/// Only attaches the DragGesture when active, so that pager horizontal
-/// swiping is not blocked at 1x zoom.
+/// Always attaches DragGesture, but only mutates offset while active.
+/// Keeping one stable view tree avoids visual ghosting when scale animates
+/// across the 1x threshold.
 private struct ConditionalPanGestureModifier: ViewModifier {
     let isActive: Bool
     @Binding var offset: CGSize
     @Binding var lastOffset: CGSize
 
     func body(content: Content) -> some View {
-        if isActive {
-            content.simultaneousGesture(
-                DragGesture()
-                    .onChanged { value in
-                        offset = CGSize(
-                            width: lastOffset.width + value.translation.width,
-                            height: lastOffset.height + value.translation.height
-                        )
-                    }
-                    .onEnded { _ in
-                        lastOffset = offset
-                    }
-            )
-        } else {
-            content
-        }
+        content.simultaneousGesture(
+            DragGesture()
+                .onChanged { value in
+                    guard isActive else { return }
+                    offset = CGSize(
+                        width: lastOffset.width + value.translation.width,
+                        height: lastOffset.height + value.translation.height
+                    )
+                }
+                .onEnded { _ in
+                    guard isActive else { return }
+                    lastOffset = offset
+                }
+        )
     }
 }
 
