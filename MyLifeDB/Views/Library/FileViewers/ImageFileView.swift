@@ -27,9 +27,12 @@ struct ImageFileView: View {
     @State private var lastTapLocation: CGPoint = .zero
 
     private let zoomTarget: CGFloat = 1.5
-    private let singleTapDelay: TimeInterval = 0.18
+    private let doubleTapZoomInDuration: TimeInterval = 0.55
+    private let doubleTapZoomOutDuration: TimeInterval = 0.28
+    private let pinchResetDuration: TimeInterval = 0.24
     private let doubleTapInterval: TimeInterval = 0.25
     private let doubleTapMaxDistance: CGFloat = 44
+    private var singleTapDelay: TimeInterval { doubleTapInterval + 0.05 }
 
     var body: some View {
         Group {
@@ -87,7 +90,7 @@ struct ImageFileView: View {
                         .onEnded { _ in
                             lastScale = 1.0
                             if scale <= 1.0 {
-                                withAnimation(.easeInOut(duration: 0.3)) {
+                                withAnimation(.linear(duration: pinchResetDuration)) {
                                     scale = 1.0
                                     offset = .zero
                                     lastOffset = .zero
@@ -131,7 +134,7 @@ struct ImageFileView: View {
                         .onEnded { _ in
                             lastScale = 1.0
                             if scale <= 1.0 {
-                                withAnimation(.easeInOut(duration: 0.3)) {
+                                withAnimation(.linear(duration: pinchResetDuration)) {
                                     scale = 1.0
                                     offset = .zero
                                     lastOffset = .zero
@@ -192,14 +195,14 @@ struct ImageFileView: View {
     private func handleDoubleTap(at location: CGPoint) {
         if scale > 1.0 {
             lastOffset = .zero
-            withAnimation(.easeInOut(duration: 0.3)) {
+            withAnimation(.linear(duration: doubleTapZoomOutDuration)) {
                 scale = 1.0
                 offset = .zero
             }
         } else {
             let targetOffset = zoomOffset(for: location, scale: zoomTarget)
             lastOffset = targetOffset
-            withAnimation(.easeInOut(duration: 0.3)) {
+            withAnimation(.linear(duration: doubleTapZoomInDuration)) {
                 scale = zoomTarget
                 offset = targetOffset
             }
