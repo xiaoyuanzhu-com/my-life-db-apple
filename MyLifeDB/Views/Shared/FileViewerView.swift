@@ -139,6 +139,12 @@ struct FileViewerView: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    /// Whether the resolved file is image or video (use tap-to-dismiss, no overlay buttons).
+    private var isMediaFile: Bool {
+        guard let file = resolvedFile else { return false }
+        return file.isImage || file.isVideo
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -155,39 +161,43 @@ struct FileViewerView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .topLeading) {
-            GlassCircleButton(systemName: onDismiss != nil ? "xmark" : "chevron.left") {
-                if let onDismiss {
-                    onDismiss()
-                } else {
-                    dismiss()
-                }
-            }
-            .padding(.leading, 16)
-            .padding(.top, 8)
-        }
-        .overlay(alignment: .topTrailing) {
-            if isDownloadingForShare {
-                ProgressView()
-                    .frame(width: 44, height: 44)
-                    .padding(.trailing, 16)
-                    .padding(.top, 8)
-            } else {
-                GlassCircleButton(systemName: "square.and.arrow.up") {
-                    isDownloadingForShare = true
-                    Task {
-                        defer { isDownloadingForShare = false }
-                        do {
-                            let data = try await APIClient.shared.getRawFile(path: filePath)
-                            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
-                            try data.write(to: tempURL)
-                            presentShareSheet(items: [tempURL])
-                        } catch {
-                            print("[FileViewer] Failed to download file for sharing: \(error)")
-                        }
+            if !isMediaFile {
+                GlassCircleButton(systemName: onDismiss != nil ? "xmark" : "chevron.left") {
+                    if let onDismiss {
+                        onDismiss()
+                    } else {
+                        dismiss()
                     }
                 }
-                .padding(.trailing, 16)
+                .padding(.leading, 16)
                 .padding(.top, 8)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if !isMediaFile {
+                if isDownloadingForShare {
+                    ProgressView()
+                        .frame(width: 44, height: 44)
+                        .padding(.trailing, 16)
+                        .padding(.top, 8)
+                } else {
+                    GlassCircleButton(systemName: "square.and.arrow.up") {
+                        isDownloadingForShare = true
+                        Task {
+                            defer { isDownloadingForShare = false }
+                            do {
+                                let data = try await APIClient.shared.getRawFile(path: filePath)
+                                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+                                try data.write(to: tempURL)
+                                presentShareSheet(items: [tempURL])
+                            } catch {
+                                print("[FileViewer] Failed to download file for sharing: \(error)")
+                            }
+                        }
+                    }
+                    .padding(.trailing, 16)
+                    .padding(.top, 8)
+                }
             }
         }
         .task {
@@ -206,9 +216,9 @@ struct FileViewerView: View {
     @ViewBuilder
     private func fileContentView(_ file: FileRecord) -> some View {
         if file.isImage {
-            // No onTapGesture — tap gestures block TabView swipe in pager mode.
-            // Dismiss via the X button overlay instead.
             ImageFileView(path: filePath)
+                .contentShape(Rectangle())
+                .onTapGesture { dismissAction() }
         } else if file.isText {
             TextFileView(path: filePath)
                 .contentShape(Rectangle())
@@ -218,9 +228,9 @@ struct FileViewerView: View {
                 .contentShape(Rectangle())
                 .onTapGesture { dismissAction() }
         } else if file.isVideo {
-            // No onTapGesture — tap gestures block TabView swipe in pager mode.
-            // Dismiss via the X button overlay instead.
             VideoFileView(path: filePath)
+                .contentShape(Rectangle())
+                .onTapGesture { dismissAction() }
         } else if file.isAudio {
             AudioFileView(path: filePath, fileName: fileName)
                 .contentShape(Rectangle())

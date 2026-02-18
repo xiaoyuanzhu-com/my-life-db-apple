@@ -3,8 +3,9 @@
 //  MyLifeDB
 //
 //  Horizontal pager for swiping between media files (images and videos)
-//  in the inbox file preview. Uses TabView with page style for native
-//  iOS swipe physics. Non-media files are excluded from the pager.
+//  in the inbox file preview. Uses a simple ScrollView with paging so
+//  each item sits side by side at full width. Non-media files are
+//  excluded from the pager.
 //
 
 import SwiftUI
@@ -14,7 +15,7 @@ struct FilePreviewPagerView: View {
     let onDismiss: () -> Void
 
     @State private var items: [PreviewItem]
-    @State private var currentID: String
+    @State private var currentID: String?
     @State private var isLoadingMore = false
 
     private let hasMoreOlder: Bool
@@ -34,27 +35,34 @@ struct FilePreviewPagerView: View {
 
     var body: some View {
         #if os(macOS)
-        // macOS: no page-style TabView, fall back to single file viewer
+        // macOS: fall back to single file viewer
         if let item = items.first(where: { $0.id == currentID }) {
             FileViewerView(filePath: item.path, fileName: item.name, onDismiss: onDismiss)
         }
         #else
-        TabView(selection: $currentID) {
-            ForEach(items) { item in
-                if let file = item.file {
-                    FileViewerView(file: file, onDismiss: onDismiss)
-                        .tag(item.id)
-                } else {
-                    FileViewerView(filePath: item.path, fileName: item.name, onDismiss: onDismiss)
-                        .tag(item.id)
+        ScrollView(.horizontal) {
+            LazyHStack(spacing: 0) {
+                ForEach(items) { item in
+                    Group {
+                        if let file = item.file {
+                            FileViewerView(file: file, onDismiss: onDismiss)
+                        } else {
+                            FileViewerView(filePath: item.path, fileName: item.name, onDismiss: onDismiss)
+                        }
+                    }
+                    .containerRelativeFrame(.horizontal)
+                    .id(item.id)
                 }
             }
         }
-        .tabViewStyle(.page(indexDisplayMode: .never))
+        .scrollTargetBehavior(.paging)
+        .scrollPosition(id: $currentID)
+        .scrollIndicators(.hidden)
         .ignoresSafeArea()
-        .onChange(of: currentID) { _, _ in
+        .onChange(of: currentID) { _, newID in
+            guard let newID else { return }
             // Load more when approaching the end of the list
-            if let idx = items.firstIndex(where: { $0.id == currentID }),
+            if let idx = items.firstIndex(where: { $0.id == newID }),
                idx >= items.count - 3 && hasMoreOlder && !isLoadingMore {
                 Task { await loadMoreItems() }
             }

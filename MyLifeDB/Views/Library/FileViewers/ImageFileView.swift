@@ -133,7 +133,7 @@ struct ImageFileView: View {
 
 // MARK: - Conditional Pan Gesture
 
-/// Only attaches the DragGesture when active, so that TabView page
+/// Only attaches the DragGesture when active, so that pager horizontal
 /// swiping is not blocked at 1x zoom.
 private struct ConditionalPanGestureModifier: ViewModifier {
     let isActive: Bool
