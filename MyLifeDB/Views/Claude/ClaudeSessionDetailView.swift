@@ -3,21 +3,31 @@
 //  MyLifeDB
 //
 //  WebView wrapper for viewing a single Claude session.
-//  Navigates the shared Claude TabWebViewModel to /claude/{sessionId}.
+//  Creates its own WebPage and loads /claude/{sessionId} directly.
+//  No JS bridge navigation — SwiftUI owns all navigation state.
 //
 
 import SwiftUI
 
 struct ClaudeSessionDetailView: View {
 
-    let session: ClaudeSession
-    let claudeVM: TabWebViewModel
+    let sessionId: String
+    let title: String?
+
+    @State private var webVM: TabWebViewModel
+    @Environment(\.scenePhase) private var scenePhase
+
+    init(sessionId: String, title: String? = nil) {
+        self.sessionId = sessionId
+        self.title = title
+        self._webVM = State(initialValue: TabWebViewModel(route: "/claude/\(sessionId)"))
+    }
 
     var body: some View {
         ZStack {
-            WebViewContainer(viewModel: claudeVM)
+            WebViewContainer(viewModel: webVM)
 
-            if !claudeVM.isLoaded {
+            if !webVM.isLoaded {
                 VStack(spacing: 12) {
                     ProgressView()
                         .controlSize(.large)
@@ -35,14 +45,16 @@ struct ClaudeSessionDetailView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         #else
-        .navigationTitle(session.title)
+        .navigationTitle(title ?? "Session")
         #endif
-        .onAppear {
-            claudeVM.navigateTo(path: "/claude/\(session.id)")
+        .task {
+            await webVM.setup(baseURL: AuthManager.shared.baseURL)
         }
-        .onDisappear {
-            // Reset WebView to session list when navigating back
-            claudeVM.navigateTo(path: "/claude")
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                webVM.syncTheme()
+                Task { await webVM.updateAuthCookies() }
+            }
         }
     }
 }

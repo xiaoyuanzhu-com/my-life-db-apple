@@ -4,7 +4,7 @@
 //
 //  Native session list for the Claude tab.
 //  Fetches sessions from the API and displays them in a SwiftUI List.
-//  Tapping a session navigates to a WebView showing that session.
+//  Tapping a session pushes a detail view with its own dedicated WebView.
 //
 
 import SwiftUI
@@ -13,12 +13,13 @@ import SwiftUI
 
 enum ClaudeDestination: Hashable {
     case session(ClaudeSession)
+    case sessionById(String)
     case newSession
 }
 
 struct ClaudeSessionListView: View {
 
-    let claudeVM: TabWebViewModel
+    @Binding var deepLink: String?
 
     @State private var sessions: [ClaudeSession] = []
     @State private var isLoading = false
@@ -46,9 +47,11 @@ struct ClaudeSessionListView: View {
             .navigationDestination(item: $destination) { dest in
                 switch dest {
                 case .session(let session):
-                    ClaudeSessionDetailView(session: session, claudeVM: claudeVM)
+                    ClaudeSessionDetailView(sessionId: session.id, title: session.title)
+                case .sessionById(let id):
+                    ClaudeSessionDetailView(sessionId: id)
                 case .newSession:
-                    NewClaudeSessionView(claudeVM: claudeVM)
+                    NewClaudeSessionView()
                 }
             }
             .toolbar {
@@ -73,6 +76,23 @@ struct ClaudeSessionListView: View {
         .onChange(of: destination) { oldValue, newValue in
             if newValue == nil {
                 Task { await refresh() }
+            }
+        }
+        .onChange(of: deepLink) { _, path in
+            guard let path else { return }
+            deepLink = nil
+
+            // Parse /claude/{sessionId} from deep link path
+            let components = path.split(separator: "/").map(String.init)
+            if components.count >= 2, components[0] == "claude" {
+                let sessionId = components[1]
+                if let session = sessions.first(where: { $0.id == sessionId }) {
+                    destination = .session(session)
+                } else {
+                    destination = .sessionById(sessionId)
+                }
+            } else if path == "/claude" {
+                destination = .newSession
             }
         }
     }
@@ -332,13 +352,14 @@ struct ClaudeSessionListView: View {
 
 private struct NewClaudeSessionView: View {
 
-    let claudeVM: TabWebViewModel
+    @State private var webVM = TabWebViewModel(route: "/claude")
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
-            WebViewContainer(viewModel: claudeVM)
+            WebViewContainer(viewModel: webVM)
 
-            if !claudeVM.isLoaded {
+            if !webVM.isLoaded {
                 VStack(spacing: 12) {
                     ProgressView()
                         .controlSize(.large)
@@ -358,11 +379,14 @@ private struct NewClaudeSessionView: View {
         #else
         .navigationTitle("New Session")
         #endif
-        .onAppear {
-            claudeVM.navigateTo(path: "/claude")
+        .task {
+            await webVM.setup(baseURL: AuthManager.shared.baseURL)
         }
-        .onDisappear {
-            claudeVM.navigateTo(path: "/claude")
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                webVM.syncTheme()
+                Task { await webVM.updateAuthCookies() }
+            }
         }
     }
 }
@@ -402,5 +426,6 @@ private struct SessionRow: View {
 // MARK: - Preview
 
 #Preview {
-    ClaudeSessionListView(claudeVM: TabWebViewModel(route: "/claude"))
+    @Previewable @State var deepLink: String? = nil
+    ClaudeSessionListView(deepLink: $deepLink)
 }
