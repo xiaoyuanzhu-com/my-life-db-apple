@@ -22,11 +22,14 @@ struct ImageFileView: View {
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
     @State private var viewSize: CGSize = .zero
+    @State private var pendingSingleTapToken: UUID?
+    @State private var lastTapAt: Date = .distantPast
 
     private let zoomTarget: CGFloat = 1.5
-    private let doubleTapZoomInDuration: TimeInterval = 0.55
-    private let doubleTapZoomOutDuration: TimeInterval = 0.28
-    private let pinchResetDuration: TimeInterval = 0.24
+    private let doubleTapZoomInDuration: TimeInterval = 0.225
+    private let doubleTapZoomOutDuration: TimeInterval = 0.195
+    private let pinchResetDuration: TimeInterval = 0.18
+    private let tapConfirmDelay: TimeInterval = 0.2
 
     var body: some View {
         Group {
@@ -46,6 +49,10 @@ struct ImageFileView: View {
         .task {
             await loadImage()
         }
+        .onDisappear {
+            pendingSingleTapToken = nil
+            lastTapAt = .distantPast
+        }
     }
 
     // MARK: - Image Content
@@ -64,7 +71,12 @@ struct ImageFileView: View {
                 .contentShape(Rectangle())
                 .background(GeometryReader { geo in Color.clear.preference(key: ViewSizeKey.self, value: geo.size) })
                 .onPreferenceChange(ViewSizeKey.self) { viewSize = $0 }
-                .highPriorityGesture(tapGesture)
+                .highPriorityGesture(
+                    SpatialTapGesture(count: 1)
+                        .onEnded { value in
+                            handleTap(at: value.location)
+                        }
+                )
                 .gesture(
                     MagnifyGesture()
                         .onChanged { value in
@@ -75,7 +87,7 @@ struct ImageFileView: View {
                         .onEnded { _ in
                             lastScale = 1.0
                             if scale <= 1.0 {
-                                withAnimation(.linear(duration: pinchResetDuration)) {
+                                withAnimation(.easeOut(duration: pinchResetDuration)) {
                                     scale = 1.0
                                     offset = .zero
                                     lastOffset = .zero
@@ -103,7 +115,12 @@ struct ImageFileView: View {
                 .contentShape(Rectangle())
                 .background(GeometryReader { geo in Color.clear.preference(key: ViewSizeKey.self, value: geo.size) })
                 .onPreferenceChange(ViewSizeKey.self) { viewSize = $0 }
-                .highPriorityGesture(tapGesture)
+                .highPriorityGesture(
+                    SpatialTapGesture(count: 1)
+                        .onEnded { value in
+                            handleTap(at: value.location)
+                        }
+                )
                 .gesture(
                     MagnifyGesture()
                         .onChanged { value in
@@ -114,7 +131,7 @@ struct ImageFileView: View {
                         .onEnded { _ in
                             lastScale = 1.0
                             if scale <= 1.0 {
-                                withAnimation(.linear(duration: pinchResetDuration)) {
+                                withAnimation(.easeOut(duration: pinchResetDuration)) {
                                     scale = 1.0
                                     offset = .zero
                                     lastOffset = .zero
@@ -144,31 +161,39 @@ struct ImageFileView: View {
         isLoading = false
     }
 
-    private var tapGesture: some Gesture {
-        SpatialTapGesture(count: 2)
-            .exclusively(before: SpatialTapGesture(count: 1))
-            .onEnded { value in
-                switch value {
-                case .first(let doubleTap):
-                    handleDoubleTap(at: doubleTap.location)
-                case .second:
-                    guard scale <= 1.0 else { return }
-                    onTap?()
-                }
-            }
+    private func handleTap(at location: CGPoint) {
+        let now = Date()
+        let isSecondTap = now.timeIntervalSince(lastTapAt) <= tapConfirmDelay
+        lastTapAt = now
+
+        if isSecondTap {
+            pendingSingleTapToken = nil
+            handleDoubleTap(at: location)
+            lastTapAt = .distantPast
+            return
+        }
+
+        let token = UUID()
+        pendingSingleTapToken = token
+        DispatchQueue.main.asyncAfter(deadline: .now() + tapConfirmDelay) {
+            guard pendingSingleTapToken == token else { return }
+            pendingSingleTapToken = nil
+            guard scale <= 1.0 else { return }
+            onTap?()
+        }
     }
 
     private func handleDoubleTap(at location: CGPoint) {
         if scale > 1.0 {
             lastOffset = .zero
-            withAnimation(.linear(duration: doubleTapZoomOutDuration)) {
+            withAnimation(.easeIn(duration: doubleTapZoomOutDuration)) {
                 scale = 1.0
                 offset = .zero
             }
         } else {
             let targetOffset = zoomOffset(for: location, scale: zoomTarget)
             lastOffset = targetOffset
-            withAnimation(.linear(duration: doubleTapZoomInDuration)) {
+            withAnimation(.easeOut(duration: doubleTapZoomInDuration)) {
                 scale = zoomTarget
                 offset = targetOffset
             }
@@ -226,7 +251,7 @@ private struct ConditionalPanGestureModifier: ViewModifier {
                     guard isActive else { return }
                     lastOffset = offset
                 }
-        )
+        , including: isActive ? .gesture : .none)
     }
 }
 
