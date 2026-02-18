@@ -21,6 +21,8 @@ struct ClaudeSessionListView: View {
 
     @Binding var deepLink: String?
 
+    @Environment(\.scenePhase) private var scenePhase
+
     @State private var sessions: [ClaudeSession] = []
     @State private var isLoading = false
     @State private var error: Error?
@@ -81,12 +83,17 @@ struct ClaudeSessionListView: View {
             }
             setupSSE()
         }
-        .onDisappear {
-            sseManager.stop()
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                // Restart SSE if it was dropped during background/inactive
+                sseManager.ensureRunning()
+                // Background-refresh to pick up any changes while app was away
+                Task { await refreshSessions() }
+            }
         }
         .onChange(of: path) { oldValue, newValue in
             if newValue.isEmpty && !oldValue.isEmpty {
-                Task { await refresh() }
+                Task { await refreshSessions() }
             }
         }
         .onChange(of: statusFilter) { _, _ in
@@ -190,7 +197,7 @@ struct ClaudeSessionListView: View {
         }
         .listStyle(.plain)
         .refreshable {
-            await refresh()
+            await refreshSessions()
         }
     }
 
@@ -278,7 +285,7 @@ struct ClaudeSessionListView: View {
 
     private func setupSSE() {
         sseManager.onSessionUpdated = {
-            Task { await refresh() }
+            Task { await refreshSessions() }
         }
         sseManager.start()
     }
@@ -303,20 +310,43 @@ struct ClaudeSessionListView: View {
         isLoading = false
     }
 
-    private func refresh() async {
-        nextCursor = nil
-        hasMore = false
-
+    /// Background refresh — merges new data with existing sessions without
+    /// showing a loading state.  Matches the web frontend's `refreshSessions`
+    /// behaviour: update existing sessions, add new ones, preserve paginated
+    /// sessions not in the first page, and re-sort.
+    private func refreshSessions() async {
         do {
             let response = try await APIClient.shared.claude.listAll(
                 status: statusFilter
             )
-            sessions = response.sessions
+            let newList = response.sessions
+            let newMap = Dictionary(newList.map { ($0.id, $0) }, uniquingKeysWith: { _, b in b })
+            let prevIds = Set(sessions.map(\.id))
+
+            // Update existing sessions with fresh data, keep paginated ones intact
+            var merged = sessions.map { existing in
+                newMap[existing.id] ?? existing
+            }
+
+            // Prepend any brand-new sessions not already in the list
+            for session in newList where !prevIds.contains(session.id) {
+                merged.insert(session, at: 0)
+            }
+
+            // Sort by lastUserActivity (or lastActivity) descending
+            merged.sort { a, b in
+                let dateA = a.lastUserActivity ?? a.lastActivity
+                let dateB = b.lastUserActivity ?? b.lastActivity
+                return dateA > dateB
+            }
+
+            sessions = merged
             hasMore = response.pagination.hasMore
             nextCursor = response.pagination.nextCursor
             error = nil
         } catch {
-            self.error = error
+            // Silent failure for background refresh — don't overwrite visible data
+            print("[ClaudeSessionListView] Background refresh failed: \(error)")
         }
     }
 
@@ -363,7 +393,7 @@ struct ClaudeSessionListView: View {
         } catch {
             // Revert on failure
             print("[ClaudeSessionListView] Archive failed: \(error)")
-            await refresh()
+            await refreshSessions()
         }
     }
 
@@ -388,7 +418,7 @@ struct ClaudeSessionListView: View {
         } catch {
             // Revert on failure
             print("[ClaudeSessionListView] Unarchive failed: \(error)")
-            await refresh()
+            await refreshSessions()
         }
     }
 }
