@@ -10,6 +10,9 @@
 //  Items are displayed in reverse-chronological order (newest on the left)
 //  so swiping left goes toward older items and swiping right toward newer.
 //
+//  The context.items array arrives newest-first from the feed, which is
+//  already the correct left-to-right order for the pager.
+//
 
 import SwiftUI
 
@@ -17,21 +20,22 @@ struct FilePreviewPagerView: View {
 
     let onDismiss: () -> Void
 
-    // Items stored in reverse-chronological order (newest first / leftmost).
+    // Items in reverse-chronological order (newest first / leftmost).
+    // The array arrives newest-first from the feed — no reversal needed.
     @State private var items: [PreviewItem]
     @State private var currentID: String?
     @State private var isLoadingMore = false
+    @State private var hasMoreOlder: Bool
 
-    private let hasMoreOlder: Bool
     private let loadMore: () async -> [PreviewItem]
 
     init(context: FilePreviewPagerContext, onDismiss: @escaping () -> Void) {
         self.onDismiss = onDismiss
-        self.hasMoreOlder = context.hasMoreOlder
         self.loadMore = context.loadMore
-        // Reverse so newest is first (leftmost in the pager).
-        self._items = State(initialValue: context.items.reversed())
-        // Use the item's stable ID (path) for selection, not an Int index
+        // Items are already newest-first from the feed — use as-is.
+        self._items = State(initialValue: context.items)
+        self._hasMoreOlder = State(initialValue: context.hasMoreOlder)
+        // Use the item's stable ID (path) for selection, not an Int index.
         let startID = context.items.indices.contains(context.startIndex)
             ? context.items[context.startIndex].id
             : (context.items.first?.id ?? "")
@@ -79,8 +83,11 @@ struct FilePreviewPagerView: View {
         isLoadingMore = true
         let newItems = await loadMore()
         if !newItems.isEmpty {
-            // Append to the end (right / older side) in reversed order.
-            items.append(contentsOf: newItems.reversed())
+            // Append to the end (right / older side). Items arrive newest-first
+            // within the batch, all older than existing items — correct order.
+            items.append(contentsOf: newItems)
+        } else {
+            hasMoreOlder = false
         }
         isLoadingMore = false
     }
