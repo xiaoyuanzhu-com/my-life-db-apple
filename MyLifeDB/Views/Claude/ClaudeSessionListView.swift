@@ -28,6 +28,7 @@ struct ClaudeSessionListView: View {
     @State private var nextCursor: String?
     @State private var destination: ClaudeDestination?
     @State private var sseManager = ClaudeSessionSSEManager()
+    @State private var statusFilter = "active"
 
     var body: some View {
         NavigationStack {
@@ -40,7 +41,6 @@ struct ClaudeSessionListView: View {
                     sessionList
                 }
             }
-            .navigationTitle("Sessions")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -55,6 +55,30 @@ struct ClaudeSessionListView: View {
                 }
             }
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Menu {
+                        Picker("Filter", selection: $statusFilter) {
+                            Label("All", systemImage: "list.bullet")
+                                .tag("all")
+                            Label("Active", systemImage: "circle.fill")
+                                .tag("active")
+                            Label("Archived", systemImage: "archivebox")
+                                .tag("archived")
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("Sessions")
+                                .fontWeight(.semibold)
+                            Text("(\(filterDisplayName))")
+                                .foregroundStyle(.secondary)
+                            Image(systemName: "chevron.down")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         claudeVM.loadPath("/claude")
@@ -79,6 +103,12 @@ struct ClaudeSessionListView: View {
                 Task { await refresh() }
             }
         }
+        .onChange(of: statusFilter) { _, _ in
+            sessions = []
+            nextCursor = nil
+            hasMore = false
+            Task { await fetchSessions() }
+        }
         .onChange(of: deepLink) { _, path in
             guard let path else { return }
             deepLink = nil
@@ -95,6 +125,16 @@ struct ClaudeSessionListView: View {
             } else if path == "/claude" {
                 destination = .newSession
             }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private var filterDisplayName: String {
+        switch statusFilter {
+        case "all": return "All"
+        case "archived": return "Archived"
+        default: return "Active"
         }
     }
 
@@ -265,7 +305,7 @@ struct ClaudeSessionListView: View {
 
         do {
             let response = try await APIClient.shared.claude.listAll(
-                status: "active"
+                status: statusFilter
             )
             sessions = response.sessions
             hasMore = response.pagination.hasMore
@@ -283,7 +323,7 @@ struct ClaudeSessionListView: View {
 
         do {
             let response = try await APIClient.shared.claude.listAll(
-                status: "active"
+                status: statusFilter
             )
             sessions = response.sessions
             hasMore = response.pagination.hasMore
@@ -301,7 +341,7 @@ struct ClaudeSessionListView: View {
         do {
             let response = try await APIClient.shared.claude.listAll(
                 cursor: cursor,
-                status: "active"
+                status: statusFilter
             )
             sessions.append(contentsOf: response.sessions)
             hasMore = response.pagination.hasMore
@@ -317,10 +357,18 @@ struct ClaudeSessionListView: View {
     // MARK: - Archive / Unarchive
 
     private func archiveSession(_ session: ClaudeSession) async {
-        // Optimistic update — remove from list with spring animation
+        // Optimistic update
         if let index = sessions.firstIndex(where: { $0.id == session.id }) {
-            let _ = withAnimation(.snappy(duration: 0.35)) {
-                sessions.remove(at: index)
+            if statusFilter == "all" {
+                // In "all" view, update status in-place
+                withAnimation(.snappy(duration: 0.35)) {
+                    sessions[index] = session.withStatus("archived")
+                }
+            } else {
+                // In "active" view, remove from list
+                let _ = withAnimation(.snappy(duration: 0.35)) {
+                    sessions.remove(at: index)
+                }
             }
         }
 
@@ -336,7 +384,17 @@ struct ClaudeSessionListView: View {
     private func unarchiveSession(_ session: ClaudeSession) async {
         // Optimistic update
         if let index = sessions.firstIndex(where: { $0.id == session.id }) {
-            sessions[index] = session.withStatus("active")
+            if statusFilter == "all" {
+                // In "all" view, update status in-place
+                withAnimation(.snappy(duration: 0.35)) {
+                    sessions[index] = session.withStatus("active")
+                }
+            } else {
+                // In "archived" view, remove from list
+                let _ = withAnimation(.snappy(duration: 0.35)) {
+                    sessions.remove(at: index)
+                }
+            }
         }
 
         do {
