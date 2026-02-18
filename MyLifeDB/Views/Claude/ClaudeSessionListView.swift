@@ -41,9 +41,20 @@ struct ClaudeSessionListView: View {
                     sessionList
                 }
             }
+            .navigationTitle(filterNavigationTitle)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            .toolbarTitleMenu {
+                Picker("Filter", selection: $statusFilter) {
+                    Label("All", systemImage: "list.bullet")
+                        .tag("all")
+                    Label("Active", systemImage: "circle.fill")
+                        .tag("active")
+                    Label("Archived", systemImage: "archivebox")
+                        .tag("archived")
+                }
+            }
             .navigationDestination(for: ClaudeDestination.self) { dest in
                 switch dest {
                 case .session(let session):
@@ -55,30 +66,6 @@ struct ClaudeSessionListView: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Menu {
-                        Picker("Filter", selection: $statusFilter) {
-                            Label("All", systemImage: "list.bullet")
-                                .tag("all")
-                            Label("Active", systemImage: "circle.fill")
-                                .tag("active")
-                            Label("Archived", systemImage: "archivebox")
-                                .tag("archived")
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text("Sessions")
-                                .fontWeight(.semibold)
-                            Text("(\(filterDisplayName))")
-                                .foregroundStyle(.secondary)
-                            Image(systemName: "chevron.down")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.secondary)
-                        }
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    }
-                }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         path.append(ClaudeDestination.newSession)
@@ -129,11 +116,11 @@ struct ClaudeSessionListView: View {
 
     // MARK: - Helpers
 
-    private var filterDisplayName: String {
+    private var filterNavigationTitle: String {
         switch statusFilter {
-        case "all": return "All"
-        case "archived": return "Archived"
-        default: return "Active"
+        case "all": return "Sessions (All)"
+        case "archived": return "Sessions (Archived)"
+        default: return "Sessions (Active)"
         }
     }
 
