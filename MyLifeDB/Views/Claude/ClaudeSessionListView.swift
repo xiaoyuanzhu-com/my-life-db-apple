@@ -81,7 +81,6 @@ struct ClaudeSessionListView: View {
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        claudeVM.loadPath("/claude")
                         destination = .newSession
                     } label: {
                         Image(systemName: "plus")
@@ -450,9 +449,7 @@ private struct NewClaudeSessionView: View {
         .onReceive(NotificationCenter.default.publisher(for: .authTokensDidChange)) { _ in
             Task { await webVM.pushAuthCookiesAndRecheck() }
         }
-        .onDisappear {
-            claudeVM.navigateTo(path: "/claude")
-        }
+        .onDisappear { }
     }
 }
 
