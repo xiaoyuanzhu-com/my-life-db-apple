@@ -25,7 +25,7 @@ struct ImageFileView: View {
     @State private var pendingSingleTapToken: UUID?
     @State private var lastTapAt: Date = .distantPast
 
-    private let zoomTarget: CGFloat = 1.5
+    private let zoomTarget: CGFloat = 2.0
     private let doubleTapZoomInDuration: TimeInterval = 0.225
     private let doubleTapZoomOutDuration: TimeInterval = 0.195
     private let pinchResetDuration: TimeInterval = 0.18
