@@ -22,8 +22,14 @@ struct ImageFileView: View {
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
     @State private var viewSize: CGSize = .zero
+    @State private var pendingSingleTapToken: UUID?
+    @State private var lastTapAt: Date = .distantPast
+    @State private var lastTapLocation: CGPoint = .zero
 
-    private let zoomTarget: CGFloat = 2.0
+    private let zoomTarget: CGFloat = 1.5
+    private let singleTapDelay: TimeInterval = 0.18
+    private let doubleTapInterval: TimeInterval = 0.25
+    private let doubleTapMaxDistance: CGFloat = 44
 
     var body: some View {
         Group {
@@ -43,6 +49,10 @@ struct ImageFileView: View {
         .task {
             await loadImage()
         }
+        .onDisappear {
+            pendingSingleTapToken = nil
+            lastTapAt = .distantPast
+        }
     }
 
     // MARK: - Image Content
@@ -61,29 +71,12 @@ struct ImageFileView: View {
                 .contentShape(Rectangle())
                 .background(GeometryReader { geo in Color.clear.preference(key: ViewSizeKey.self, value: geo.size) })
                 .onPreferenceChange(ViewSizeKey.self) { viewSize = $0 }
-                // Double-tap: toggle between 1× and 2.5× zoom (centered on tap point)
                 .gesture(
-                    SpatialTapGesture(count: 2)
+                    SpatialTapGesture(count: 1)
                         .onEnded { value in
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                if scale > 1.0 {
-                                    scale = 1.0
-                                    offset = .zero
-                                    lastOffset = .zero
-                                } else {
-                                    let dx = value.location.x - viewSize.width / 2
-                                    let dy = value.location.y - viewSize.height / 2
-                                    scale = zoomTarget
-                                    offset = CGSize(width: -dx * zoomTarget, height: -dy * zoomTarget)
-                                    lastOffset = offset
-                                }
-                            }
+                            handleTap(at: value.location)
                         }
                 )
-                // Single-tap: dismiss
-                .onTapGesture(count: 1) {
-                    onTap?()
-                }
                 .gesture(
                     MagnifyGesture()
                         .onChanged { value in
@@ -122,29 +115,12 @@ struct ImageFileView: View {
                 .contentShape(Rectangle())
                 .background(GeometryReader { geo in Color.clear.preference(key: ViewSizeKey.self, value: geo.size) })
                 .onPreferenceChange(ViewSizeKey.self) { viewSize = $0 }
-                // Double-tap: toggle between 1× and 2.5× zoom (centered on tap point)
                 .gesture(
-                    SpatialTapGesture(count: 2)
+                    SpatialTapGesture(count: 1)
                         .onEnded { value in
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                if scale > 1.0 {
-                                    scale = 1.0
-                                    offset = .zero
-                                    lastOffset = .zero
-                                } else {
-                                    let dx = value.location.x - viewSize.width / 2
-                                    let dy = value.location.y - viewSize.height / 2
-                                    scale = zoomTarget
-                                    offset = CGSize(width: -dx * zoomTarget, height: -dy * zoomTarget)
-                                    lastOffset = offset
-                                }
-                            }
+                            handleTap(at: value.location)
                         }
                 )
-                // Single-tap: dismiss
-                .onTapGesture(count: 1) {
-                    onTap?()
-                }
                 .gesture(
                     MagnifyGesture()
                         .onChanged { value in
@@ -183,6 +159,50 @@ struct ImageFileView: View {
         }
 
         isLoading = false
+    }
+
+    private func handleTap(at location: CGPoint) {
+        let now = Date()
+        let distance = hypot(
+            location.x - lastTapLocation.x,
+            location.y - lastTapLocation.y
+        )
+        let isDoubleTap = now.timeIntervalSince(lastTapAt) <= doubleTapInterval && distance <= doubleTapMaxDistance
+
+        lastTapAt = now
+        lastTapLocation = location
+
+        if isDoubleTap {
+            pendingSingleTapToken = nil
+            handleDoubleTap(at: location)
+            lastTapAt = .distantPast
+            return
+        }
+
+        let token = UUID()
+        pendingSingleTapToken = token
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + singleTapDelay) {
+            guard pendingSingleTapToken == token else { return }
+            pendingSingleTapToken = nil
+            onTap?()
+        }
+    }
+
+    private func handleDoubleTap(at location: CGPoint) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            if scale > 1.0 {
+                scale = 1.0
+                offset = .zero
+                lastOffset = .zero
+            } else {
+                let dx = location.x - viewSize.width / 2
+                let dy = location.y - viewSize.height / 2
+                scale = zoomTarget
+                offset = CGSize(width: -dx * zoomTarget, height: -dy * zoomTarget)
+                lastOffset = offset
+            }
+        }
     }
 }
 
