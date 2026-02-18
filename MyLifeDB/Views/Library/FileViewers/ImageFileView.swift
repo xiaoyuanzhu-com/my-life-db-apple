@@ -22,7 +22,6 @@ struct ImageFileView: View {
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
     @State private var viewSize: CGSize = .zero
-    @State private var zoomAnchor: UnitPoint = .center
     @State private var pendingSingleTapToken: UUID?
     @State private var lastTapAt: Date = .distantPast
     @State private var lastTapLocation: CGPoint = .zero
@@ -65,7 +64,7 @@ struct ImageFileView: View {
             Image(uiImage: uiImage)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .scaleEffect(scale, anchor: zoomAnchor)
+                .scaleEffect(scale)
                 .offset(offset)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
@@ -88,12 +87,7 @@ struct ImageFileView: View {
                         .onEnded { _ in
                             lastScale = 1.0
                             if scale <= 1.0 {
-                                let anchorDx = (0.5 - zoomAnchor.x) * viewSize.width * (scale - 1)
-                                let anchorDy = (0.5 - zoomAnchor.y) * viewSize.height * (scale - 1)
-                                zoomAnchor = .center
-                                offset = CGSize(width: offset.width + anchorDx, height: offset.height + anchorDy)
-
-                                withAnimation(.smooth(duration: 0.4)) {
+                                withAnimation(.easeInOut(duration: 0.3)) {
                                     scale = 1.0
                                     offset = .zero
                                     lastOffset = .zero
@@ -114,7 +108,7 @@ struct ImageFileView: View {
             Image(nsImage: nsImage)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .scaleEffect(scale, anchor: zoomAnchor)
+                .scaleEffect(scale)
                 .offset(offset)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
@@ -137,12 +131,7 @@ struct ImageFileView: View {
                         .onEnded { _ in
                             lastScale = 1.0
                             if scale <= 1.0 {
-                                let anchorDx = (0.5 - zoomAnchor.x) * viewSize.width * (scale - 1)
-                                let anchorDy = (0.5 - zoomAnchor.y) * viewSize.height * (scale - 1)
-                                zoomAnchor = .center
-                                offset = CGSize(width: offset.width + anchorDx, height: offset.height + anchorDy)
-
-                                withAnimation(.smooth(duration: 0.4)) {
+                                withAnimation(.easeInOut(duration: 0.3)) {
                                     scale = 1.0
                                     offset = .zero
                                     lastOffset = .zero
@@ -202,28 +191,38 @@ struct ImageFileView: View {
 
     private func handleDoubleTap(at location: CGPoint) {
         if scale > 1.0 {
-            // Zoom out: convert to center anchor (no visual change), then animate.
-            let anchorDx = (0.5 - zoomAnchor.x) * viewSize.width * (scale - 1)
-            let anchorDy = (0.5 - zoomAnchor.y) * viewSize.height * (scale - 1)
-            zoomAnchor = .center
-            offset = CGSize(width: offset.width + anchorDx, height: offset.height + anchorDy)
-            lastOffset = offset
-
-            withAnimation(.smooth(duration: 0.4)) {
+            lastOffset = .zero
+            withAnimation(.easeInOut(duration: 0.3)) {
                 scale = 1.0
                 offset = .zero
-                lastOffset = .zero
             }
         } else {
-            // Zoom in: anchor at tap point — single unified zoom, no offset needed.
-            zoomAnchor = UnitPoint(
-                x: location.x / viewSize.width,
-                y: location.y / viewSize.height
-            )
-            withAnimation(.smooth(duration: 0.4)) {
+            let targetOffset = zoomOffset(for: location, scale: zoomTarget)
+            lastOffset = targetOffset
+            withAnimation(.easeInOut(duration: 0.3)) {
                 scale = zoomTarget
+                offset = targetOffset
             }
         }
+    }
+
+    private func zoomOffset(for location: CGPoint, scale: CGFloat) -> CGSize {
+        guard viewSize.width > 0, viewSize.height > 0 else { return .zero }
+
+        let xRatio = (location.x / viewSize.width) - 0.5
+        let yRatio = (location.y / viewSize.height) - 0.5
+        let rawOffset = CGSize(
+            width: -xRatio * viewSize.width * (scale - 1),
+            height: -yRatio * viewSize.height * (scale - 1)
+        )
+
+        let maxOffsetX = viewSize.width * (scale - 1) / 2
+        let maxOffsetY = viewSize.height * (scale - 1) / 2
+
+        return CGSize(
+            width: min(max(rawOffset.width, -maxOffsetX), maxOffsetX),
+            height: min(max(rawOffset.height, -maxOffsetY), maxOffsetY)
+        )
     }
 }
 
