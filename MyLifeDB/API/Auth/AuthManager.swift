@@ -127,7 +127,7 @@ final class AuthManager {
                 return
             case .invalid, .noOAuth:
                 // Token expired or OAuth not configured, try refresh
-                if await tryRefresh() {
+                if await tryRefresh() == .success {
                     return
                 }
                 state = .unauthenticated
@@ -141,7 +141,7 @@ final class AuthManager {
 
         // Try refresh if we have a refresh token
         if refreshToken != nil {
-            if await tryRefresh() {
+            if await tryRefresh() == .success {
                 return
             }
         }
@@ -176,12 +176,21 @@ final class AuthManager {
 
     @MainActor
     func refreshAccessToken() async -> Bool {
-        return await tryRefresh()
+        return await tryRefresh() == .success
+    }
+
+    /// Outcome of a token refresh attempt. Distinguishes "refresh token is
+    /// confirmed invalid" (server returned 401) from transient failures
+    /// (network error, server 5xx) so callers can decide whether to logout.
+    private enum RefreshResult {
+        case success
+        case rejected   // Server confirmed refresh token is invalid (401)
+        case failed     // Transient error — network, timeout, server error, etc.
     }
 
     @MainActor
-    private func tryRefresh() async -> Bool {
-        guard let refreshToken = refreshToken, !isRefreshing else { return false }
+    private func tryRefresh() async -> RefreshResult {
+        guard let refreshToken = refreshToken, !isRefreshing else { return .failed }
         isRefreshing = true
         defer { isRefreshing = false }
 
@@ -194,13 +203,18 @@ final class AuthManager {
 
             let (data, response) = try await URLSession.shared.data(for: request)
 
-            guard let httpResponse = response as? HTTPURLResponse else { return false }
+            guard let httpResponse = response as? HTTPURLResponse else { return .failed }
 
-            guard httpResponse.statusCode == 200 else { return false }
+            // 401 = server explicitly rejected the refresh token
+            if httpResponse.statusCode == 401 {
+                return .rejected
+            }
+
+            guard httpResponse.statusCode == 200 else { return .failed }
 
             // Parse tokens from JSON response body
             guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                return false
+                return .failed
             }
 
             if let newAccess = json["access_token"] as? String, !newAccess.isEmpty {
@@ -217,7 +231,7 @@ final class AuthManager {
                     state = .authenticated(username)
                     scheduleRefresh()
                     NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
-                    return true
+                    return .success
                 }
             }
 
@@ -225,12 +239,12 @@ final class AuthManager {
             if self.accessToken != nil {
                 scheduleRefresh()
                 NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
-                return true
+                return .success
             }
 
-            return false
+            return .failed
         } catch {
-            return false
+            return .failed
         }
     }
 
@@ -265,14 +279,19 @@ final class AuthManager {
 
     @MainActor
     func handleUnauthorized() async -> Bool {
-        // Try refresh once
-        if await tryRefresh() {
+        let result = await tryRefresh()
+        switch result {
+        case .success:
             return true // Caller should retry the request
+        case .rejected:
+            // Refresh token is confirmed invalid — full logout
+            await logout()
+            return false
+        case .failed:
+            // Transient error (network, server 5xx, etc.) — don't destroy
+            // tokens, the user may recover on retry or foreground resume.
+            return false
         }
-
-        // Refresh failed, logout
-        await logout()
-        return false
     }
 
     // MARK: - Scene Phase Handling

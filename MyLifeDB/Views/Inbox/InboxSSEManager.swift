@@ -92,15 +92,25 @@ final class InboxSSEManager {
         }
     }
 
-    fileprivate func handleDisconnect() {
+    fileprivate func handleDisconnect(authFailed: Bool = false) {
         guard isRunning else { return }
 
         // Reconnect with backoff
         let delay = reconnectDelay
         reconnectDelay = min(reconnectDelay * 2, 30) // Cap at 30s
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            self?.connect()
+        Task { @MainActor [weak self] in
+            // Attempt token refresh before reconnecting (required per auth doc).
+            // Without this, SSE reconnects with the same expired token forever.
+            if authFailed {
+                _ = await AuthManager.shared.refreshAccessToken()
+            }
+
+            guard let self, self.isRunning else { return }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.connect()
+            }
         }
     }
 
@@ -125,10 +135,12 @@ private class SSESessionDelegate: NSObject, URLSessionDataDelegate {
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
         if let http = response as? HTTPURLResponse, http.statusCode == 401 {
             // Don't reset backoff on auth failure — cancel so didCompleteWithError
-            // triggers reconnect with proper backoff.
+            // triggers reconnect with proper backoff + token refresh.
+            lastResponseWas401 = true
             completionHandler(.cancel)
             return
         }
+        lastResponseWas401 = false
         manager?.handleConnected()
         completionHandler(.allow)
     }
@@ -140,6 +152,11 @@ private class SSESessionDelegate: NSObject, URLSessionDataDelegate {
            manager?.isRunning != true {
             return // Intentional cancellation via stop()
         }
-        manager?.handleDisconnect()
+        manager?.handleDisconnect(authFailed: lastResponseWas401)
+        lastResponseWas401 = false
     }
+
+    /// Tracks whether the last response was a 401 so handleDisconnect
+    /// knows to attempt a token refresh before reconnecting.
+    private var lastResponseWas401 = false
 }
