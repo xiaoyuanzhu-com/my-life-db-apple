@@ -26,12 +26,12 @@ struct ClaudeSessionListView: View {
     @State private var error: Error?
     @State private var hasMore = false
     @State private var nextCursor: String?
-    @State private var destination: ClaudeDestination?
+    @State private var path = NavigationPath()
     @State private var sseManager = ClaudeSessionSSEManager()
     @State private var statusFilter = "active"
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Group {
                 if isLoading && sessions.isEmpty {
                     loadingView
@@ -44,7 +44,7 @@ struct ClaudeSessionListView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .navigationDestination(item: $destination) { dest in
+            .navigationDestination(for: ClaudeDestination.self) { dest in
                 switch dest {
                 case .session(let session):
                     ClaudeSessionDetailView(sessionId: session.id, title: session.title)
@@ -81,7 +81,7 @@ struct ClaudeSessionListView: View {
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        destination = .newSession
+                        path.append(ClaudeDestination.newSession)
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -97,8 +97,8 @@ struct ClaudeSessionListView: View {
         .onDisappear {
             sseManager.stop()
         }
-        .onChange(of: destination) { oldValue, newValue in
-            if newValue == nil {
+        .onChange(of: path) { oldValue, newValue in
+            if newValue.isEmpty && !oldValue.isEmpty {
                 Task { await refresh() }
             }
         }
@@ -108,21 +108,21 @@ struct ClaudeSessionListView: View {
             hasMore = false
             Task { await fetchSessions() }
         }
-        .onChange(of: deepLink) { _, path in
-            guard let path else { return }
+        .onChange(of: deepLink) { _, link in
+            guard let link else { return }
             deepLink = nil
 
             // Parse /claude/{sessionId} from deep link path
-            let components = path.split(separator: "/").map(String.init)
+            let components = link.split(separator: "/").map(String.init)
             if components.count >= 2, components[0] == "claude" {
                 let sessionId = components[1]
                 if let session = sessions.first(where: { $0.id == sessionId }) {
-                    destination = .session(session)
+                    path.append(ClaudeDestination.session(session))
                 } else {
-                    destination = .sessionById(sessionId)
+                    path.append(ClaudeDestination.sessionById(sessionId))
                 }
-            } else if path == "/claude" {
-                destination = .newSession
+            } else if link == "/claude" {
+                path.append(ClaudeDestination.newSession)
             }
         }
     }
@@ -209,7 +209,7 @@ struct ClaudeSessionListView: View {
 
     private func sessionButton(_ session: ClaudeSession) -> some View {
         Button {
-            destination = .session(session)
+            path.append(ClaudeDestination.session(session))
         } label: {
             SessionRow(session: session)
                 .contentShape(Rectangle())
