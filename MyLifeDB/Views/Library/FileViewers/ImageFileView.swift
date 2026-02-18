@@ -23,7 +23,7 @@ struct ImageFileView: View {
     @State private var lastOffset: CGSize = .zero
     @State private var viewSize: CGSize = .zero
 
-    private let zoomTarget: CGFloat = 2.5
+    private let zoomTarget: CGFloat = 2.0
 
     var body: some View {
         Group {
@@ -65,7 +65,7 @@ struct ImageFileView: View {
                 .gesture(
                     SpatialTapGesture(count: 2)
                         .onEnded { value in
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                 if scale > 1.0 {
                                     scale = 1.0
                                     offset = .zero
@@ -94,7 +94,7 @@ struct ImageFileView: View {
                         .onEnded { _ in
                             lastScale = 1.0
                             if scale <= 1.0 {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                     scale = 1.0
                                     offset = .zero
                                     lastOffset = .zero
@@ -126,7 +126,7 @@ struct ImageFileView: View {
                 .gesture(
                     SpatialTapGesture(count: 2)
                         .onEnded { value in
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                 if scale > 1.0 {
                                     scale = 1.0
                                     offset = .zero
@@ -155,7 +155,7 @@ struct ImageFileView: View {
                         .onEnded { _ in
                             lastScale = 1.0
                             if scale <= 1.0 {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                     scale = 1.0
                                     offset = .zero
                                     lastOffset = .zero
