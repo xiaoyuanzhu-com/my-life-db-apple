@@ -7,6 +7,9 @@
 //  each item sits side by side at full width. Non-media files are
 //  excluded from the pager.
 //
+//  Items are displayed in reverse-chronological order (newest on the left)
+//  so swiping left goes toward older items and swiping right toward newer.
+//
 
 import SwiftUI
 
@@ -14,6 +17,7 @@ struct FilePreviewPagerView: View {
 
     let onDismiss: () -> Void
 
+    // Items stored in reverse-chronological order (newest first / leftmost).
     @State private var items: [PreviewItem]
     @State private var currentID: String?
     @State private var isLoadingMore = false
@@ -25,7 +29,8 @@ struct FilePreviewPagerView: View {
         self.onDismiss = onDismiss
         self.hasMoreOlder = context.hasMoreOlder
         self.loadMore = context.loadMore
-        self._items = State(initialValue: context.items)
+        // Reverse so newest is first (leftmost in the pager).
+        self._items = State(initialValue: context.items.reversed())
         // Use the item's stable ID (path) for selection, not an Int index
         let startID = context.items.indices.contains(context.startIndex)
             ? context.items[context.startIndex].id
@@ -61,7 +66,7 @@ struct FilePreviewPagerView: View {
         .ignoresSafeArea()
         .onChange(of: currentID) { _, newID in
             guard let newID else { return }
-            // Load more when approaching the end of the list
+            // Load more older items when approaching the right end (oldest side).
             if let idx = items.firstIndex(where: { $0.id == newID }),
                idx >= items.count - 3 && hasMoreOlder && !isLoadingMore {
                 Task { await loadMoreItems() }
@@ -74,7 +79,8 @@ struct FilePreviewPagerView: View {
         isLoadingMore = true
         let newItems = await loadMore()
         if !newItems.isEmpty {
-            items.append(contentsOf: newItems)
+            // Append to the end (right / older side) in reversed order.
+            items.append(contentsOf: newItems.reversed())
         }
         isLoadingMore = false
     }

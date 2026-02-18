@@ -216,9 +216,8 @@ struct FileViewerView: View {
     @ViewBuilder
     private func fileContentView(_ file: FileRecord) -> some View {
         if file.isImage {
-            ImageFileView(path: filePath)
-                .contentShape(Rectangle())
-                .onTapGesture { dismissAction() }
+            // ImageFileView handles both double-tap (zoom) and single-tap (dismiss) internally.
+            ImageFileView(path: filePath, onTap: dismissAction)
         } else if file.isText {
             TextFileView(path: filePath)
                 .contentShape(Rectangle())

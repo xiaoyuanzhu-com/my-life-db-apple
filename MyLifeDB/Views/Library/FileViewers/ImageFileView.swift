@@ -11,6 +11,8 @@ import SwiftUI
 struct ImageFileView: View {
 
     let path: String
+    /// Called on single tap (used for dismiss). Double-tap is handled internally for zoom.
+    var onTap: (() -> Void)?
 
     @State private var imageData: Data?
     @State private var isLoading = true
@@ -19,6 +21,8 @@ struct ImageFileView: View {
     @State private var lastScale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
+
+    private let zoomTarget: CGFloat = 2.5
 
     var body: some View {
         Group {
@@ -54,6 +58,22 @@ struct ImageFileView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
                 .contentShape(Rectangle())
+                // Double-tap: toggle between 1× and 2.5× zoom
+                .onTapGesture(count: 2) {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        if scale > 1.0 {
+                            scale = 1.0
+                            offset = .zero
+                            lastOffset = .zero
+                        } else {
+                            scale = zoomTarget
+                        }
+                    }
+                }
+                // Single-tap: dismiss (deferred automatically when double-tap fires)
+                .onTapGesture(count: 1) {
+                    onTap?()
+                }
                 .gesture(
                     MagnifyGesture()
                         .onChanged { value in
@@ -90,6 +110,22 @@ struct ImageFileView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
                 .contentShape(Rectangle())
+                // Double-tap: toggle between 1× and 2.5× zoom
+                .onTapGesture(count: 2) {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        if scale > 1.0 {
+                            scale = 1.0
+                            offset = .zero
+                            lastOffset = .zero
+                        } else {
+                            scale = zoomTarget
+                        }
+                    }
+                }
+                // Single-tap: dismiss
+                .onTapGesture(count: 1) {
+                    onTap?()
+                }
                 .gesture(
                     MagnifyGesture()
                         .onChanged { value in
