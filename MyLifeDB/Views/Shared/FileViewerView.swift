@@ -24,7 +24,7 @@ struct PreviewItem: Identifiable, Hashable {
     var id: String { path }
     let path: String
     let name: String
-    let file: FileRecord?
+    var file: FileRecord?
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(path)

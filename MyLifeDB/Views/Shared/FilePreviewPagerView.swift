@@ -90,16 +90,31 @@ struct FilePreviewPagerView: View {
         #endif
     }
 
-    /// Warm the FileCache for the previous and next image so swiping feels instant.
+    /// Prefetch adjacent items so swiping feels instant.
+    /// - Images: warm raw data into FileCache
+    /// - All items without a FileRecord: fetch metadata so FileViewerView skips its own fetch
     private func prefetchAdjacentItems(around id: String) {
         guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
         for delta in [-1, 1] {
             let adjacent = idx + delta
             guard adjacent >= 0 && adjacent < items.count else { continue }
             let item = items[adjacent]
-            guard item.isLikelyImage else { continue }
-            let url = APIClient.shared.rawFileURL(path: item.path)
-            Task { _ = try? await FileCache.shared.data(for: url) }
+
+            // Prefetch file metadata if missing (eliminates a network roundtrip on swipe)
+            if item.file == nil {
+                Task {
+                    guard let response = try? await APIClient.shared.library.getFileInfo(path: item.path) else { return }
+                    if let i = items.firstIndex(where: { $0.id == item.id }) {
+                        items[i].file = response.file
+                    }
+                }
+            }
+
+            // Prefetch raw image data into FileCache
+            if item.isLikelyImage {
+                let url = APIClient.shared.rawFileURL(path: item.path)
+                Task { _ = try? await FileCache.shared.data(for: url) }
+            }
         }
     }
 
