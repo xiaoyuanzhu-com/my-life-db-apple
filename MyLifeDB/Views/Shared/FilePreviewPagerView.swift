@@ -73,6 +73,7 @@ struct FilePreviewPagerView: View {
             .onAppear {
                 if let id = currentID {
                     proxy.scrollTo(id, anchor: .center)
+                    prefetchAdjacentItems(around: id)
                 }
             }
             .onChange(of: currentID) { _, newID in
@@ -82,9 +83,24 @@ struct FilePreviewPagerView: View {
                    idx <= 2 && hasMoreOlder && !isLoadingMore {
                     Task { await loadMoreItems() }
                 }
+                // Prefetch adjacent images for smoother swiping.
+                prefetchAdjacentItems(around: newID)
             }
         }
         #endif
+    }
+
+    /// Warm the FileCache for the previous and next image so swiping feels instant.
+    private func prefetchAdjacentItems(around id: String) {
+        guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
+        for delta in [-1, 1] {
+            let adjacent = idx + delta
+            guard adjacent >= 0 && adjacent < items.count else { continue }
+            let item = items[adjacent]
+            guard item.isLikelyImage else { continue }
+            let url = APIClient.shared.rawFileURL(path: item.path)
+            Task { _ = try? await FileCache.shared.data(for: url) }
+        }
     }
 
     private func loadMoreItems() async {

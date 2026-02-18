@@ -33,6 +33,13 @@ struct PreviewItem: Identifiable, Hashable {
     static func == (lhs: PreviewItem, rhs: PreviewItem) -> Bool {
         lhs.path == rhs.path
     }
+
+    /// Whether this item is likely an image (for prefetching — skip videos which are large).
+    var isLikelyImage: Bool {
+        if let file = file { return file.isImage }
+        let ext = (name as NSString).pathExtension.lowercased()
+        return ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "bmp", "tiff", "svg"].contains(ext)
+    }
 }
 
 // MARK: - File Preview Pager Context
