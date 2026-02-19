@@ -427,7 +427,13 @@ struct ClaudeSessionListView: View {
 
 private struct NewClaudeSessionView: View {
 
-    @State private var webVM = TabWebViewModel(route: "/claude")
+    @State private var webVM = TabWebViewModel(
+        route: "/claude",
+        featureFlags: [
+            "sessionSidebar": false,
+            "sessionCreateNew": false,
+        ]
+    )
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {

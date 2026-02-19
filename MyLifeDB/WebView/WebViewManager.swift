@@ -32,6 +32,11 @@ final class TabWebViewModel {
     /// The route this WebView is pinned to (e.g. "/", "/claude").
     let route: String
 
+    /// Feature flags to inject into the WebView before React mounts.
+    /// Keys map to FeatureFlags properties on the web side (e.g. "sessionSidebar").
+    /// Only flags explicitly set here are injected; missing flags keep their web-side defaults.
+    let featureFlags: [String: Bool]
+
     // MARK: - Observable State
 
     /// The WebPage instance that backs the SwiftUI WebView.
@@ -61,8 +66,9 @@ final class TabWebViewModel {
 
     // MARK: - Init
 
-    init(route: String) {
+    init(route: String, featureFlags: [String: Bool] = [:]) {
         self.route = route
+        self.featureFlags = featureFlags
         let config = WebViewConfiguration.create(bridgeHandler: bridgeHandler)
         self.webPage = WebPage(configuration: config)
     }
@@ -173,7 +179,19 @@ final class TabWebViewModel {
         guard !bridgeInjected else { return }
         bridgeInjected = true
 
-        _ = try? await webPage.callJavaScript(NativeBridgeHandler.bridgePolyfillScript)
+        var script = NativeBridgeHandler.bridgePolyfillScript
+
+        // Inject feature flags if any are configured.
+        // Sets window.__featureFlags before React mounts so the web frontend
+        // can read them synchronously during initial render.
+        if !featureFlags.isEmpty {
+            let pairs = featureFlags
+                .map { "\($0.key): \($0.value)" }
+                .joined(separator: ", ")
+            script += "\nwindow.__featureFlags = { \(pairs) };"
+        }
+
+        _ = try? await webPage.callJavaScript(script)
 
         // Also apply theme immediately
         syncTheme()

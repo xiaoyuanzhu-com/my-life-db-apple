@@ -20,7 +20,13 @@ struct ClaudeSessionDetailView: View {
     init(sessionId: String, title: String? = nil) {
         self.sessionId = sessionId
         self.title = title
-        self._webVM = State(initialValue: TabWebViewModel(route: "/claude/\(sessionId)"))
+        self._webVM = State(initialValue: TabWebViewModel(
+            route: "/claude/\(sessionId)",
+            featureFlags: [
+                "sessionSidebar": false,
+                "sessionCreateNew": false,
+            ]
+        ))
     }
 
     var body: some View {
