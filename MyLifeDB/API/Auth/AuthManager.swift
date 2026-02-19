@@ -3,7 +3,7 @@
 //  MyLifeDB
 //
 //  Central authentication state manager.
-//  Handles OAuth login, token storage, auto-refresh, and 401 recovery.
+//  Handles OAuth login, token storage, reactive refresh (401 + foreground resume), and logout.
 //
 
 import Foundation
@@ -89,9 +89,7 @@ final class AuthManager {
         return jwtExpiration(token)
     }
 
-    // MARK: - Refresh Timer
-
-    private var refreshTask: Task<Void, Never>?
+    // MARK: - Refresh
 
     /// In-flight refresh task. Concurrent callers await the same task
     /// instead of being rejected (single-flight pattern).
@@ -138,7 +136,6 @@ final class AuthManager {
             switch result {
             case .valid(let username):
                 state = .authenticated(username)
-                scheduleRefresh()
                 return
             case .invalid, .noOAuth:
                 // Token expired or OAuth not configured, try refresh
@@ -177,11 +174,9 @@ final class AuthManager {
             switch result {
             case .valid(let username):
                 state = .authenticated(username)
-                scheduleRefresh()
             default:
                 // Token was just issued, shouldn't fail. But handle gracefully.
                 state = .authenticated("User")
-                scheduleRefresh()
             }
             NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
         }
@@ -253,7 +248,6 @@ final class AuthManager {
                     let result = await self.validateToken(token)
                     if case .valid(let username) = result {
                         self.state = .authenticated(username)
-                        self.scheduleRefresh()
                         NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
                         return .success
                     }
@@ -261,7 +255,6 @@ final class AuthManager {
 
                 // Even if validation fails, if we got new tokens, consider it success
                 if self.accessToken != nil {
-                    self.scheduleRefresh()
                     NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
                     return .success
                 }
@@ -282,10 +275,6 @@ final class AuthManager {
 
     @MainActor
     func logout() async {
-        // Cancel refresh timer
-        refreshTask?.cancel()
-        refreshTask = nil
-
         // Call backend logout (best-effort)
         do {
             let url = baseURL.appendingPathComponent("api/oauth/logout")
@@ -385,31 +374,6 @@ final class AuthManager {
     }
 
     // MARK: - JWT Helpers
-
-    private func scheduleRefresh() {
-        refreshTask?.cancel()
-
-        guard let token = accessToken else { return }
-        guard let exp = jwtExpiration(token) else { return }
-
-        // Refresh 60 seconds before expiry
-        let refreshAt = exp.addingTimeInterval(-60)
-        let delay = refreshAt.timeIntervalSinceNow
-
-        guard delay > 0 else {
-            // Already expired or about to expire, refresh now
-            refreshTask = Task { @MainActor in
-                _ = await tryRefresh()
-            }
-            return
-        }
-
-        refreshTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(delay))
-            guard !Task.isCancelled else { return }
-            _ = await self?.tryRefresh()
-        }
-    }
 
     private func isTokenExpiringSoon(_ token: String) -> Bool {
         guard let exp = jwtExpiration(token) else { return true }
