@@ -268,7 +268,7 @@ struct InboxFeedContainerView: View {
             items = response.items
             cursors = response.cursors
             hasMore = response.hasMore
-            // No scrollToBottomTrigger here — flipped ScrollView starts at offset 0 (visual bottom).
+            // No scrollToBottomTrigger here — .defaultScrollAnchor(.bottom) handles initial position.
         } catch let apiError as APIError {
             error = apiError
         } catch {
