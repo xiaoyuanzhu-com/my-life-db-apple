@@ -494,9 +494,7 @@ private struct SessionRow: View {
             // the width (matching web's white-space:nowrap behaviour).
             Text(session.title.replacing(/\s*\n\s*/, with: " "))
                 .lineLimit(1)
-                .layoutPriority(1)
-
-            Spacer(minLength: 0)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             if session.sessionState == .working || session.sessionState == .ready {
                 UnreadDot(state: session.sessionState)
