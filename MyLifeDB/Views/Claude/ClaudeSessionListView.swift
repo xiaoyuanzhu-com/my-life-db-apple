@@ -205,7 +205,7 @@ struct ClaudeSessionListView: View {
         Button {
             // Optimistically clear unread dot — the subscribe WS will confirm
             // the read state on the server when the detail view connects.
-            if session.sessionState == .active || session.sessionState == .waiting,
+            if session.sessionState == .working || session.sessionState == .ready,
                let index = sessions.firstIndex(where: { $0.id == session.id }) {
                 sessions[index] = session.withSessionState(.idle)
             }
@@ -495,7 +495,7 @@ private struct SessionRow: View {
 
             // Fixed-width dot column — keeps dots vertically aligned across rows
             Group {
-                if session.sessionState == .active || session.sessionState == .waiting {
+                if session.sessionState == .working || session.sessionState == .ready {
                     UnreadDot(state: session.sessionState)
                 }
             }
@@ -525,22 +525,22 @@ private struct SessionRow: View {
 // MARK: - Unread Dot Indicator
 
 /// Animated dot indicating unread session activity.
-/// - `.active` (amber, pulsing): Claude is still working
-/// - `.waiting` (blue, static): Claude finished, waiting for user
+/// - `.working` (amber, pulsing): Claude is still working
+/// - `.ready` (blue, static): Claude finished, waiting for user
 private struct UnreadDot: View {
 
     let state: SessionState
 
     var body: some View {
         Circle()
-            .fill(state == .active ? Color.orange : Color.accentColor)
+            .fill(state == .working ? Color.orange : Color.accentColor)
             .frame(width: 8, height: 8)
-            .modifier(PulseModifier(enabled: state == .active))
-            .accessibilityLabel(state == .active ? "Claude is working" : "Waiting for you")
+            .modifier(PulseModifier(enabled: state == .working))
+            .accessibilityLabel(state == .working ? "Claude is working" : "Waiting for you")
     }
 }
 
-/// Subtle pulsing animation for the "active" (working) dot.
+/// Subtle pulsing animation for the "working" dot.
 private struct PulseModifier: ViewModifier {
 
     let enabled: Bool

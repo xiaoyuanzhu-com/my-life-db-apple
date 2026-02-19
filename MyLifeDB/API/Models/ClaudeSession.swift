@@ -11,8 +11,8 @@ import Foundation
 /// read state, and processing state.
 enum SessionState: String, Codable, Hashable {
     case idle       // No unread messages
-    case active     // Has unread messages, Claude is still working
-    case waiting    // Has unread messages, Claude finished (needs user input)
+    case working    // Has unread messages, Claude is still working
+    case ready      // Has unread messages, Claude finished (needs user input)
     case archived   // User explicitly archived
 }
 
