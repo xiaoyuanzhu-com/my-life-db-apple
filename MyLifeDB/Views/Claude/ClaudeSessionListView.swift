@@ -497,13 +497,9 @@ private struct SessionRow: View {
 
             Spacer()
 
-            // Fixed-width dot column at trailing edge — always vertically aligned
-            Group {
-                if session.sessionState == .working || session.sessionState == .ready {
-                    UnreadDot(state: session.sessionState)
-                }
+            if session.sessionState == .working || session.sessionState == .ready {
+                UnreadDot(state: session.sessionState)
             }
-            .frame(width: 8)
 
             // TimelineView re-renders every 30s so relative timestamps stay current
             // — no manual refresh token needed.
