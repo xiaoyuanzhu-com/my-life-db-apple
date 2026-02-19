@@ -493,7 +493,9 @@ private struct SessionRow: View {
             Text(session.title)
                 .lineLimit(1)
 
-            // Fixed-width dot column — keeps dots vertically aligned across rows
+            Spacer()
+
+            // Fixed-width dot column at trailing edge — always vertically aligned
             Group {
                 if session.sessionState == .working || session.sessionState == .ready {
                     UnreadDot(state: session.sessionState)
@@ -501,11 +503,11 @@ private struct SessionRow: View {
             }
             .frame(width: 8)
 
-            Spacer()
-
             Text(shortRelativeTime(session.lastUserActivity ?? session.lastActivity))
+                .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .font(.callout)
+                .frame(minWidth: 32, alignment: .trailing)
         }
         .opacity(session.isArchived ? 0.6 : 1.0)
     }
