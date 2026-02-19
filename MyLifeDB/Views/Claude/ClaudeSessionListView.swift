@@ -503,7 +503,7 @@ private struct SessionRow: View {
 
             // TimelineView re-renders every 30s so relative timestamps stay current
             // — no manual refresh token needed.
-            TimelineView(.periodic(every: 30)) { context in
+            TimelineView(.periodic(from: .now, by: 30)) { context in
                 Text(shortRelativeTime(session.lastUserActivity ?? session.lastActivity, now: context.date))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
