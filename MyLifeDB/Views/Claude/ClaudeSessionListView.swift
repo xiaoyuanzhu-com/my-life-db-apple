@@ -490,13 +490,16 @@ private struct SessionRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            // Unread indicator dot
-            if session.sessionState == .active || session.sessionState == .waiting {
-                UnreadDot(state: session.sessionState)
-            }
-
             Text(session.title)
                 .lineLimit(1)
+
+            // Fixed-width dot column — keeps dots vertically aligned across rows
+            Group {
+                if session.sessionState == .active || session.sessionState == .waiting {
+                    UnreadDot(state: session.sessionState)
+                }
+            }
+            .frame(width: 8)
 
             Spacer()
 
