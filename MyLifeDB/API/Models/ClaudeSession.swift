@@ -7,6 +7,15 @@
 
 import Foundation
 
+/// Unified session state computed by the backend from archive state,
+/// read state, and processing state.
+enum SessionState: String, Codable, Hashable {
+    case idle       // No unread messages
+    case active     // Has unread messages, Claude is still working
+    case waiting    // Has unread messages, Claude finished (needs user input)
+    case archived   // User explicitly archived
+}
+
 /// Represents a Claude Code session
 struct ClaudeSession: Codable, Identifiable, Hashable {
 
@@ -18,15 +27,15 @@ struct ClaudeSession: Codable, Identifiable, Hashable {
     let lastUserActivity: Date?  // Last user (not Claude) interaction — used for stable list ordering
     let messageCount: Int
     let isSidechain: Bool
-    var status: String        // "active" or "archived"
+    var sessionState: SessionState
     let git: ClaudeSessionGitInfo?
 
-    var isArchived: Bool { status == "archived" }
+    var isArchived: Bool { sessionState == .archived }
 
-    /// Returns a copy with the given status
-    func withStatus(_ newStatus: String) -> ClaudeSession {
+    /// Returns a copy with the given session state
+    func withSessionState(_ state: SessionState) -> ClaudeSession {
         var copy = self
-        copy.status = newStatus
+        copy.sessionState = state
         return copy
     }
 }

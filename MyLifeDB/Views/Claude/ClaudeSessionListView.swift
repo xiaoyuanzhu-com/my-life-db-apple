@@ -376,9 +376,9 @@ struct ClaudeSessionListView: View {
         // Optimistic update
         if let index = sessions.firstIndex(where: { $0.id == session.id }) {
             if statusFilter == "all" {
-                // In "all" view, update status in-place
+                // In "all" view, update state in-place
                 withAnimation(.snappy(duration: 0.35)) {
-                    sessions[index] = session.withStatus("archived")
+                    sessions[index] = session.withSessionState(.archived)
                 }
             } else {
                 // In "active" view, remove from list
@@ -401,9 +401,9 @@ struct ClaudeSessionListView: View {
         // Optimistic update
         if let index = sessions.firstIndex(where: { $0.id == session.id }) {
             if statusFilter == "all" {
-                // In "all" view, update status in-place
+                // In "all" view, update state in-place
                 withAnimation(.snappy(duration: 0.35)) {
-                    sessions[index] = session.withStatus("active")
+                    sessions[index] = session.withSessionState(.idle)
                 }
             } else {
                 // In "archived" view, remove from list
@@ -483,7 +483,12 @@ private struct SessionRow: View {
     let session: ClaudeSession
 
     var body: some View {
-        HStack {
+        HStack(spacing: 8) {
+            // Unread indicator dot
+            if session.sessionState == .active || session.sessionState == .waiting {
+                UnreadDot(state: session.sessionState)
+            }
+
             Text(session.title)
                 .lineLimit(1)
 
@@ -505,6 +510,46 @@ private struct SessionRow: View {
         if hours < 24 { return "\(hours)h" }
         let days = hours / 24
         return "\(days)d"
+    }
+}
+
+// MARK: - Unread Dot Indicator
+
+/// Animated dot indicating unread session activity.
+/// - `.active` (amber, pulsing): Claude is still working
+/// - `.waiting` (blue, static): Claude finished, waiting for user
+private struct UnreadDot: View {
+
+    let state: SessionState
+
+    var body: some View {
+        Circle()
+            .fill(state == .active ? Color.orange : Color.accentColor)
+            .frame(width: 8, height: 8)
+            .modifier(PulseModifier(enabled: state == .active))
+            .accessibilityLabel(state == .active ? "Claude is working" : "Waiting for you")
+    }
+}
+
+/// Subtle pulsing animation for the "active" (working) dot.
+private struct PulseModifier: ViewModifier {
+
+    let enabled: Bool
+    @State private var isPulsing = false
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content
+                .scaleEffect(isPulsing ? 1.4 : 1.0)
+                .opacity(isPulsing ? 0.5 : 1.0)
+                .animation(
+                    .easeInOut(duration: 1.0).repeatForever(autoreverses: true),
+                    value: isPulsing
+                )
+                .onAppear { isPulsing = true }
+        } else {
+            content
+        }
     }
 }
 
