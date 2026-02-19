@@ -73,8 +73,8 @@ final class AuthManager {
     // MARK: - Cookie Helpers (used by TabWebViewModel for cookie injection)
 
     /// The refresh token for WebView cookie injection.
-    /// The refresh token is primarily managed by native; the cookie is a fallback
-    /// so the web-side fetchWithRefresh can work independently if needed.
+    /// Native is the single auth owner; the cookie is an emergency fallback.
+    /// WebView delegates refresh to native via the bridge (requestTokenRefresh).
     var refreshTokenForCookie: String? { refreshToken }
 
     /// Seconds until the access token expires (for cookie max-age). Defaults to 3600.
@@ -92,7 +92,22 @@ final class AuthManager {
     // MARK: - Refresh Timer
 
     private var refreshTask: Task<Void, Never>?
-    private var isRefreshing = false
+
+    /// In-flight refresh task. Concurrent callers await the same task
+    /// instead of being rejected (single-flight pattern).
+    private var refreshInFlight: Task<RefreshResult, Never>?
+
+    // MARK: - Dedicated Auth Session
+
+    /// Ephemeral session for auth requests. Cookies disabled to prevent
+    /// dual-storage — Keychain is the single source of truth for tokens.
+    private static let authSession: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.httpShouldSetCookies = false
+        config.httpCookieAcceptPolicy = .never
+        config.httpCookieStorage = nil
+        return URLSession(configuration: config)
+    }()
 
     // MARK: - Base URL
 
@@ -190,62 +205,77 @@ final class AuthManager {
 
     @MainActor
     private func tryRefresh() async -> RefreshResult {
-        guard let refreshToken = refreshToken, !isRefreshing else { return .failed }
-        isRefreshing = true
-        defer { isRefreshing = false }
+        // Single-flight: if a refresh is already in progress, wait for it
+        if let existing = refreshInFlight {
+            return await existing.value
+        }
 
-        do {
-            let url = baseURL.appendingPathComponent("api/oauth/refresh")
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue("refresh_token=\(refreshToken)", forHTTPHeaderField: "Cookie")
-            request.timeoutInterval = 10
+        guard let refreshToken = refreshToken else { return .failed }
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+        let task = Task<RefreshResult, Never> { @MainActor [weak self] in
+            guard let self else { return .failed }
 
-            guard let httpResponse = response as? HTTPURLResponse else { return .failed }
+            do {
+                let url = self.baseURL.appendingPathComponent("api/oauth/refresh")
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.httpBody = try JSONSerialization.data(
+                    withJSONObject: ["refresh_token": refreshToken]
+                )
+                request.timeoutInterval = 10
 
-            // 401 = server explicitly rejected the refresh token
-            if httpResponse.statusCode == 401 {
-                return .rejected
-            }
+                let (data, response) = try await Self.authSession.data(for: request)
 
-            guard httpResponse.statusCode == 200 else { return .failed }
+                guard let httpResponse = response as? HTTPURLResponse else { return .failed }
 
-            // Parse tokens from JSON response body
-            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                return .failed
-            }
+                // 401 = server explicitly rejected the refresh token
+                if httpResponse.statusCode == 401 {
+                    return .rejected
+                }
 
-            if let newAccess = json["access_token"] as? String, !newAccess.isEmpty {
-                self.accessToken = newAccess
-            }
-            if let newRefresh = json["refresh_token"] as? String, !newRefresh.isEmpty {
-                self.refreshToken = newRefresh
-            }
+                guard httpResponse.statusCode == 200 else { return .failed }
 
-            // Validate new token and update state
-            if let token = self.accessToken {
-                let result = await validateToken(token)
-                if case .valid(let username) = result {
-                    state = .authenticated(username)
-                    scheduleRefresh()
+                // Parse tokens from JSON response body
+                guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    return .failed
+                }
+
+                if let newAccess = json["access_token"] as? String, !newAccess.isEmpty {
+                    self.accessToken = newAccess
+                }
+                if let newRefresh = json["refresh_token"] as? String, !newRefresh.isEmpty {
+                    self.refreshToken = newRefresh
+                }
+
+                // Validate new token and update state
+                if let token = self.accessToken {
+                    let result = await self.validateToken(token)
+                    if case .valid(let username) = result {
+                        self.state = .authenticated(username)
+                        self.scheduleRefresh()
+                        NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
+                        return .success
+                    }
+                }
+
+                // Even if validation fails, if we got new tokens, consider it success
+                if self.accessToken != nil {
+                    self.scheduleRefresh()
                     NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
                     return .success
                 }
-            }
 
-            // Even if validation fails, if we got new tokens, consider it success
-            if self.accessToken != nil {
-                scheduleRefresh()
-                NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
-                return .success
+                return .failed
+            } catch {
+                return .failed
             }
-
-            return .failed
-        } catch {
-            return .failed
         }
+
+        refreshInFlight = task
+        let result = await task.value
+        refreshInFlight = nil
+        return result
     }
 
     // MARK: - Logout
@@ -265,7 +295,7 @@ final class AuthManager {
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             }
             request.timeoutInterval = 5
-            _ = try? await URLSession.shared.data(for: request)
+            _ = try? await Self.authSession.data(for: request)
         }
 
         // Clear local state
@@ -325,7 +355,7 @@ final class AuthManager {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             request.timeoutInterval = 10
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await Self.authSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 return .connectionError

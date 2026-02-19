@@ -15,6 +15,7 @@
 //  - openExternal: Open URL in Safari
 //  - copyToClipboard: Copy text to system clipboard
 //  - log: Forward console messages to native log
+//  - requestTokenRefresh: Await native token refresh (returns JSON response)
 //
 
 import WebKit
@@ -34,26 +35,42 @@ final class NativeBridgeHandler: URLSchemeHandler {
         let url = request.url ?? URL(string: "nativebridge://message")!
 
         return AsyncThrowingStream { continuation in
-            // Parse and dispatch the message
-            if let body,
-               let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
-               let action = json["action"] as? String {
+            guard let body,
+                  let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+                  let action = json["action"] as? String else {
+                print("[NativeBridge] Invalid message format from URL scheme request")
+                let response = HTTPURLResponse(url: url, statusCode: 204, httpVersion: nil, headerFields: nil)!
+                continuation.yield(.response(response))
+                continuation.finish()
+                return
+            }
+
+            if action == "requestTokenRefresh" {
+                // Async action: await native token refresh before responding
+                Task { @MainActor in
+                    let success = await AuthManager.shared.refreshAccessToken()
+                    let responseBody = (try? JSONSerialization.data(
+                        withJSONObject: ["success": success]
+                    )) ?? Data("{}".utf8)
+                    let response = HTTPURLResponse(
+                        url: url,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    continuation.yield(.response(response))
+                    continuation.yield(.data(responseBody))
+                    continuation.finish()
+                }
+            } else {
+                // Fire-and-forget for other actions
                 Task { @MainActor in
                     self.dispatch(action: action, body: json)
                 }
-            } else {
-                print("[NativeBridge] Invalid message format from URL scheme request")
+                let response = HTTPURLResponse(url: url, statusCode: 204, httpVersion: nil, headerFields: nil)!
+                continuation.yield(.response(response))
+                continuation.finish()
             }
-
-            // Return an empty 204 response
-            let response = HTTPURLResponse(
-                url: url,
-                statusCode: 204,
-                httpVersion: nil,
-                headerFields: nil
-            )!
-            continuation.yield(.response(response))
-            continuation.finish()
         }
     }
 

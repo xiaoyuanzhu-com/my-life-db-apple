@@ -12,8 +12,9 @@ enum KeychainHelper {
 
     private static let service = "com.mylifedb.auth"
 
-    static func save(key: String, value: String) {
-        guard let data = value.data(using: .utf8) else { return }
+    @discardableResult
+    static func save(key: String, value: String) -> Bool {
+        guard let data = value.data(using: .utf8) else { return false }
 
         // Delete existing item first
         delete(key: key)
@@ -26,7 +27,11 @@ enum KeychainHelper {
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
         ]
 
-        SecItemAdd(query as CFDictionary, nil)
+        let status = SecItemAdd(query as CFDictionary, nil)
+        if status != errSecSuccess {
+            print("[Keychain] save failed for \(key): OSStatus \(status)")
+        }
+        return status == errSecSuccess
     }
 
     static func load(key: String) -> String? {
