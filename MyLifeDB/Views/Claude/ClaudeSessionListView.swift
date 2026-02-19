@@ -327,6 +327,7 @@ struct ClaudeSessionListView: View {
             )
             let newList = response.sessions
             let newMap = Dictionary(newList.map { ($0.id, $0) }, uniquingKeysWith: { _, b in b })
+            let freshIds = Set(newList.map(\.id))
             let prevIds = Set(sessions.map(\.id))
 
             // Update existing sessions with fresh data, keep paginated ones intact
@@ -339,6 +340,18 @@ struct ClaudeSessionListView: View {
                 merged.insert(session, at: 0)
             }
 
+            // Remove sessions that should have appeared in the first page but
+            // didn't (e.g. archived/deleted on another device).  Only drop
+            // sessions whose activity date is recent enough to fall within the
+            // first page — truly paginated older sessions are left alone.
+            if let oldestFresh = newList.last {
+                let cutoff = oldestFresh.lastUserActivity ?? oldestFresh.lastActivity
+                merged.removeAll { session in
+                    let date = session.lastUserActivity ?? session.lastActivity
+                    return !freshIds.contains(session.id) && date >= cutoff
+                }
+            }
+
             // Sort by lastUserActivity (or lastActivity) descending
             merged.sort { a, b in
                 let dateA = a.lastUserActivity ?? a.lastActivity
@@ -346,7 +359,9 @@ struct ClaudeSessionListView: View {
                 return dateA > dateB
             }
 
-            sessions = merged
+            withAnimation(.snappy(duration: 0.35)) {
+                sessions = merged
+            }
             hasMore = response.pagination.hasMore
             nextCursor = response.pagination.nextCursor
             error = nil
