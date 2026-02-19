@@ -60,6 +60,11 @@ final class TabWebViewModel {
     /// Set when `navigateTo` is called while `isLoaded` is false.
     private var pendingNavigation: String?
 
+    /// The running navigation observation task.  Stored so it can be
+    /// cancelled when `teardownAndReload` replaces the WebPage, preventing
+    /// the old task from keeping `self` alive via the async `for await` loop.
+    private var navigationTask: Task<Void, Never>?
+
     // MARK: - Bridge
 
     let bridgeHandler = NativeBridgeHandler()
@@ -108,10 +113,15 @@ final class TabWebViewModel {
     // MARK: - Navigation Event Observation
 
     private func observeNavigationEvents() {
-        Task { @MainActor [weak self] in
-            guard let self else { return }
+        // Cancel any previous observation task so it doesn't keep self alive
+        // via the long-lived `for await` loop on the old WebPage's navigations.
+        navigationTask?.cancel()
+
+        navigationTask = Task { @MainActor [weak self] in
+            guard let navigations = self?.webPage.navigations else { return }
             do {
-                for try await event in self.webPage.navigations {
+                for try await event in navigations {
+                    guard let self, !Task.isCancelled else { return }
                     switch event {
                     case .committed:
                         // Inject bridge polyfill and platform detection as soon as content starts loading
@@ -147,6 +157,7 @@ final class TabWebViewModel {
                     }
                 }
             } catch let error as WebPage.NavigationError {
+                guard let self, !Task.isCancelled else { return }
                 switch error {
                 case .failedProvisionalNavigation(let underlying):
                     self.isLoaded = false
@@ -166,6 +177,7 @@ final class TabWebViewModel {
                     print("[TabWebViewModel:\(self.route)] Navigation error: \(error)")
                 }
             } catch {
+                guard let self, !Task.isCancelled else { return }
                 self.loadError = error
                 print("[TabWebViewModel:\(self.route)] Navigation failed: \(error.localizedDescription)")
             }

@@ -83,6 +83,10 @@ struct ClaudeSessionListView: View {
             }
             setupSSE()
         }
+        .onDisappear {
+            sseManager.onSessionUpdated = nil
+            sseManager.stop()
+        }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 // Restart SSE if it was dropped during background/inactive

@@ -52,6 +52,14 @@ final class ClaudeSessionSSEManager {
     private func connect() {
         guard isRunning else { return }
 
+        // Invalidate any existing session before creating a new one.
+        // URLSession retains its delegate strongly — without this, each
+        // reconnect leaks the previous session and its network resources.
+        task?.cancel()
+        task = nil
+        session?.invalidateAndCancel()
+        session = nil
+
         let baseURL = AuthManager.shared.baseURL
         guard let url = URL(string: "\(baseURL)/api/notifications/stream") else {
             print("[ClaudeSSE] Invalid URL")

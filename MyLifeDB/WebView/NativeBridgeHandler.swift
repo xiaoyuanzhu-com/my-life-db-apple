@@ -64,8 +64,8 @@ final class NativeBridgeHandler: URLSchemeHandler {
                 }
             } else {
                 // Fire-and-forget for other actions
-                Task { @MainActor in
-                    self.dispatch(action: action, body: json)
+                Task { @MainActor [weak self] in
+                    self?.dispatch(action: action, body: json)
                 }
                 let response = HTTPURLResponse(url: url, statusCode: 204, httpVersion: nil, headerFields: nil)!
                 continuation.yield(.response(response))
