@@ -71,27 +71,28 @@ final class ClaudeSessionSSEManager {
     fileprivate func handleData(_ data: Data) {
         guard let text = String(data: data, encoding: .utf8) else { return }
 
-        // Parse SSE format: lines separated by \n
-        // event: <name>\ndata: <json>\n\n
-        let lines = text.components(separatedBy: "\n")
-        var currentEvent: String?
-
-        for line in lines {
-            if line.hasPrefix("event: ") {
-                currentEvent = String(line.dropFirst(7)).trimmingCharacters(in: .whitespaces)
-            } else if line.hasPrefix("data: ") {
-                let eventName = currentEvent ?? "message"
-                handleEvent(name: eventName)
-                currentEvent = nil
-            } else if line.isEmpty {
-                currentEvent = nil
-            }
+        // The backend sends unnamed SSE events — the event type lives inside
+        // the JSON payload as `"type"`, NOT in an SSE `event:` header.
+        // Format:  data: {"type":"claude-session-updated",...}\n\n
+        //
+        // This matches how the web frontend parses events (onmessage → JSON.parse → data.type).
+        for line in text.components(separatedBy: "\n") {
+            guard line.hasPrefix("data: ") else { continue }
+            let json = String(line.dropFirst(6))
+            handleEventJSON(json)
         }
     }
 
-    private func handleEvent(name: String) {
+    private func handleEventJSON(_ json: String) {
+        guard let data = json.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let type = obj["type"] as? String else { return }
+
+        // Ignore connection confirmation (same as web: `if (data.type === 'connected') return`)
+        guard type != "connected" else { return }
+
         DispatchQueue.main.async { [weak self] in
-            switch name {
+            switch type {
             case "claude-session-updated":
                 self?.onSessionUpdated?()
             default:
