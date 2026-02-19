@@ -203,6 +203,12 @@ struct ClaudeSessionListView: View {
 
     private func sessionButton(_ session: ClaudeSession) -> some View {
         Button {
+            // Optimistically clear unread dot — the subscribe WS will confirm
+            // the read state on the server when the detail view connects.
+            if session.sessionState == .active || session.sessionState == .waiting,
+               let index = sessions.firstIndex(where: { $0.id == session.id }) {
+                sessions[index] = session.withSessionState(.idle)
+            }
             path.append(ClaudeDestination.session(session))
         } label: {
             SessionRow(session: session)
