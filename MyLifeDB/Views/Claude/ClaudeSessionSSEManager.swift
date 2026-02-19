@@ -19,6 +19,12 @@ final class ClaudeSessionSSEManager {
     fileprivate var isRunning = false
     private var reconnectDelay: TimeInterval = 1
 
+    /// Buffer for incoming SSE data.  Network chunks can split mid-event
+    /// (e.g. the `data:` line arrives in one chunk and the trailing `\n\n`
+    /// in the next).  We accumulate bytes here and only process complete
+    /// events — those terminated by a blank line (`\n\n`).
+    fileprivate var buffer = ""
+
     func start() {
         guard !isRunning else { return }
         isRunning = true
@@ -62,24 +68,41 @@ final class ClaudeSessionSSEManager {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
+        buffer = "" // Reset buffer for new connection
+
         let delegate = ClaudeSSESessionDelegate(manager: self)
         session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
         task = session?.dataTask(with: request)
         task?.resume()
     }
 
+    /// Appends raw network bytes to the buffer and processes any complete
+    /// SSE events.  Per the SSE spec, events are delimited by a blank line
+    /// (`\n\n`).  Partial data stays in the buffer until the next chunk
+    /// completes it.
+    ///
+    /// The backend sends unnamed events — the event type lives inside the
+    /// JSON payload as `"type"`, NOT in an SSE `event:` header.
+    /// Format:  `data: {"type":"claude-session-updated",...}\n\n`
+    ///
+    /// This matches how the web frontend parses events
+    /// (`EventSource.onmessage` → `JSON.parse` → `data.type`).
     fileprivate func handleData(_ data: Data) {
         guard let text = String(data: data, encoding: .utf8) else { return }
+        buffer.append(text)
 
-        // The backend sends unnamed SSE events — the event type lives inside
-        // the JSON payload as `"type"`, NOT in an SSE `event:` header.
-        // Format:  data: {"type":"claude-session-updated",...}\n\n
-        //
-        // This matches how the web frontend parses events (onmessage → JSON.parse → data.type).
-        for line in text.components(separatedBy: "\n") {
-            guard line.hasPrefix("data: ") else { continue }
-            let json = String(line.dropFirst(6))
-            handleEventJSON(json)
+        // Split on the SSE event delimiter (\n\n).  Complete events are all
+        // segments except the last, which may be a partial event still
+        // accumulating.
+        var segments = buffer.components(separatedBy: "\n\n")
+        buffer = segments.removeLast() // Keep incomplete tail in buffer
+
+        for event in segments {
+            for line in event.components(separatedBy: "\n") {
+                guard line.hasPrefix("data: ") else { continue }
+                let json = String(line.dropFirst(6))
+                handleEventJSON(json)
+            }
         }
     }
 
