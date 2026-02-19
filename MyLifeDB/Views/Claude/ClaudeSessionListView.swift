@@ -490,7 +490,9 @@ private struct SessionRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Text(session.title)
+            // Collapse newlines to spaces so multi-line titles fill
+            // the width (matching web's white-space:nowrap behaviour).
+            Text(session.title.replacing(/\s*\n\s*/, with: " "))
                 .lineLimit(1)
 
             Spacer()
@@ -503,17 +505,21 @@ private struct SessionRow: View {
             }
             .frame(width: 8)
 
-            Text(shortRelativeTime(session.lastUserActivity ?? session.lastActivity))
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .font(.callout)
-                .frame(minWidth: 32, alignment: .trailing)
+            // TimelineView re-renders every 30s so relative timestamps stay current
+            // — no manual refresh token needed.
+            TimelineView(.periodic(every: 30)) { context in
+                Text(shortRelativeTime(session.lastUserActivity ?? session.lastActivity, now: context.date))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .font(.callout)
+                    .frame(minWidth: 32, alignment: .trailing)
+            }
         }
         .opacity(session.isArchived ? 0.6 : 1.0)
     }
 
-    private func shortRelativeTime(_ date: Date) -> String {
-        let seconds = Int(Date().timeIntervalSince(date))
+    private func shortRelativeTime(_ date: Date, now: Date) -> String {
+        let seconds = Int(now.timeIntervalSince(date))
         if seconds < 60 { return "\(seconds)s" }
         let minutes = seconds / 60
         if minutes < 60 { return "\(minutes)m" }

@@ -40,13 +40,11 @@ final class ClaudeSessionSSEManager {
         session = nil
     }
 
-    /// Ensures the SSE connection is active.  If it was previously stopped
-    /// (e.g. the app went to background and the OS tore down the socket),
-    /// this will tear down the stale connection and reconnect with a fresh
-    /// auth token.  Safe to call repeatedly — no-ops when already connected.
+    /// Ensures the SSE connection is active.  Always tears down any existing
+    /// connection and reconnects with a fresh auth token.  This handles the
+    /// case where iOS killed the network socket while the app was in the
+    /// background but `isRunning` stayed true (no delegate callback fired).
     func ensureRunning() {
-        if isRunning { return }
-        // Full restart: tear down any leftover state, then reconnect
         stop()
         start()
     }
