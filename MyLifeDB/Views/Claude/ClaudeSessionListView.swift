@@ -524,41 +524,18 @@ private struct SessionRow: View {
 
 // MARK: - Unread Dot Indicator
 
-/// Animated dot indicating unread session activity.
-/// - `.working` (amber, pulsing): Claude is still working
-/// - `.ready` (blue, static): Claude finished, waiting for user
+/// Static dot indicating unread session activity.
+/// - `.working` (amber): Claude is still working
+/// - `.ready` (green): Claude finished, waiting for user
 private struct UnreadDot: View {
 
     let state: SessionState
 
     var body: some View {
         Circle()
-            .fill(state == .working ? Color.orange : Color.accentColor)
+            .fill(state == .working ? Color.orange : Color.green)
             .frame(width: 8, height: 8)
-            .modifier(PulseModifier(enabled: state == .working))
             .accessibilityLabel(state == .working ? "Claude is working" : "Waiting for you")
-    }
-}
-
-/// Subtle pulsing animation for the "working" dot.
-private struct PulseModifier: ViewModifier {
-
-    let enabled: Bool
-    @State private var isPulsing = false
-
-    func body(content: Content) -> some View {
-        if enabled {
-            content
-                .scaleEffect(isPulsing ? 1.4 : 1.0)
-                .opacity(isPulsing ? 0.5 : 1.0)
-                .animation(
-                    .easeInOut(duration: 1.0).repeatForever(autoreverses: true),
-                    value: isPulsing
-                )
-                .onAppear { isPulsing = true }
-        } else {
-            content
-        }
     }
 }
 
