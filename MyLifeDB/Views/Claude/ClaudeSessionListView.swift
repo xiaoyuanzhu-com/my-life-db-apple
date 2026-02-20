@@ -209,7 +209,7 @@ struct ClaudeSessionListView: View {
         Button {
             // Optimistically clear unread dot — the subscribe WS will confirm
             // the read state on the server when the detail view connects.
-            if session.sessionState == .working || session.sessionState == .ready,
+            if session.sessionState == .working || session.sessionState == .unread,
                let index = sessions.firstIndex(where: { $0.id == session.id }) {
                 sessions[index] = session.withSessionState(.idle)
             }
@@ -515,7 +515,7 @@ private struct SessionRow: View {
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            if session.sessionState == .working || session.sessionState == .ready {
+            if session.sessionState == .working || session.sessionState == .unread {
                 UnreadDot(state: session.sessionState)
             }
 
@@ -546,9 +546,9 @@ private struct SessionRow: View {
 
 // MARK: - Unread Dot Indicator
 
-/// Static dot indicating unread session activity.
+/// Static dot indicating session activity.
 /// - `.working` (amber): Claude is still working
-/// - `.ready` (green): Claude finished, waiting for user
+/// - `.unread` (green): unread result (completed turn) or pending permission
 private struct UnreadDot: View {
 
     let state: SessionState
@@ -557,7 +557,7 @@ private struct UnreadDot: View {
         Circle()
             .fill(state == .working ? Color.orange : Color.green)
             .frame(width: 8, height: 8)
-            .accessibilityLabel(state == .working ? "Claude is working" : "Waiting for you")
+            .accessibilityLabel(state == .working ? "Claude is working" : "Unread results")
     }
 }
 

@@ -9,10 +9,14 @@ import Foundation
 
 /// Unified session state computed by the backend from archive state,
 /// read state, and processing state.
+///
+/// "unread" refers specifically to unread *result* messages (completed turns),
+/// NOT intermediate messages like assistant text, tool calls, or progress
+/// updates that stream while Claude is working.
 enum SessionState: String, Codable, Hashable {
-    case idle       // No unread messages
-    case working    // Has unread messages, Claude is still working
-    case ready      // Has unread messages, Claude finished (needs user input)
+    case idle       // User is up to date, nothing needs attention
+    case working    // Claude is mid-turn (processing)
+    case unread     // Unread result messages or pending permission
     case archived   // User explicitly archived
 }
 
