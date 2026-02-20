@@ -22,8 +22,8 @@ struct InboxItem: Codable, Identifiable, Hashable {
     let size: Int64?
     let mimeType: String?
     let hash: String?
-    let modifiedAt: String
-    let createdAt: String
+    let modifiedAt: Int64
+    let createdAt: Int64
     let digests: [Digest]
     let textPreview: String?
     let screenshotSqlar: String?
@@ -157,7 +157,7 @@ struct PinnedItem: Codable, Identifiable {
 
     let path: String
     let name: String
-    let pinnedAt: String
+    let pinnedAt: Int64
     let displayText: String
     let cursor: String
 }

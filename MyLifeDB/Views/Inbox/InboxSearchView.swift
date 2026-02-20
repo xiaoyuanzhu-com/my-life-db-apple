@@ -58,7 +58,7 @@ struct InboxSearchView: View {
     @ViewBuilder
     private func resultView(for result: SearchResultItem) -> some View {
         VStack(alignment: .trailing, spacing: 4) {
-            InboxTimestampView(dateString: result.createdAt)
+            InboxTimestampView(epochMs: result.createdAt)
 
             Button {
                 openFilePreview?(result.path, result.name, nil, nil)

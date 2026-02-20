@@ -14,8 +14,8 @@ struct Person: Codable, Identifiable, Hashable {
 
     let id: String
     let displayName: String
-    let createdAt: String
-    let updatedAt: String
+    let createdAt: Int64
+    let updatedAt: Int64
     let clusters: [PersonCluster]?
 
     // MARK: - Hashable
@@ -42,8 +42,8 @@ struct PersonCluster: Codable, Identifiable {
     let peopleId: String?
     let clusterType: String
     let sampleCount: Int
-    let createdAt: String
-    let updatedAt: String
+    let createdAt: Int64
+    let updatedAt: Int64
 }
 
 // MARK: - API Request/Response Types

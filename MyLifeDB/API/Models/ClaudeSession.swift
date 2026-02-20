@@ -22,9 +22,9 @@ struct ClaudeSession: Codable, Identifiable, Hashable {
     let id: String
     let title: String
     let workingDir: String
-    let createdAt: Date
-    let lastActivity: Date
-    let lastUserActivity: Date?  // Last user (not Claude) interaction — used for stable list ordering
+    let createdAt: Int64           // epoch milliseconds
+    let lastActivity: Int64        // epoch milliseconds
+    let lastUserActivity: Int64?   // epoch milliseconds — last user (not Claude) interaction, used for stable list ordering
     let messageCount: Int
     let isSidechain: Bool
     var sessionState: SessionState
@@ -60,4 +60,13 @@ struct ClaudeSessionsPagination: Codable {
     let hasMore: Bool
     let nextCursor: String?
     let totalCount: Int
+}
+
+// MARK: - Epoch Millisecond Helpers
+
+extension Int64 {
+    /// Converts Unix epoch milliseconds to a Swift Date
+    var asDate: Date {
+        Date(timeIntervalSince1970: Double(self) / 1000.0)
+    }
 }

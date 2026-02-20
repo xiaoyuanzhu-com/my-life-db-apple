@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct InboxTimestampView: View {
-    let dateString: String
+    let epochMs: Int64
 
     var body: some View {
         Text(formattedTime)
@@ -18,9 +18,7 @@ struct InboxTimestampView: View {
     }
 
     private var formattedTime: String {
-        guard let date = parseDate(dateString) else {
-            return dateString
-        }
+        let date = epochMs.asDate
 
         let now = Date()
         let interval = now.timeIntervalSince(date)
@@ -48,15 +46,5 @@ struct InboxTimestampView: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter.string(from: date)
-    }
-
-    private func parseDate(_ string: String) -> Date? {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: string) {
-            return date
-        }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        return isoFormatter.date(from: string)
     }
 }

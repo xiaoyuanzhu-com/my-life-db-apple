@@ -45,13 +45,8 @@ struct GenericFileInfoView: View {
                         infoRow(label: "Extension", value: ext.uppercased())
                     }
 
-                    if let date = file.modifiedDate {
-                        infoRow(label: "Modified", value: date.formatted(date: .long, time: .shortened))
-                    }
-
-                    if let date = file.createdDate {
-                        infoRow(label: "Created", value: date.formatted(date: .long, time: .shortened))
-                    }
+                    infoRow(label: "Modified", value: file.modifiedDate.formatted(date: .long, time: .shortened))
+                    infoRow(label: "Created", value: file.createdDate.formatted(date: .long, time: .shortened))
                 }
                 .background(Color.platformGray6)
                 .clipShape(RoundedRectangle(cornerRadius: 10))

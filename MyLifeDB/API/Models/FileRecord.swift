@@ -22,8 +22,8 @@ struct FileRecord: Codable, Identifiable, Hashable {
     let size: Int64?
     let mimeType: String?
     let hash: String?
-    let modifiedAt: String
-    let createdAt: String
+    let modifiedAt: Int64
+    let createdAt: Int64
     let textPreview: String?
     let screenshotSqlar: String?
 
@@ -71,14 +71,10 @@ struct FileRecord: Codable, Identifiable, Hashable {
     }
 
     /// Parsed modification date
-    var modifiedDate: Date? {
-        ISO8601DateFormatter().date(from: modifiedAt)
-    }
+    var modifiedDate: Date { modifiedAt.asDate }
 
     /// Parsed creation date
-    var createdDate: Date? {
-        ISO8601DateFormatter().date(from: createdAt)
-    }
+    var createdDate: Date { createdAt.asDate }
 }
 
 // MARK: - FileRecord + Preview

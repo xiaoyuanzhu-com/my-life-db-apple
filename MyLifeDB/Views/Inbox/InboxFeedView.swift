@@ -128,7 +128,7 @@ struct InboxFeedView: View {
     @ViewBuilder
     private func itemView(for item: InboxItem) -> some View {
         VStack(alignment: .trailing, spacing: 4) {
-            InboxTimestampView(dateString: item.createdAt)
+            InboxTimestampView(epochMs: item.createdAt)
 
             Button {
                 let pagerContext = mediaPagerContext(for: item)

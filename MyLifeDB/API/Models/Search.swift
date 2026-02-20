@@ -21,8 +21,8 @@ struct SearchResultItem: Codable, Identifiable {
     let isFolder: Bool
     let size: Int64?
     let mimeType: String?
-    let modifiedAt: String
-    let createdAt: String
+    let modifiedAt: Int64
+    let createdAt: Int64
     let digests: [Digest]
     let score: Double
     let snippet: String

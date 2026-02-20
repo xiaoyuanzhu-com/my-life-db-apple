@@ -21,8 +21,8 @@ struct LibraryNode: Codable, Identifiable, Hashable {
     let isFolder: Bool
     let size: Int64?
     let mimeType: String?
-    let modifiedAt: String?
-    let createdAt: String?
+    let modifiedAt: Int64?
+    let createdAt: Int64?
     let children: [LibraryNode]?
 
     // MARK: - Computed Properties
@@ -149,8 +149,8 @@ struct FileTreeNode: Codable, Identifiable, Hashable {
     let type: String
     /// File size in bytes (nil for folders)
     let size: Int64?
-    /// ISO 8601 modification timestamp
-    let modifiedAt: String?
+    /// Epoch millisecond modification timestamp
+    let modifiedAt: Int64?
     /// Children (populated for folders when depth allows)
     let children: [FileTreeNode]?
 
@@ -202,8 +202,8 @@ struct FileTreeNode: Codable, Identifiable, Hashable {
 
     /// Parsed modification date
     var modifiedDate: Date? {
-        guard let modifiedAt = modifiedAt else { return nil }
-        return ISO8601DateFormatter().date(from: modifiedAt)
+        guard let ms = modifiedAt else { return nil }
+        return ms.asDate
     }
 }
 

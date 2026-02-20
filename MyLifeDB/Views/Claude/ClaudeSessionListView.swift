@@ -154,7 +154,7 @@ struct ClaudeSessionListView: View {
         var earlier: [ClaudeSession] = []
 
         for session in sessions {
-            let date = session.lastUserActivity ?? session.lastActivity
+            let date = (session.lastUserActivity ?? session.lastActivity).asDate
             if date >= startOfToday {
                 today.append(session)
             } else if date >= startOfYesterday {
@@ -351,16 +351,16 @@ struct ClaudeSessionListView: View {
             if let oldestFresh = newList.last {
                 let cutoff = oldestFresh.lastUserActivity ?? oldestFresh.lastActivity
                 merged.removeAll { session in
-                    let date = session.lastUserActivity ?? session.lastActivity
-                    return !freshIds.contains(session.id) && date >= cutoff
+                    let ms = session.lastUserActivity ?? session.lastActivity
+                    return !freshIds.contains(session.id) && ms >= cutoff
                 }
             }
 
             // Sort by lastUserActivity (or lastActivity) descending
             merged.sort { a, b in
-                let dateA = a.lastUserActivity ?? a.lastActivity
-                let dateB = b.lastUserActivity ?? b.lastActivity
-                return dateA > dateB
+                let msA = a.lastUserActivity ?? a.lastActivity
+                let msB = b.lastUserActivity ?? b.lastActivity
+                return msA > msB
             }
 
             withAnimation(.snappy(duration: 0.35)) {
@@ -522,7 +522,7 @@ private struct SessionRow: View {
             // TimelineView re-renders every 30s so relative timestamps stay current
             // — no manual refresh token needed.
             TimelineView(.periodic(from: .now, by: 30)) { context in
-                Text(shortRelativeTime(session.lastUserActivity ?? session.lastActivity, now: context.date))
+                Text(shortRelativeTime((session.lastUserActivity ?? session.lastActivity).asDate, now: context.date))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .font(.callout)

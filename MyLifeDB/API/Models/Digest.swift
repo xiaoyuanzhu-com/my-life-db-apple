@@ -30,8 +30,8 @@ struct Digest: Codable, Identifiable {
     let sqlarName: String?
     let error: String?
     let attempts: Int
-    let createdAt: String
-    let updatedAt: String
+    let createdAt: Int64
+    let updatedAt: Int64
 
     // MARK: - Computed Properties
 
