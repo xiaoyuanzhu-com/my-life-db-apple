@@ -162,10 +162,19 @@ struct PinnedItem: Codable, Identifiable {
     let cursor: String
 }
 
+/// Per-file result in an upload response
+struct UploadFileResult: Codable {
+    let path: String
+    let status: String  // "created" or "skipped"
+
+    var isSkipped: Bool { status == "skipped" }
+}
+
 /// Response from POST /api/inbox
 struct CreateInboxResponse: Codable {
     let path: String
     let paths: [String]
+    let results: [UploadFileResult]?  // nil for older server versions
 }
 
 /// Response from GET /api/inbox/:id/status

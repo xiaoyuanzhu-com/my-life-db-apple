@@ -33,11 +33,18 @@ enum ShareUploadError: LocalizedError {
 
 // MARK: - Response Model
 
+/// Per-file result in an upload response
+struct ShareUploadFileResult: Codable {
+    let path: String
+    let status: String  // "created" or "skipped"
+}
+
 /// Response from POST /api/inbox
 /// (Matches CreateInboxResponse in InboxItem.swift in the main app)
 struct ShareCreateInboxResponse: Codable {
     let path: String
     let paths: [String]
+    let results: [ShareUploadFileResult]?  // nil for older server versions
 }
 
 // MARK: - API Client
