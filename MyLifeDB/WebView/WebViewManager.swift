@@ -131,6 +131,11 @@ final class TabWebViewModel {
                         // before React's first fetch, bypassing HTTPCookieStorage sync delay
                         await self.injectAuthCookiesViaJS()
 
+                        // Inject real safe area insets as CSS custom properties.
+                        // Must happen before React renders so fullscreen overlays
+                        // can position elements outside the Dynamic Island / notch.
+                        await self.injectSafeAreaInsets()
+
                     case .finished:
                         self.isLoaded = true
                         self.loadError = nil
@@ -243,6 +248,33 @@ final class TabWebViewModel {
         pendingNavigation = nil
         bridgeInjected = false
         webPage.load(URLRequest(url: url))
+    }
+
+    // MARK: - Safe Area Inset Injection
+
+    /// Push the device's real safe area insets to the WebView as CSS custom properties.
+    /// `.ignoresSafeArea()` on the SwiftUI WebView zeroes out the UIView's safeAreaInsets,
+    /// which causes CSS `env(safe-area-inset-*)` to return 0px. This method reads the
+    /// actual insets from the key window and injects them as `--native-sat/sar/sab/sal`
+    /// so web content can use them as a fallback.
+    @MainActor
+    func injectSafeAreaInsets() async {
+        #if os(iOS)
+        guard let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+                ?? UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = scene.keyWindow else { return }
+        let insets = window.safeAreaInsets
+        let js = """
+            (function() {
+                var s = document.documentElement.style;
+                s.setProperty('--native-sat', '\(insets.top)px');
+                s.setProperty('--native-sar', '\(insets.right)px');
+                s.setProperty('--native-sab', '\(insets.bottom)px');
+                s.setProperty('--native-sal', '\(insets.left)px');
+            })();
+            """
+        _ = try? await webPage.callJavaScript(js)
+        #endif
     }
 
     // MARK: - Theme Sync
