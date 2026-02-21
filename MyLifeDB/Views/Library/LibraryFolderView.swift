@@ -51,7 +51,7 @@ struct LibraryFolderView: View {
         }
         .navigationTitle(folderName)
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
             ToolbarItem(placement: .automatic) {
