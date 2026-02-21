@@ -45,6 +45,7 @@ struct InboxInputBar: View {
     @State private var attachments: [InboxFileAttachment] = []
     @State private var isSending = false
     @State private var photoPickerItems: [PhotosPickerItem] = []
+    @State private var showPhotoPicker = false
     @State private var showFileImporter = false
 
     var body: some View {
@@ -82,6 +83,12 @@ struct InboxInputBar: View {
         .onChange(of: photoPickerItems) { _, newItems in
             Task { await handlePhotoPickerSelection(newItems) }
         }
+        .photosPicker(
+            isPresented: $showPhotoPicker,
+            selection: $photoPickerItems,
+            maxSelectionCount: 10,
+            matching: .any(of: [.images, .videos])
+        )
         .fileImporter(
             isPresented: $showFileImporter,
             allowedContentTypes: [.data],
@@ -146,11 +153,9 @@ struct InboxInputBar: View {
 
     private var attachButton: some View {
         Menu {
-            PhotosPicker(
-                selection: $photoPickerItems,
-                maxSelectionCount: 10,
-                matching: .any(of: [.images, .videos])
-            ) {
+            Button {
+                showPhotoPicker = true
+            } label: {
                 Label("Photo Library", systemImage: "photo.on.rectangle")
             }
 
