@@ -105,19 +105,17 @@ struct InboxInputBar: View {
 
             Spacer()
 
-            // Right: send button
-            if canSend {
-                Button {
-                    send()
-                } label: {
-                    Text("Send")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-                .disabled(isSending)
+            // Right: send button (always visible, disabled when empty)
+            Button {
+                send()
+            } label: {
+                Text("Send")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
             }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .disabled(!canSend || isSending)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
