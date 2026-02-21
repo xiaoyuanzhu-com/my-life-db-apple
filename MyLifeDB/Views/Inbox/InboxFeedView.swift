@@ -8,6 +8,10 @@
 //  newest items are visible first, and older items load
 //  at the top as the user scrolls up.
 //
+//  Uses .defaultScrollAnchor(.bottom, for: .sizeChanges)
+//  to stay anchored at the bottom when content height grows
+//  (e.g. async image loading expanding placeholders).
+//
 
 import SwiftUI
 
@@ -92,6 +96,7 @@ struct InboxFeedView: View {
         }
         .scrollPosition($scrollPosition)
         .defaultScrollAnchor(.bottom)
+        .defaultScrollAnchor(.bottom, for: .sizeChanges)
         .onScrollGeometryChange(for: Bool.self) { geometry in
             let maxOffset = geometry.contentSize.height - geometry.containerSize.height
             return maxOffset > 0 && geometry.contentOffset.y < 1000
