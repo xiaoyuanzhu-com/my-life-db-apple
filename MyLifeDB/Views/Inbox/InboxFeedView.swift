@@ -36,6 +36,11 @@ struct InboxFeedView: View {
     let onLoadMoreForPreview: () async -> [PreviewItem]
 
     @State private var scrollPosition = ScrollPosition(idType: String.self)
+    /// Gates pagination until the initial scroll settles at the bottom.
+    /// Without this, the sentinel onAppear and onScrollGeometryChange fire
+    /// before .defaultScrollAnchor(.bottom) takes effect, eagerly loading
+    /// older pages and breaking the initial scroll position.
+    @State private var paginationEnabled = false
 
     private let newestAnchorID = "feed-newest"
 
@@ -89,6 +94,9 @@ struct InboxFeedView: View {
                     Color.clear
                         .frame(height: 1)
                         .id(newestAnchorID)
+                        .onAppear {
+                            paginationEnabled = true
+                        }
                 }
             }
             .padding(.horizontal, 16)
@@ -101,7 +109,7 @@ struct InboxFeedView: View {
             let maxOffset = geometry.contentSize.height - geometry.containerSize.height
             return maxOffset > 0 && geometry.contentOffset.y < 1000
         } action: { _, isNearOlderEnd in
-            if isNearOlderEnd && hasOlderItems && !isLoadingMore {
+            if paginationEnabled && isNearOlderEnd && hasOlderItems && !isLoadingMore {
                 onLoadMore()
             }
         }
@@ -124,7 +132,9 @@ struct InboxFeedView: View {
         }
         .frame(maxWidth: .infinity, minHeight: 1)
         .onAppear {
-            onLoadMore()
+            if paginationEnabled {
+                onLoadMore()
+            }
         }
     }
 
