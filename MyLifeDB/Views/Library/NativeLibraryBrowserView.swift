@@ -53,7 +53,8 @@ struct NativeLibraryBrowserView: View {
             LibraryFolderView(
                 folderPath: "",
                 folderName: "Library",
-                viewMode: $viewMode
+                viewMode: $viewMode,
+                navigationPath: $navigationPath
             )
             .navigationDestination(for: LibraryDestination.self) { destination in
                 switch destination {
@@ -61,7 +62,8 @@ struct NativeLibraryBrowserView: View {
                     LibraryFolderView(
                         folderPath: path,
                         folderName: name,
-                        viewMode: $viewMode
+                        viewMode: $viewMode,
+                        navigationPath: $navigationPath
                     )
                 case .file:
                     EmptyView()

@@ -11,11 +11,24 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - Ancestor Folder
+
+/// A folder in the breadcrumb hierarchy, used by the toolbar title menu.
+struct AncestorFolder: Identifiable {
+    let id = UUID()
+    let name: String   // Display name ("january", "2024", "Library")
+    let path: String   // Full relative path ("photos/2024", "photos", "")
+    let depth: Int     // Depth in the navigation stack (0 = root)
+}
+
+// MARK: - LibraryFolderView
+
 struct LibraryFolderView: View {
 
     let folderPath: String
     let folderName: String
     @Binding var viewMode: LibraryViewMode
+    @Binding var navigationPath: NavigationPath
 
     @State private var children: [FileTreeNode] = []
     @State private var isLoading = false
@@ -53,6 +66,17 @@ struct LibraryFolderView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .toolbarTitleMenu {
+            if !folderPath.isEmpty {
+                ForEach(ancestorFolders) { ancestor in
+                    Button {
+                        navigateToAncestor(ancestor)
+                    } label: {
+                        Label(ancestor.name, systemImage: ancestor.depth == 0 ? "books.vertical" : "folder")
+                    }
+                }
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 HStack(spacing: 4) {
@@ -287,6 +311,42 @@ struct LibraryFolderView: View {
         } catch {
             uploadError = "Failed to create folder: \(error.localizedDescription)"
             showUploadError = true
+        }
+    }
+
+    // MARK: - Folder Hierarchy Navigation
+
+    /// Builds the ancestor chain from the immediate parent up to the root.
+    /// Example: "photos/2024/january" →
+    ///   [("2024", "photos/2024", 2), ("photos", "photos", 1), ("Library", "", 0)]
+    private var ancestorFolders: [AncestorFolder] {
+        guard !folderPath.isEmpty else { return [] }
+
+        let components = folderPath.split(separator: "/").map(String.init)
+        var ancestors: [AncestorFolder] = []
+
+        // Walk from the immediate parent down to the root
+        for depth in stride(from: components.count - 1, through: 1, by: -1) {
+            let path = components[0..<depth].joined(separator: "/")
+            ancestors.append(AncestorFolder(name: components[depth - 1], path: path, depth: depth))
+        }
+
+        // Root ("Library")
+        ancestors.append(AncestorFolder(name: "Library", path: "", depth: 0))
+
+        return ancestors
+    }
+
+    /// Navigate to an ancestor by popping the navigation stack to the correct depth.
+    private func navigateToAncestor(_ ancestor: AncestorFolder) {
+        let currentDepth = folderPath.split(separator: "/").count
+        let popCount = currentDepth - ancestor.depth
+        guard popCount > 0 else { return }
+
+        if ancestor.depth == 0 {
+            navigationPath = NavigationPath()
+        } else {
+            navigationPath.removeLast(popCount)
         }
     }
 }
