@@ -79,34 +79,31 @@ struct LibraryFolderView: View {
         }
         .toolbar {
             ToolbarItem(placement: .automatic) {
-                HStack(spacing: 4) {
-                    // Upload button
+                Menu {
                     Button {
                         showFilePicker = true
                     } label: {
-                        Image(systemName: "arrow.up.doc")
+                        Label("Upload Files", systemImage: "arrow.up.doc")
                     }
-                    .accessibilityLabel("Upload files")
                     .disabled(isUploading)
 
-                    // New folder button
                     Button {
                         newFolderName = ""
                         showNewFolderDialog = true
                     } label: {
-                        Image(systemName: "folder.badge.plus")
+                        Label("New Folder", systemImage: "folder.badge.plus")
                     }
-                    .accessibilityLabel("New folder")
 
-                    // View mode toggle
-                    Button {
-                        withAnimation {
-                            viewMode = viewMode == .grid ? .list : .grid
-                        }
-                    } label: {
-                        Image(systemName: viewMode == .grid ? "list.bullet" : "square.grid.2x2")
+                    Divider()
+
+                    Picker("View Mode", selection: $viewMode) {
+                        Label("Grid", systemImage: "square.grid.2x2")
+                            .tag(LibraryViewMode.grid)
+                        Label("List", systemImage: "list.bullet")
+                            .tag(LibraryViewMode.list)
                     }
-                    .accessibilityLabel(viewMode == .grid ? "Switch to list view" : "Switch to grid view")
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
         }
