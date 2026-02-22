@@ -171,7 +171,7 @@ struct FileTreeNode: Codable, Identifiable, Hashable {
 
     /// SF Symbol name based on file extension (tree response has no mimeType)
     var systemImage: String {
-        if isFolder { return "folder.fill" }
+        if isFolder { return "folder" }
         guard let ext = fileExtension else { return "doc" }
         switch ext {
         case "jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "svg", "tiff", "bmp", "ico":

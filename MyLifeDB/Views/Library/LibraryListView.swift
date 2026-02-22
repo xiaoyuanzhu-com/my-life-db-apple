@@ -93,23 +93,6 @@ struct LibraryListRow: View {
     // MARK: - Icon Color
 
     private var iconColor: Color {
-        if node.isFolder { return .blue }
-        guard let ext = node.fileExtension else { return .gray }
-        switch ext {
-        case "jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "svg", "tiff", "bmp":
-            return .green
-        case "mp4", "mov", "avi", "mkv", "webm", "m4v":
-            return .purple
-        case "mp3", "wav", "m4a", "aac", "ogg", "flac":
-            return .pink
-        case "pdf":
-            return .red
-        case "md", "txt":
-            return .orange
-        case "swift", "go", "py", "js", "ts", "tsx", "jsx", "html", "css":
-            return .indigo
-        default:
-            return .gray
-        }
+        node.isFolder ? .blue : .secondary
     }
 }
