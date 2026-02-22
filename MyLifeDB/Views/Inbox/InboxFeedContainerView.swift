@@ -10,6 +10,13 @@ import SwiftUI
 
 struct InboxFeedContainerView: View {
 
+    // MARK: - Constants
+
+    /// Maximum number of items to keep in memory. When pagination pushes
+    /// the array past this limit, the oldest items (at the end) are trimmed.
+    /// This prevents unbounded memory growth during long scrolling sessions.
+    private static let maxItemCount = 500
+
     // MARK: - State
 
     @State private var items: [InboxItem] = []
@@ -315,6 +322,7 @@ struct InboxFeedContainerView: View {
         do {
             let response = try await APIClient.shared.inbox.fetchOlder(cursor: lastCursor)
             items.append(contentsOf: response.items)
+            trimItemsIfNeeded()
             cursors = response.cursors
             hasMore = response.hasMore
         } catch {
@@ -332,6 +340,7 @@ struct InboxFeedContainerView: View {
         do {
             let response = try await APIClient.shared.inbox.fetchOlder(cursor: lastCursor)
             items.append(contentsOf: response.items)
+            trimItemsIfNeeded()
             cursors = response.cursors
             hasMore = response.hasMore
 
@@ -341,6 +350,18 @@ struct InboxFeedContainerView: View {
         } catch {
             print("[Inbox] Failed to load more for preview: \(error)")
             return []
+        }
+    }
+
+    // MARK: - Item Trimming
+
+    /// Drops the oldest items (at the end of the array, i.e. furthest from
+    /// the newest/bottom) when the array exceeds `maxItemCount`. This keeps
+    /// memory bounded during long scroll-back sessions while preserving the
+    /// most recent items the user is actively viewing.
+    private func trimItemsIfNeeded() {
+        if items.count > Self.maxItemCount {
+            items = Array(items.prefix(Self.maxItemCount))
         }
     }
 

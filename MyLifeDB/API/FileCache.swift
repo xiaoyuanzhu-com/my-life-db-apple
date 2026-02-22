@@ -51,13 +51,18 @@ final class FileCache: @unchecked Sendable {
         config.timeoutIntervalForRequest = 30
         self.session = URLSession(configuration: config)
 
-        // Raw data cache: 100 items, 80MB
-        dataCache.countLimit = 100
-        dataCache.totalCostLimit = 80 * 1024 * 1024
+        // Raw data cache: 80 items, 50MB
+        // Stores compressed file bytes. Images are evicted from here once
+        // decoded into imageCache, so this mainly holds non-image files and
+        // images that haven't been decoded yet.
+        dataCache.countLimit = 80
+        dataCache.totalCostLimit = 50 * 1024 * 1024
 
-        // Decoded image cache: 150 items, 60MB
-        imageCache.countLimit = 150
-        imageCache.totalCostLimit = 60 * 1024 * 1024
+        // Decoded image cache: 30 items, 120MB
+        // Cost is the actual decoded bitmap size (width × height × 4 bytes),
+        // NOT the compressed file size. 120MB ≈ 2–3 full-resolution photos.
+        imageCache.countLimit = 30
+        imageCache.totalCostLimit = 120 * 1024 * 1024
 
         // Disk cache directory
         let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
@@ -118,10 +123,39 @@ final class FileCache: @unchecked Sendable {
             throw FileCacheError.decodingFailed
         }
 
-        // 3. Store decoded image in memory cache
-        imageCache.setObject(image, forKey: key, cost: data.count)
+        // 3. Store decoded image using actual bitmap cost, not compressed size.
+        // A decoded image occupies width × height × bytesPerPixel in memory,
+        // which can be 10–50× larger than the compressed JPEG/PNG data.
+        let bitmapCost = Self.decodedByteCount(of: image, compressedSize: data.count)
+        imageCache.setObject(image, forKey: key, cost: bitmapCost)
+
+        // 4. Evict the compressed data from dataCache — no need to keep both
+        // the raw bytes and the decoded bitmap in memory simultaneously.
+        // The raw data is still on disk and will be re-read if needed.
+        dataCache.removeObject(forKey: key)
 
         return image
+    }
+
+    // MARK: - Bitmap Cost Estimation
+
+    /// Returns the estimated in-memory byte count of a decoded image.
+    /// Falls back to 4× compressed size if pixel dimensions aren't available.
+    private static func decodedByteCount(of image: Image, compressedSize: Int) -> Int {
+        #if os(iOS) || os(visionOS)
+        let w = Int(image.size.width * image.scale)
+        let h = Int(image.size.height * image.scale)
+        #elseif os(macOS)
+        guard let rep = image.representations.first else {
+            return max(compressedSize * 4, 1)
+        }
+        let w = rep.pixelsWide
+        let h = rep.pixelsHigh
+        #endif
+        let bytesPerPixel = 4 // RGBA
+        let estimated = w * h * bytesPerPixel
+        // Guard against zero (e.g. vector/PDF images with no pixel backing)
+        return estimated > 0 ? estimated : max(compressedSize * 4, 1)
     }
 
     // MARK: - Private: Disk Cache
