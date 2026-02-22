@@ -95,7 +95,11 @@ struct InboxFeedView: View {
                         .frame(height: 1)
                         .id(newestAnchorID)
                         .onAppear {
-                            paginationEnabled = true
+                            if !paginationEnabled {
+                                paginationEnabled = true
+                                // Correct any scroll overshoot from LazyVStack height estimation
+                                scrollPosition.scrollTo(id: newestAnchorID, anchor: .bottom)
+                            }
                         }
                 }
             }
