@@ -39,7 +39,7 @@ struct LibraryAPI {
     ///   - path: Directory path to list (empty string for root).
     ///   - depth: Recursion depth (1 = direct children only, 0 = unlimited).
     /// - Returns: FileTreeResponse with basePath, path, and children.
-    func getTree(path: String = "", depth: Int = 1) async throws -> FileTreeResponse {
+    func getTree(path: String = "", depth: Int = 1, ignoreCache: Bool = false) async throws -> FileTreeResponse {
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "depth", value: String(depth))
         ]
@@ -48,7 +48,8 @@ struct LibraryAPI {
         }
         return try await client.request(
             path: "/api/library/tree",
-            queryItems: queryItems
+            queryItems: queryItems,
+            ignoreCache: ignoreCache
         )
     }
 

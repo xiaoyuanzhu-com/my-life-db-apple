@@ -135,7 +135,7 @@ struct LibraryFolderView: View {
             }
         }
         .refreshable {
-            await loadChildren()
+            await loadChildren(ignoreCache: true)
         }
     }
 
@@ -221,12 +221,12 @@ struct LibraryFolderView: View {
 
     // MARK: - Data Fetching
 
-    private func loadChildren() async {
+    private func loadChildren(ignoreCache: Bool = false) async {
         isLoading = true
         error = nil
 
         do {
-            let response = try await APIClient.shared.library.getTree(path: folderPath, depth: 1)
+            let response = try await APIClient.shared.library.getTree(path: folderPath, depth: 1, ignoreCache: ignoreCache)
             children = response.children
         } catch {
             self.error = error
