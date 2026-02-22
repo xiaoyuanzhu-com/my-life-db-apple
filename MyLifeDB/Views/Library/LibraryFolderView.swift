@@ -103,7 +103,7 @@ struct LibraryFolderView: View {
                             .tag(LibraryViewMode.list)
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Image(systemName: "ellipsis")
                 }
             }
         }
