@@ -37,6 +37,7 @@ struct TextFileView: View {
                 )
             }
         }
+        .background(Color.platformBackground)
         .task {
             await loadContent()
         }

@@ -16,6 +16,7 @@ struct GenericFileInfoView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
+
                 Spacer()
                     .frame(height: 40)
 
@@ -55,6 +56,7 @@ struct GenericFileInfoView: View {
                 Spacer()
             }
         }
+        .background(Color.platformBackground)
     }
 
     // MARK: - Helpers

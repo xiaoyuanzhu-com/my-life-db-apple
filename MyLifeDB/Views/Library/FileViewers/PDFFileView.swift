@@ -33,6 +33,7 @@ struct PDFFileView: View {
                 )
             }
         }
+        .background(Color.platformBackground)
         .task {
             await loadPDF()
         }

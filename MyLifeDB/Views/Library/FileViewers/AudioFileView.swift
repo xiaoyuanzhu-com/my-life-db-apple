@@ -46,6 +46,7 @@ struct AudioFileView: View {
         .onAppear {
             setupPlayer()
         }
+        .background(Color.platformBackground)
         .onDisappear {
             player?.pause()
             player = nil
