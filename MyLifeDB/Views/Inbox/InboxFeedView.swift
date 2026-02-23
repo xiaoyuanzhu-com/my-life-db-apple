@@ -34,6 +34,7 @@ struct InboxFeedView: View {
     let onPinnedTap: (PinnedItem) -> Void
     let onPinnedUnpin: (PinnedItem) -> Void
     let onLoadMoreForPreview: () async -> [PreviewItem]
+    let onRefresh: () async -> Void
 
     @State private var scrollPosition = ScrollPosition(idType: String.self)
     /// Gates pagination until the initial scroll settles at the bottom.
@@ -41,6 +42,7 @@ struct InboxFeedView: View {
     /// before .defaultScrollAnchor(.bottom) takes effect, eagerly loading
     /// older pages and breaking the initial scroll position.
     @State private var paginationEnabled = false
+    @State private var isRefreshingFromBottom = false
 
     private let newestAnchorID = "feed-newest"
 
@@ -102,6 +104,13 @@ struct InboxFeedView: View {
                             }
                         }
                 }
+
+                // Bottom refresh indicator (pull-up-to-refresh)
+                if isRefreshingFromBottom {
+                    ProgressView()
+                        .padding(.vertical, 16)
+                        .frame(maxWidth: .infinity)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -115,6 +124,21 @@ struct InboxFeedView: View {
         } action: { _, isNearOlderEnd in
             if paginationEnabled && isNearOlderEnd && hasOlderItems && !isLoadingMore {
                 onLoadMore()
+            }
+        }
+        // Pull-up-to-refresh: detect overscroll past the bottom edge
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            let visibleBottom = geometry.contentOffset.y + geometry.containerSize.height
+            let overscroll = visibleBottom - geometry.contentSize.height
+            return max(0, overscroll)
+        } action: { _, overscroll in
+            let threshold: CGFloat = 60
+            if overscroll > threshold && !isRefreshingFromBottom {
+                isRefreshingFromBottom = true
+                Task {
+                    await onRefresh()
+                    isRefreshingFromBottom = false
+                }
             }
         }
         .onChange(of: scrollToBottomTrigger) { _, _ in

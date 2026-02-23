@@ -160,7 +160,8 @@ struct InboxFeedContainerView: View {
             onPinnedUnpin: { pinnedItem in
                 Task { await unpinItem(pinnedItem) }
             },
-            onLoadMoreForPreview: { await loadOlderMediaItemsForPreview() }
+            onLoadMoreForPreview: { await loadOlderMediaItemsForPreview() },
+            onRefresh: { await refresh() }
         )
         .refreshable {
             await refresh()
@@ -244,7 +245,8 @@ struct InboxFeedContainerView: View {
 
     private func refreshItems() async {
         do {
-            let response = try await APIClient.shared.inbox.list()
+            // ignoreCache: SSE signals server data has changed, so cached responses are stale
+            let response = try await APIClient.shared.inbox.list(ignoreCache: true)
             withAnimation(.easeOut(duration: 0.35)) {
                 items = response.items
             }

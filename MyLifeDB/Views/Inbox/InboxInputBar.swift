@@ -47,6 +47,7 @@ struct InboxInputBar: View {
     @State private var photoPickerItems: [PhotosPickerItem] = []
     @State private var showPhotoPicker = false
     @State private var showFileImporter = false
+    @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -55,6 +56,7 @@ struct InboxInputBar: View {
                 // Textarea
                 TextField("What's up?", text: $text, axis: .vertical)
                     .textFieldStyle(.plain)
+                    .focused($isTextFieldFocused)
                     .lineLimit(1...6)
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
@@ -262,10 +264,20 @@ struct InboxInputBar: View {
         isSending = true
         onSend(trimmedText, attachments)
 
+        // Dismiss focus first so the UIKit backing text view syncs the clear.
+        // Without this, TextField(axis: .vertical) on iOS may retain the old text
+        // even after @State is set to "".
+        isTextFieldFocused = false
         text = ""
         attachments = []
         photoPickerItems = []
         isSending = false
+
+        // Restore keyboard focus on the next run loop so the user can
+        // immediately type a follow-up message.
+        DispatchQueue.main.async {
+            isTextFieldFocused = true
+        }
     }
 
     // MARK: - File Handling
