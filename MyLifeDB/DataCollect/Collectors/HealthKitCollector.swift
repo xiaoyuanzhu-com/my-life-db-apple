@@ -140,8 +140,7 @@ final class HealthKitCollector: DataCollector {
         case "respiratory_rate":  return [HKQuantityType(.respiratoryRate)]
         case "vo2max":            return [HKQuantityType(.vo2Max)]
         case "body_weight":       return [HKQuantityType(.bodyMass)]
-        case "walking_steadiness": return [HKQuantityType(.appleSleepingWristTemperature)]
-            // Note: walkingSteadiness requires a dedicated API, using temperature as placeholder
+        case "walking_steadiness": return [HKQuantityType(.appleWalkingSteadiness)]
 
         // Sleep — all map to the same HK type
         case "sleep_duration", "sleep_stages", "bedtime", "sleep_consistency":
@@ -199,6 +198,7 @@ final class HealthKitCollector: DataCollector {
         case .dietaryCaffeine:               return .gramUnit(with: .milli)
         case .dietaryEnergyConsumed:         return .kilocalorie()
         case .appleSleepingWristTemperature: return .degreeCelsius()
+        case .appleWalkingSteadiness:        return .percent()
         default:                             return .count()
         }
     }
