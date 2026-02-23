@@ -65,6 +65,12 @@ final class TabWebViewModel {
     /// the old task from keeping `self` alive via the async `for await` loop.
     private var navigationTask: Task<Void, Never>?
 
+    /// Tracks the last process-termination time to avoid a crash→reload spiral
+    /// under memory pressure.  If the process crashes again within this window,
+    /// we skip the automatic reload.
+    private var lastProcessTermination: Date?
+    private static let processTerminationCooldown: TimeInterval = 10
+
     // MARK: - Bridge
 
     let bridgeHandler = NativeBridgeHandler()
@@ -76,6 +82,10 @@ final class TabWebViewModel {
         self.featureFlags = featureFlags
         let config = WebViewConfiguration.create(bridgeHandler: bridgeHandler)
         self.webPage = WebPage(configuration: config)
+    }
+
+    deinit {
+        navigationTask?.cancel()
     }
 
     // MARK: - Setup
@@ -169,7 +179,18 @@ final class TabWebViewModel {
                     self.loadError = underlying
                     print("[TabWebViewModel:\(self.route)] Provisional navigation failed: \(underlying.localizedDescription)")
                 case .webContentProcessTerminated:
+                    // Debounce: if the process was terminated very recently,
+                    // skip the reload to avoid a crash→reload→crash spiral
+                    // that exhausts memory under pressure.
+                    if let last = self.lastProcessTermination,
+                       Date().timeIntervalSince(last) < Self.processTerminationCooldown {
+                        print("[TabWebViewModel:\(self.route)] WebView process terminated again within \(Self.processTerminationCooldown)s, skipping auto-reload")
+                        self.isLoaded = false
+                        self.bridgeInjected = false
+                        break
+                    }
                     print("[TabWebViewModel:\(self.route)] WebView process terminated, reloading...")
+                    self.lastProcessTermination = Date()
                     self.isLoaded = false
                     self.bridgeInjected = false
                     // Re-inject cookies via store before reload (JS not available after crash)
@@ -364,6 +385,17 @@ final class TabWebViewModel {
         guard baseURL != nil else { return }
         await injectAuthCookiesViaJS()
         _ = try? await webPage.callJavaScript("window.__nativeRecheckAuth?.()")
+    }
+
+    // MARK: - Cleanup
+
+    /// Cancel the navigation observation task.
+    /// Call this when the hosting view disappears to release resources
+    /// promptly instead of waiting for `deinit`.
+    @MainActor
+    func cancelObservation() {
+        navigationTask?.cancel()
+        navigationTask = nil
     }
 
     // MARK: - Reload

@@ -21,12 +21,21 @@ struct FilePreviewPagerView: View {
 
     let onDismiss: () -> Void
 
+    /// Maximum number of items to keep in the pager. When loading older
+    /// items pushes the array past this limit, the newest items (at the
+    /// end, i.e. rightmost) are trimmed. This keeps memory bounded while
+    /// preserving the older items the user is actively swiping toward.
+    private static let maxItemCount = 100
+
     // Items in chronological order (oldest first / leftmost).
     // Reversed from the feed's newest-first order.
     @State private var items: [PreviewItem]
     @State private var currentID: String?
     @State private var isLoadingMore = false
     @State private var hasMoreOlder: Bool
+    /// Active prefetch tasks — limited to avoid spawning unbounded concurrent requests.
+    @State private var activePrefetchTasks = 0
+    private static let maxConcurrentPrefetch = 2
 
     private let loadMore: () async -> [PreviewItem]
 
@@ -93,16 +102,22 @@ struct FilePreviewPagerView: View {
     /// Prefetch adjacent items so swiping feels instant.
     /// - Images: warm raw data into FileCache
     /// - All items without a FileRecord: fetch metadata so FileViewerView skips its own fetch
+    ///
+    /// Throttled to at most `maxConcurrentPrefetch` in-flight requests to
+    /// avoid spawning unbounded concurrent tasks during rapid scrolling.
     private func prefetchAdjacentItems(around id: String) {
         guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
         for delta in [-1, 1] {
             let adjacent = idx + delta
             guard adjacent >= 0 && adjacent < items.count else { continue }
             let item = items[adjacent]
+            guard activePrefetchTasks < Self.maxConcurrentPrefetch else { return }
 
             // Prefetch file metadata if missing (eliminates a network roundtrip on swipe)
             if item.file == nil {
+                activePrefetchTasks += 1
                 Task {
+                    defer { activePrefetchTasks -= 1 }
                     guard let response = try? await APIClient.shared.library.getFileInfo(path: item.path) else { return }
                     if let i = items.firstIndex(where: { $0.id == item.id }) {
                         items[i].file = response.file
@@ -112,8 +127,12 @@ struct FilePreviewPagerView: View {
 
             // Prefetch raw image data into FileCache
             if item.isLikelyImage {
+                activePrefetchTasks += 1
                 let url = APIClient.shared.rawFileURL(path: item.path)
-                Task { _ = try? await FileCache.shared.data(for: url) }
+                Task {
+                    defer { activePrefetchTasks -= 1 }
+                    _ = try? await FileCache.shared.data(for: url)
+                }
             }
         }
     }
@@ -125,6 +144,13 @@ struct FilePreviewPagerView: View {
             // Prepend to the start (left / older side).
             // New items arrive newest-first from the API, reverse to oldest-first.
             items.insert(contentsOf: newItems.reversed(), at: 0)
+
+            // Trim the newest (rightmost) items if we've exceeded the cap.
+            // The user is scrolling left toward older items, so the right
+            // end is least relevant.
+            if items.count > Self.maxItemCount {
+                items = Array(items.prefix(Self.maxItemCount))
+            }
         } else {
             hasMoreOlder = false
         }

@@ -77,6 +77,10 @@ struct InboxFeedContainerView: View {
             setupSSE()
         }
         .onDisappear {
+            searchTask?.cancel()
+            searchTask = nil
+            sseManager.onInboxChanged = nil
+            sseManager.onPinChanged = nil
             sseManager.stop()
         }
     }
@@ -470,6 +474,11 @@ struct InboxFeedContainerView: View {
                        current.status == .queued {
                         await uploadPendingItem(current)
                     }
+                } else {
+                    // All retries exhausted — release file data to free memory.
+                    // Keep the pending item visible so the user can manually retry,
+                    // but drop the large binary payloads.
+                    pendingItems[index].files = []
                 }
             }
         }

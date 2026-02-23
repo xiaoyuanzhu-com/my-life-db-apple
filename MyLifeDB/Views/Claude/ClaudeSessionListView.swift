@@ -497,7 +497,9 @@ private struct NewClaudeSessionView: View {
         .onReceive(NotificationCenter.default.publisher(for: .authTokensDidChange)) { _ in
             Task { await webVM.pushAuthCookiesAndRecheck() }
         }
-        .onDisappear { }
+        .onDisappear {
+            webVM.cancelObservation()
+        }
     }
 }
 

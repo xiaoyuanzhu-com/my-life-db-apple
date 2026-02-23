@@ -13,7 +13,7 @@ import SwiftUI
 struct PendingInboxItem: Identifiable {
     let id: String
     let text: String
-    let files: [InboxFileAttachment]
+    var files: [InboxFileAttachment]
     var status: PendingStatus
     var error: String?
     var retryAt: Date?
