@@ -8,6 +8,7 @@
 
 import Foundation
 import HealthKit
+import CoreLocation
 #if os(iOS)
 import UIKit
 #endif
@@ -36,7 +37,7 @@ final class HealthKitCollector: DataCollector {
         // Sleep
         "sleep_duration", "sleep_stages", "bedtime", "sleep_consistency",
         // Fitness
-        "workouts", "running", "swimming", "cycling",
+        "workouts", "running", "swimming", "cycling", "workout_routes",
         // Nutrition
         "water", "caffeine", "calories_in",
         // Audio & environment
@@ -267,6 +268,7 @@ final class HealthKitCollector: DataCollector {
         // Fitness
         case "workouts", "swimming", "cycling":
             return [HKWorkoutType.workoutType()]
+        case "workout_routes": return [HKSeriesType.workoutRoute()]
         case "running":
             // Workouts + running-specific biomechanics (Apple Watch, iOS 16+)
             return [
@@ -465,55 +467,61 @@ final class HealthKitCollector: DataCollector {
             samplesCollected: allRawSamples.count
         )
 
-        guard !allRawSamples.isEmpty else {
-            return CollectionResult(batches: [], stats: stats)
-        }
-
-        // Group samples by startDate's calendar day
-        let calendar = Calendar.current
-        let grouped = Dictionary(grouping: allRawSamples) { sample -> String in
-            let components = calendar.dateComponents([.year, .month, .day], from: sample.start)
-            return String(format: "%04d-%02d-%02d",
-                          components.year!, components.month!, components.day!)
-        }
-
-        // Build DaySamples for each day
-        let syncTimestamp = ISO8601DateFormatter().string(from: Date())
-            .replacingOccurrences(of: ":", with: "-")
-        let deviceInfo = currentDeviceInfo()
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.sortedKeys]
-
         var batches: [DaySamples] = []
 
-        for (dayString, samples) in grouped.sorted(by: { $0.key < $1.key }) {
-            let sorted = samples.sorted { $0.start < $1.start }
-
-            let payload = SyncFilePayload(
-                syncedAt: Date(),
-                deviceInfo: deviceInfo,
-                samples: sorted
-            )
-
-            guard let jsonData = try? encoder.encode(payload) else {
-                continue
+        if !allRawSamples.isEmpty {
+            // Group samples by startDate's calendar day
+            let calendar = Calendar.current
+            let grouped = Dictionary(grouping: allRawSamples) { sample -> String in
+                let components = calendar.dateComponents([.year, .month, .day], from: sample.start)
+                return String(format: "%04d-%02d-%02d",
+                              components.year!, components.month!, components.day!)
             }
 
-            // Path: imports/fitness/apple-health/YYYY/MM/DD/sample-<timestamp>.json
-            let pathComponents = dayString.split(separator: "-")
-            guard pathComponents.count == 3 else { continue }
-            let uploadPath = "imports/fitness/apple-health/\(pathComponents[0])/\(pathComponents[1])/\(pathComponents[2])/sample-\(syncTimestamp).json"
+            // Build DaySamples for each day
+            let syncTimestamp = ISO8601DateFormatter().string(from: Date())
+                .replacingOccurrences(of: ":", with: "-")
+            let deviceInfo = currentDeviceInfo()
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            encoder.outputFormatting = [.sortedKeys]
 
-            let dayDate = dayDateFormatter.date(from: dayString) ?? Date()
+            for (dayString, samples) in grouped.sorted(by: { $0.key < $1.key }) {
+                let sorted = samples.sorted { $0.start < $1.start }
 
-            batches.append(DaySamples(
-                date: dayDate,
-                collectorID: id,
-                uploadPath: uploadPath,
-                data: jsonData,
-                anchorToken: sorted.last?.end ?? sorted.last?.start
-            ))
+                let payload = SyncFilePayload(
+                    syncedAt: Date(),
+                    deviceInfo: deviceInfo,
+                    samples: sorted
+                )
+
+                guard let jsonData = try? encoder.encode(payload) else {
+                    continue
+                }
+
+                // Path: imports/fitness/apple-health/YYYY/MM/DD/sample-<timestamp>.json
+                let pathComponents = dayString.split(separator: "-")
+                guard pathComponents.count == 3 else { continue }
+                let uploadPath = "imports/fitness/apple-health/\(pathComponents[0])/\(pathComponents[1])/\(pathComponents[2])/sample-\(syncTimestamp).json"
+
+                let dayDate = dayDateFormatter.date(from: dayString) ?? Date()
+
+                batches.append(DaySamples(
+                    date: dayDate,
+                    collectorID: id,
+                    uploadPath: uploadPath,
+                    data: jsonData,
+                    anchorToken: sorted.last?.end ?? sorted.last?.start
+                ))
+            }
+        }
+
+        // Also collect workouts (separate files, separate anchor)
+        if !allHKTypes(for: enabled).filter({ $0 is HKWorkoutType }).isEmpty {
+            let workoutStart = loadWorkoutAnchorDate()
+                ?? Calendar.current.date(byAdding: .day, value: -initialLookbackDays, to: Date())!
+            let workoutBatches = (try? await collectWorkouts(since: workoutStart)) ?? []
+            batches.append(contentsOf: workoutBatches)
         }
 
         return CollectionResult(batches: batches, stats: stats)
@@ -521,8 +529,152 @@ final class HealthKitCollector: DataCollector {
 
     func commitAnchor(for batch: DaySamples) async {
         if let date = batch.anchorToken as? Date {
-            saveAnchorDate(date)
+            if batch.uploadPath.contains("/workout-") {
+                saveWorkoutAnchorDate(date)
+            } else {
+                saveAnchorDate(date)
+            }
         }
+    }
+
+    // MARK: - Workout Collection
+
+    /// Queries workouts since `startDate`, fetches their GPS routes,
+    /// and returns DaySamples with workout-<UUID>.json upload paths.
+    func collectWorkouts(since startDate: Date) async throws -> [DaySamples] {
+        let predicate = HKQuery.predicateForSamples(
+            withStart: startDate, end: Date(), options: .strictStartDate
+        )
+
+        let workouts = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<[HKSample], Error>) in
+            let q = HKSampleQuery(
+                sampleType: HKWorkoutType.workoutType(),
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+            ) { _, results, error in
+                if let error { cont.resume(throwing: error) }
+                else { cont.resume(returning: results ?? []) }
+            }
+            store.execute(q)
+        }
+
+        var batches: [DaySamples] = []
+        let deviceInfo = currentDeviceInfo()
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.sortedKeys]
+        let calendar = Calendar.current
+
+        for sample in workouts {
+            guard let workout = sample as? HKWorkout else { continue }
+
+            let uuid = workout.uuid.uuidString
+            let activityType = workoutActivityTypeName(for: workout.workoutActivityType.rawValue)
+
+            // Build stats dict
+            var stats: [String: StatValue] = [:]
+            if let energy = workout.statistics(for: HKQuantityType(.activeEnergyBurned))?.sumQuantity() {
+                stats["active_energy_burned"] = StatValue(value: energy.doubleValue(for: .kilocalorie()), unit: "kcal")
+            }
+            if let dist = workout.statistics(for: HKQuantityType(.distanceWalkingRunning))?.sumQuantity() {
+                stats["distance"] = StatValue(value: dist.doubleValue(for: .meter()), unit: "m")
+            }
+            if let strokes = workout.statistics(for: HKQuantityType(.swimmingStrokeCount))?.sumQuantity() {
+                stats["swimming_stroke_count"] = StatValue(value: strokes.doubleValue(for: .count()), unit: "count")
+            }
+
+            // Fetch GPS route (nil for indoor workouts)
+            let route = try? await fetchRoute(for: workout)
+
+            let workoutFile = WorkoutFile(
+                uuid: uuid,
+                activityType: activityType,
+                start: workout.startDate,
+                end: workout.endDate,
+                durationS: workout.duration,
+                source: workout.sourceRevision.source.bundleIdentifier,
+                device: workout.sourceRevision.productType ?? workout.device?.name,
+                syncedAt: Date(),
+                deviceInfo: deviceInfo,
+                stats: stats,
+                metadata: encodeMetadata(workout.metadata),
+                route: route
+            )
+
+            guard let jsonData = try? encoder.encode(workoutFile) else { continue }
+
+            // Path: imports/fitness/apple-health/YYYY/MM/DD/workout-<UUID>.json
+            let components = calendar.dateComponents([.year, .month, .day], from: workout.startDate)
+            guard let y = components.year, let mo = components.month, let d = components.day else { continue }
+            let uploadPath = String(format: "imports/fitness/apple-health/%04d/%02d/%02d/workout-%@.json",
+                                    y, mo, d, uuid)
+
+            batches.append(DaySamples(
+                date: workout.startDate,
+                collectorID: id,
+                uploadPath: uploadPath,
+                data: jsonData,
+                anchorToken: workout.endDate
+            ))
+        }
+
+        return batches
+    }
+
+    /// Fetches all CLLocation points for a workout's GPS route.
+    /// Returns nil if the workout has no associated route (indoor workouts).
+    private func fetchRoute(for workout: HKWorkout) async throws -> [RoutePoint]? {
+        let routePredicate = HKQuery.predicateForObjects(from: workout)
+
+        // First: find the HKWorkoutRoute associated with this workout
+        let routes = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<[HKSample], Error>) in
+            let q = HKSampleQuery(
+                sampleType: HKSeriesType.workoutRoute(),
+                predicate: routePredicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: nil
+            ) { _, results, error in
+                if let error { cont.resume(throwing: error) }
+                else { cont.resume(returning: results ?? []) }
+            }
+            store.execute(q)
+        }
+
+        guard let route = routes.first as? HKWorkoutRoute else { return nil }
+
+        // Second: stream all CLLocation points from the route
+        var points: [RoutePoint] = []
+
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            var resumed = false
+            let q = HKWorkoutRouteQuery(route: route) { _, locations, done, error in
+                if let error {
+                    if !resumed { resumed = true; cont.resume(throwing: error) }
+                    return
+                }
+                if let locations {
+                    points.append(contentsOf: locations.map { loc in
+                        RoutePoint(
+                            timestamp: loc.timestamp,
+                            lat: loc.coordinate.latitude,
+                            lon: loc.coordinate.longitude,
+                            alt: loc.altitude,
+                            hAcc: loc.horizontalAccuracy,
+                            vAcc: loc.verticalAccuracy,
+                            speed: loc.speed,
+                            speedAcc: loc.speedAccuracy,
+                            course: loc.course,
+                            courseAcc: loc.courseAccuracy
+                        )
+                    })
+                }
+                if done, !resumed { resumed = true; cont.resume() }
+            }
+            store.execute(q)
+        }
+
+        return points.isEmpty ? nil : points
     }
 
     // MARK: - HealthKit Queries
@@ -594,31 +746,10 @@ final class HealthKitCollector: DataCollector {
             )
         }
 
-        if let workout = sample as? HKWorkout {
-            var meta = encodeMetadata(workout.metadata) ?? [:]
-            // Store activity type as a readable string ("running", "cycling", …)
-            // instead of HealthKit's opaque rawValue integer (37, 13, …).
-            meta["workoutActivityType"] = workoutActivityTypeName(for: workout.workoutActivityType.rawValue)
-            meta["duration"] = workout.duration
-            if let energy = workout.statistics(for: HKQuantityType(.activeEnergyBurned))?.sumQuantity() {
-                meta["totalEnergyBurned"] = energy.doubleValue(for: .kilocalorie())
-                meta["totalEnergyBurnedUnit"] = "kcal"
-            }
-            if let distance = workout.statistics(for: HKQuantityType(.distanceWalkingRunning))?.sumQuantity() {
-                meta["totalDistance"] = distance.doubleValue(for: .meter())
-                meta["totalDistanceUnit"] = "m"
-            }
-
-            return RawHealthSample(
-                type: type,
-                start: workout.startDate,
-                end: workout.endDate,
-                value: nil,
-                unit: nil,
-                source: source,
-                device: device,
-                metadata: meta
-            )
+        // Workouts are exported as standalone workout-<UUID>.json files,
+        // not as entries in the sample batch.
+        if sample is HKWorkout {
+            return nil
         }
 
         return nil
@@ -673,6 +804,18 @@ final class HealthKitCollector: DataCollector {
 
     private func saveAnchorDate(_ date: Date) {
         UserDefaults.standard.set(date, forKey: anchorKey)
+    }
+
+    // MARK: - Workout Anchor Persistence
+
+    private let workoutAnchorKey = "sync.anchor.healthkit.workouts"
+
+    private func loadWorkoutAnchorDate() -> Date? {
+        UserDefaults.standard.object(forKey: workoutAnchorKey) as? Date
+    }
+
+    private func saveWorkoutAnchorDate(_ date: Date) {
+        UserDefaults.standard.set(date, forKey: workoutAnchorKey)
     }
 
     // MARK: - Helpers
@@ -788,7 +931,7 @@ struct RawHealthSample: Encodable {
 }
 
 /// Helper for encoding arbitrary JSON-compatible values.
-private struct AnyCodable: Encodable {
+struct AnyCodable: Encodable {
     let value: Any
 
     init(_ value: Any) {

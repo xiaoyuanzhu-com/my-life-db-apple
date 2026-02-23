@@ -31,13 +31,13 @@ while IFS= read -r -d '' src; do
 
     if [ -f "$dest" ]; then
         echo "SKIP (exists): $dest"
-        ((skipped++))
+        skipped=$((skipped + 1))
         continue
     fi
 
     mv "$src" "$dest"
     echo "MOVED: raw/$rel → $dir/sample-$filename"
-    ((moved++))
+    moved=$((moved + 1))
 done < <(find "$RAW_DIR" -name "*.json" -print0)
 
 echo ""
