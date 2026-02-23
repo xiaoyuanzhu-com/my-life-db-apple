@@ -40,6 +40,78 @@ final class HealthKitCollector: DataCollector {
 
     private let store = HKHealthStore()
 
+    // MARK: - Enum-to-String Mappings
+    //
+    // DESIGN RULE: Store human-readable strings, never opaque numeric enums.
+    // The exported JSON files must be self-explanatory — readable by any person
+    // or AI agent without our application or Apple's SDK headers. Long-term
+    // sustainability and openness matter more than saving a few bytes.
+    //
+    // When Apple adds new HealthKit enum cases, add them here. Unmapped values
+    // fall back to "unknown_<rawValue>" so files remain parseable even before
+    // we update these tables.
+
+    /// HKWorkoutActivityType.rawValue → human-readable name
+    private let workoutActivityTypeNames: [UInt: String] = [
+        37: "running",
+        13: "cycling",
+        46: "swimming",
+        52: "walking",
+        20: "functionalStrengthTraining",
+        35: "yoga",
+        63: "highIntensityIntervalTraining",
+    ]
+
+    /// HKCategoryValueSleepAnalysis.rawValue → human-readable name
+    private let sleepAnalysisValueNames: [Int: String] = [
+        0: "inBed",
+        1: "asleepUnspecified",
+        2: "awake",
+        3: "asleepCore",
+        4: "asleepDeep",
+        5: "asleepREM",
+    ]
+
+    /// HKCategoryValueAppleStandHour.rawValue → human-readable name
+    private let standHourValueNames: [Int: String] = [
+        0: "idle",
+        1: "stood",
+    ]
+
+    /// HKHeartRateMotionContext.rawValue → human-readable name
+    /// HealthKit stores this under the metadata key "HKMetadataKeyHeartRateMotionContext".
+    private let heartRateMotionContextNames: [Int: String] = [
+        0: "notSet",
+        1: "sedentary",
+        2: "active",
+    ]
+
+    /// Category value mappings keyed by HKCategoryType identifier.
+    /// Used in encodeSample() to convert numeric category values to strings.
+    private var categoryValueNames: [String: [Int: String]] {
+        [
+            HKCategoryType(.sleepAnalysis).identifier: sleepAnalysisValueNames,
+            HKCategoryType(.appleStandHour).identifier: standHourValueNames,
+        ]
+    }
+
+    /// Converts a workout activity type rawValue to a human-readable string.
+    private func workoutActivityTypeName(for rawValue: UInt) -> String {
+        workoutActivityTypeNames[rawValue] ?? "unknown_\(rawValue)"
+    }
+
+    /// Converts a category sample's numeric value to a human-readable string,
+    /// based on the sample's type identifier. Returns a numeric fallback for
+    /// unmapped types (e.g. mindfulSession, which has no meaningful value enum).
+    private func categoryValueName(for value: Int, type: String) -> SampleValue {
+        if let mapping = categoryValueNames[type] {
+            return .category(mapping[value] ?? "unknown_\(value)")
+        }
+        // Types without a meaningful category enum (e.g. mindfulSession)
+        // keep the numeric value as-is.
+        return .numeric(Double(value))
+    }
+
     /// How far back to look on first sync (no anchor yet)
     private let initialLookbackDays = 7
 
@@ -333,7 +405,7 @@ final class HealthKitCollector: DataCollector {
                 type: type,
                 start: quantitySample.startDate,
                 end: quantitySample.endDate,
-                value: value,
+                value: .numeric(value),
                 unit: unit.unitString,
                 source: source,
                 device: device,
@@ -342,11 +414,16 @@ final class HealthKitCollector: DataCollector {
         }
 
         if let categorySample = sample as? HKCategorySample {
+            // Convert numeric category value to a human-readable string
+            // (e.g. sleep stage 4 → "asleepDeep", stand hour 1 → "stood").
+            // See categoryValueNames mapping and the design rule comment above.
+            let resolved = categoryValueName(for: categorySample.value, type: type)
+
             return RawHealthSample(
                 type: type,
                 start: categorySample.startDate,
                 end: categorySample.endDate,
-                value: Double(categorySample.value),
+                value: resolved,
                 unit: nil,
                 source: source,
                 device: device,
@@ -356,7 +433,9 @@ final class HealthKitCollector: DataCollector {
 
         if let workout = sample as? HKWorkout {
             var meta = encodeMetadata(workout.metadata) ?? [:]
-            meta["workoutActivityType"] = workout.workoutActivityType.rawValue
+            // Store activity type as a readable string ("running", "cycling", …)
+            // instead of HealthKit's opaque rawValue integer (37, 13, …).
+            meta["workoutActivityType"] = workoutActivityTypeName(for: workout.workoutActivityType.rawValue)
             meta["duration"] = workout.duration
             if let energy = workout.statistics(for: HKQuantityType(.activeEnergyBurned))?.sumQuantity() {
                 meta["totalEnergyBurned"] = energy.doubleValue(for: .kilocalorie())
@@ -382,14 +461,29 @@ final class HealthKitCollector: DataCollector {
         return nil
     }
 
+    /// Metadata keys whose integer values should be converted to human-readable
+    /// strings. Add new entries here when HealthKit introduces more enum-valued
+    /// metadata. See the design rule comment at the top of this section.
+    private let metadataEnumKeys: [String: [Int: String]] = [
+        HKMetadataKeyHeartRateMotionContext: [
+            0: "notSet",
+            1: "sedentary",
+            2: "active",
+        ],
+    ]
+
     /// Converts HealthKit metadata dictionary to a JSON-safe dictionary.
+    /// Integer-valued enum metadata (e.g. heart rate motion context) is
+    /// converted to human-readable strings — see design rule comment above.
     private func encodeMetadata(_ metadata: [String: Any]?) -> [String: Any]? {
         guard let metadata, !metadata.isEmpty else { return nil }
 
         var result: [String: Any] = [:]
         for (key, value) in metadata {
-            // Only include JSON-compatible values
-            if value is String || value is Int || value is Double || value is Bool {
+            // Convert known enum metadata from integers to strings
+            if let mapping = metadataEnumKeys[key], let intValue = value as? Int {
+                result[key] = mapping[intValue] ?? "unknown_\(intValue)"
+            } else if value is String || value is Int || value is Double || value is Bool {
                 result[key] = value
             } else if let date = value as? Date {
                 result[key] = ISO8601DateFormatter().string(from: date)
@@ -475,13 +569,32 @@ struct DeviceInfo: Encodable {
     }
 }
 
+/// The `value` field of a health sample. Encodes as a JSON number for
+/// quantity types (heart rate, steps, etc.) and a JSON string for category
+/// types (sleep stages, stand hours, etc.).
+///
+/// This keeps the data self-describing: `"value": "asleepDeep"` is
+/// immediately meaningful, unlike the HealthKit raw integer `4`.
+enum SampleValue: Encodable {
+    case numeric(Double)
+    case category(String)
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .numeric(let v):  try container.encode(v)
+        case .category(let s): try container.encode(s)
+        }
+    }
+}
+
 /// A single raw HealthKit sample, ready for JSON encoding.
 /// Follows the schema defined in data-collect.md.
 struct RawHealthSample: Encodable {
     let type: String
     let start: Date
     let end: Date
-    let value: Double?
+    let value: SampleValue?
     let unit: String?
     let source: String
     let device: String?
