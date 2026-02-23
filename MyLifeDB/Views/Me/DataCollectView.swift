@@ -101,7 +101,7 @@ private let dataCategories: [DataCategory] = [
         icon: "figure.run",
         sources: [
             DataSource(id: "workouts", name: "Workouts", icon: "figure.mixed.cardio", description: "All workout types with duration and calories", platform: .iOSWatch, status: .available),
-            DataSource(id: "workout_routes", name: "Workout Routes", icon: "map.fill", description: "GPS tracks for outdoor workouts", platform: .iOSWatch, status: .available),
+            DataSource(id: "workout_routes", name: "Workout Routes", icon: "map.fill", description: "GPS tracks for outdoor workouts — stored inside each workout file", platform: .iOSWatch, status: .available),
             DataSource(id: "running", name: "Running Metrics", icon: "figure.run", description: "Pace, stride length, vertical oscillation, power, ground contact time", platform: .watch, status: .available),
             DataSource(id: "swimming", name: "Swimming", icon: "figure.pool.swim", description: "Laps, strokes, distance, SWOLF", platform: .watch, status: .available),
             DataSource(id: "cycling", name: "Cycling", icon: "figure.outdoor.cycle", description: "Distance, speed, power", platform: .iOSWatch, status: .available),
