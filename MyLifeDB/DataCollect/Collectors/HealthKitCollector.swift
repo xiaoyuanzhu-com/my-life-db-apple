@@ -425,10 +425,10 @@ final class HealthKitCollector: DataCollector {
                 continue
             }
 
-            // Path: imports/fitness/apple-health/raw/YYYY/MM/DD/<timestamp>.json
+            // Path: imports/fitness/apple-health/YYYY/MM/DD/sample-<timestamp>.json
             let pathComponents = dayString.split(separator: "-")
             guard pathComponents.count == 3 else { continue }
-            let uploadPath = "imports/fitness/apple-health/raw/\(pathComponents[0])/\(pathComponents[1])/\(pathComponents[2])/\(syncTimestamp).json"
+            let uploadPath = "imports/fitness/apple-health/\(pathComponents[0])/\(pathComponents[1])/\(pathComponents[2])/sample-\(syncTimestamp).json"
 
             let dayDate = dayDateFormatter.date(from: dayString) ?? Date()
 

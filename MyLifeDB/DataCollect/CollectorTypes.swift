@@ -17,7 +17,8 @@ struct DaySamples {
     let collectorID: String
 
     /// The upload path on the backend
-    /// e.g., "imports/fitness/apple-health/raw/2026/02/09/2026-02-09T12-00-00Z.json"
+    /// e.g., "imports/fitness/apple-health/2026/02/09/sample-2026-02-09T12-00-00Z.json"
+    /// or    "imports/fitness/apple-health/2026/02/09/workout-E3F2ABCD-….json"
     let uploadPath: String
 
     /// The JSON data to upload (already encoded)
