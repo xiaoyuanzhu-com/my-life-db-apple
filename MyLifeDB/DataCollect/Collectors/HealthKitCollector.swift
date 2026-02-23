@@ -22,16 +22,25 @@ final class HealthKitCollector: DataCollector {
     /// All DataSource toggle IDs this collector covers.
     /// These match the `DataSource.id` values in DataCollectView.
     let sourceIDs: [String] = [
-        // Health & Body
-        "steps", "distance", "flights", "active_energy", "exercise_min",
+        // Health & Body — core vitals
+        "steps", "distance", "flights", "active_energy", "basal_energy", "exercise_min",
         "stand_hours", "heart_rate", "hrv", "blood_oxygen", "respiratory_rate",
-        "vo2max", "body_weight", "walking_steadiness",
+        "vo2max", "body_weight", "body_height", "body_fat", "lean_body_mass", "bmi",
+        "waist_circumference", "wrist_temperature", "walking_steadiness",
+        // Cardiovascular events & metabolic
+        "high_heart_rate_event", "low_heart_rate_event", "irregular_rhythm_event",
+        "afib_burden", "blood_pressure", "blood_glucose",
+        // Mobility metrics
+        "walking_speed", "walking_step_length", "walking_asymmetry",
+        "walking_double_support", "stair_ascent_speed", "stair_descent_speed",
         // Sleep
         "sleep_duration", "sleep_stages", "bedtime", "sleep_consistency",
         // Fitness
         "workouts", "running", "swimming", "cycling",
         // Nutrition
         "water", "caffeine", "calories_in",
+        // Audio & environment
+        "noise", "headphone_audio", "uv_exposure",
         // Mindfulness
         "mindful_min", "mood",
     ]
@@ -86,12 +95,22 @@ final class HealthKitCollector: DataCollector {
         2: "active",
     ]
 
+    /// HKCategoryValuePresence.rawValue → human-readable name.
+    /// Used for cardiac event types (highHeartRate, lowHeartRate, irregularRhythm).
+    private let presenceValueNames: [Int: String] = [
+        0: "notPresent",
+        1: "present",
+    ]
+
     /// Category value mappings keyed by HKCategoryType identifier.
     /// Used in encodeSample() to convert numeric category values to strings.
     private var categoryValueNames: [String: [Int: String]] {
         [
-            HKCategoryType(.sleepAnalysis).identifier: sleepAnalysisValueNames,
-            HKCategoryType(.appleStandHour).identifier: standHourValueNames,
+            HKCategoryType(.sleepAnalysis).identifier:          sleepAnalysisValueNames,
+            HKCategoryType(.appleStandHour).identifier:         standHourValueNames,
+            HKCategoryType(.highHeartRateEvent).identifier:     presenceValueNames,
+            HKCategoryType(.lowHeartRateEvent).identifier:      presenceValueNames,
+            HKCategoryType(.irregularHeartRhythmEvent).identifier: presenceValueNames,
         ]
     }
 
@@ -122,11 +141,12 @@ final class HealthKitCollector: DataCollector {
     /// heartRate, restingHeartRate, walkingHeartRateAverage).
     private func hkTypes(for sourceID: String) -> [HKSampleType] {
         switch sourceID {
-        // Health & Body
+        // Health & Body — core vitals
         case "steps":             return [HKQuantityType(.stepCount)]
         case "distance":          return [HKQuantityType(.distanceWalkingRunning)]
         case "flights":           return [HKQuantityType(.flightsClimbed)]
         case "active_energy":     return [HKQuantityType(.activeEnergyBurned)]
+        case "basal_energy":      return [HKQuantityType(.basalEnergyBurned)]
         case "exercise_min":      return [HKQuantityType(.appleExerciseTime)]
         case "stand_hours":       return [HKQuantityType(.appleStandTime)]
         case "heart_rate":        return [
@@ -140,24 +160,62 @@ final class HealthKitCollector: DataCollector {
         case "respiratory_rate":  return [HKQuantityType(.respiratoryRate)]
         case "vo2max":            return [HKQuantityType(.vo2Max)]
         case "body_weight":       return [HKQuantityType(.bodyMass)]
+        case "body_height":       return [HKQuantityType(.height)]
+        case "body_fat":          return [HKQuantityType(.bodyFatPercentage)]
+        case "lean_body_mass":    return [HKQuantityType(.leanBodyMass)]
+        case "bmi":               return [HKQuantityType(.bodyMassIndex)]
+        case "waist_circumference": return [HKQuantityType(.waistCircumference)]
+        case "wrist_temperature": return [HKQuantityType(.appleSleepingWristTemperature)]
         case "walking_steadiness": return [HKQuantityType(.appleWalkingSteadiness)]
+
+        // Cardiovascular events & metabolic
+        case "high_heart_rate_event":  return [HKCategoryType(.highHeartRateEvent)]
+        case "low_heart_rate_event":   return [HKCategoryType(.lowHeartRateEvent)]
+        case "irregular_rhythm_event": return [HKCategoryType(.irregularHeartRhythmEvent)]
+        case "afib_burden":            return [HKQuantityType(.atrialFibrillationBurden)]
+        case "blood_pressure":         return [HKQuantityType(.bloodPressureSystolic),
+                                               HKQuantityType(.bloodPressureDiastolic)]
+        case "blood_glucose":          return [HKQuantityType(.bloodGlucose)]
+
+        // Mobility metrics (Apple Watch, iOS 14+)
+        case "walking_speed":          return [HKQuantityType(.walkingSpeed)]
+        case "walking_step_length":    return [HKQuantityType(.walkingStepLength)]
+        case "walking_asymmetry":      return [HKQuantityType(.walkingAsymmetryPercentage)]
+        case "walking_double_support": return [HKQuantityType(.walkingDoubleSupportPercentage)]
+        case "stair_ascent_speed":     return [HKQuantityType(.stairAscentSpeed)]
+        case "stair_descent_speed":    return [HKQuantityType(.stairDescentSpeed)]
 
         // Sleep — all map to the same HK type
         case "sleep_duration", "sleep_stages", "bedtime", "sleep_consistency":
             return [HKCategoryType(.sleepAnalysis)]
 
         // Fitness
-        case "workouts", "running", "swimming", "cycling":
+        case "workouts", "swimming", "cycling":
             return [HKWorkoutType.workoutType()]
+        case "running":
+            // Workouts + running-specific biomechanics (Apple Watch, iOS 16+)
+            return [
+                HKWorkoutType.workoutType(),
+                HKQuantityType(.runningStrideLength),
+                HKQuantityType(.runningVerticalOscillation),
+                HKQuantityType(.runningPower),
+                HKQuantityType(.runningGroundContactTime),
+                HKQuantityType(.runningSpeed),
+            ]
 
         // Nutrition
         case "water":         return [HKQuantityType(.dietaryWater)]
         case "caffeine":      return [HKQuantityType(.dietaryCaffeine)]
         case "calories_in":   return [HKQuantityType(.dietaryEnergyConsumed)]
 
+        // Audio & environment
+        case "noise":           return [HKQuantityType(.environmentalAudioExposure)]
+        case "headphone_audio": return [HKQuantityType(.headphoneAudioExposure)]
+        case "uv_exposure":     return [HKQuantityType(.uvExposure)]
+
         // Mindfulness
         case "mindful_min":   return [HKCategoryType(.mindfulSession)]
-        case "mood":          return [] // iOS 17+ State of Mind, handled separately
+        case "mood":          return [] // iOS 18+ HKStateOfMind — requires dedicated query
 
         default: return []
         }
@@ -177,29 +235,59 @@ final class HealthKitCollector: DataCollector {
     /// Preferred unit for a quantity type (used when extracting numeric values).
     private func preferredUnit(for typeID: HKQuantityTypeIdentifier) -> HKUnit {
         switch typeID {
-        case .stepCount:                     return .count()
-        case .distanceWalkingRunning:         return .meter()
-        case .flightsClimbed:                return .count()
-        case .activeEnergyBurned:            return .kilocalorie()
-        case .basalEnergyBurned:             return .kilocalorie()
-        case .appleExerciseTime:             return .minute()
-        case .appleStandTime:                return .minute()
-        case .heartRate:                     return .count().unitDivided(by: .minute())
-        case .restingHeartRate:              return .count().unitDivided(by: .minute())
-        case .walkingHeartRateAverage:       return .count().unitDivided(by: .minute())
-        case .heartRateRecoveryOneMinute:    return .count().unitDivided(by: .minute())
-        case .heartRateVariabilitySDNN:      return .secondUnit(with: .milli)
-        case .oxygenSaturation:              return .percent()
-        case .respiratoryRate:               return .count().unitDivided(by: .minute())
-        case .vo2Max:                        return HKUnit(from: "ml/kg*min")
-        case .bodyMass:                      return .gramUnit(with: .kilo)
-        case .bodyFatPercentage:             return .percent()
-        case .dietaryWater:                  return .liter()
-        case .dietaryCaffeine:               return .gramUnit(with: .milli)
-        case .dietaryEnergyConsumed:         return .kilocalorie()
-        case .appleSleepingWristTemperature: return .degreeCelsius()
-        case .appleWalkingSteadiness:        return .percent()
-        default:                             return .count()
+        // Activity & energy
+        case .stepCount:                        return .count()
+        case .distanceWalkingRunning:           return .meter()
+        case .flightsClimbed:                   return .count()
+        case .activeEnergyBurned:               return .kilocalorie()
+        case .basalEnergyBurned:                return .kilocalorie()
+        case .appleExerciseTime:                return .minute()
+        case .appleStandTime:                   return .minute()
+        // Heart
+        case .heartRate:                        return .count().unitDivided(by: .minute())
+        case .restingHeartRate:                 return .count().unitDivided(by: .minute())
+        case .walkingHeartRateAverage:          return .count().unitDivided(by: .minute())
+        case .heartRateRecoveryOneMinute:       return .count().unitDivided(by: .minute())
+        case .heartRateVariabilitySDNN:         return .secondUnit(with: .milli)
+        case .atrialFibrillationBurden:         return .percent()
+        // Vitals
+        case .oxygenSaturation:                 return .percent()
+        case .respiratoryRate:                  return .count().unitDivided(by: .minute())
+        case .vo2Max:                           return HKUnit(from: "ml/kg*min")
+        case .bloodPressureSystolic:            return .millimeterOfMercury()
+        case .bloodPressureDiastolic:           return .millimeterOfMercury()
+        case .bloodGlucose:                     return HKUnit(from: "mg/dL")
+        // Body measurements
+        case .bodyMass:                         return .gramUnit(with: .kilo)
+        case .height:                           return .meter()
+        case .bodyFatPercentage:                return .percent()
+        case .leanBodyMass:                     return .gramUnit(with: .kilo)
+        case .bodyMassIndex:                    return .count()
+        case .waistCircumference:               return .meter()
+        case .appleSleepingWristTemperature:    return .degreeCelsius()
+        case .appleWalkingSteadiness:           return .percent()
+        // Mobility
+        case .walkingSpeed:                     return .meter().unitDivided(by: .second())
+        case .walkingStepLength:                return .meter()
+        case .walkingAsymmetryPercentage:       return .percent()
+        case .walkingDoubleSupportPercentage:   return .percent()
+        case .stairAscentSpeed:                 return .meter().unitDivided(by: .second())
+        case .stairDescentSpeed:                return .meter().unitDivided(by: .second())
+        // Running biomechanics (Apple Watch, iOS 16+)
+        case .runningStrideLength:              return .meter()
+        case .runningVerticalOscillation:       return .meter()
+        case .runningPower:                     return HKUnit(from: "W")
+        case .runningGroundContactTime:         return .secondUnit(with: .milli)
+        case .runningSpeed:                     return .meter().unitDivided(by: .second())
+        // Nutrition
+        case .dietaryWater:                     return .liter()
+        case .dietaryCaffeine:                  return .gramUnit(with: .milli)
+        case .dietaryEnergyConsumed:            return .kilocalorie()
+        // Audio & environment
+        case .environmentalAudioExposure:       return HKUnit(from: "dBASPL")
+        case .headphoneAudioExposure:           return HKUnit(from: "dBASPL")
+        case .uvExposure:                       return .count()
+        default:                                return .count()
         }
     }
 
