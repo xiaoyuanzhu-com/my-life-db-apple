@@ -47,10 +47,18 @@ jobs:
             -P "$DEV_CERTIFICATES_P12_PASSWORD" \
             -T /usr/bin/codesign
 
+          # Import Apple WWDR intermediate certificates (needed for cert chain)
+          curl -sL https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer \
+            -o "$RUNNER_TEMP/AppleWWDRCAG3.cer"
+          curl -sL https://www.apple.com/certificateauthority/AppleWWDRCAG6.cer \
+            -o "$RUNNER_TEMP/AppleWWDRCAG6.cer"
+          security import "$RUNNER_TEMP/AppleWWDRCAG3.cer" -k "$KEYCHAIN_PATH" -T /usr/bin/codesign
+          security import "$RUNNER_TEMP/AppleWWDRCAG6.cer" -k "$KEYCHAIN_PATH" -T /usr/bin/codesign
+
           security set-key-partition-list -S apple-tool:,apple: \
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Set keychain search list: temp keychain + system (for Apple CA certs)
+          # Set keychain search list: temp keychain + system (for Apple root CAs)
           security list-keychains -d user -s "$KEYCHAIN_PATH" /Library/Keychains/System.keychain
 
           # Write API key for altool and xcodebuild
@@ -106,7 +114,7 @@ jobs:
         run: |
           security list-keychains -d user -s login.keychain-db
           security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
-          rm -f "$RUNNER_TEMP/dist-cert.p12" "$RUNNER_TEMP/dev-cert.p12"
+          rm -f "$RUNNER_TEMP/dist-cert.p12" "$RUNNER_TEMP/dev-cert.p12" "$RUNNER_TEMP"/AppleWWDRCA*.cer
           rm -f ~/private_keys/AuthKey_*.p8
           rm -rf "$RUNNER_TEMP/MyLifeDB-iOS.xcarchive"
           rm -rf "$RUNNER_TEMP/ios-output"
@@ -148,10 +156,18 @@ jobs:
             -P "$DEV_CERTIFICATES_P12_PASSWORD" \
             -T /usr/bin/codesign
 
+          # Import Apple WWDR intermediate certificates (needed for cert chain)
+          curl -sL https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer \
+            -o "$RUNNER_TEMP/AppleWWDRCAG3.cer"
+          curl -sL https://www.apple.com/certificateauthority/AppleWWDRCAG6.cer \
+            -o "$RUNNER_TEMP/AppleWWDRCAG6.cer"
+          security import "$RUNNER_TEMP/AppleWWDRCAG3.cer" -k "$KEYCHAIN_PATH" -T /usr/bin/codesign
+          security import "$RUNNER_TEMP/AppleWWDRCAG6.cer" -k "$KEYCHAIN_PATH" -T /usr/bin/codesign
+
           security set-key-partition-list -S apple-tool:,apple: \
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Set keychain search list: temp keychain + system (for Apple CA certs)
+          # Set keychain search list: temp keychain + system (for Apple root CAs)
           security list-keychains -d user -s "$KEYCHAIN_PATH" /Library/Keychains/System.keychain
 
           # Write API key for xcodebuild provisioning
@@ -217,7 +233,7 @@ jobs:
         run: |
           security list-keychains -d user -s login.keychain-db
           security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
-          rm -f "$RUNNER_TEMP/dist-cert.p12" "$RUNNER_TEMP/dev-cert.p12"
+          rm -f "$RUNNER_TEMP/dist-cert.p12" "$RUNNER_TEMP/dev-cert.p12" "$RUNNER_TEMP"/AppleWWDRCA*.cer
           rm -f ~/private_keys/AuthKey_*.p8
           rm -rf "$RUNNER_TEMP/MyLifeDB-macOS.xcarchive"
           rm -rf "$RUNNER_TEMP/macos-output"
