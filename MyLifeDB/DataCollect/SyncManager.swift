@@ -333,7 +333,7 @@ final class SyncManager {
 
     /// Discovers the HealthKit date range and builds the calendar model for full sync.
     @MainActor
-    private func prepareFullSync() async {
+    func prepareFullSync() async {
         guard let hkCollector = collectors.first(where: { $0 is HealthKitCollector }) as? HealthKitCollector else {
             return
         }

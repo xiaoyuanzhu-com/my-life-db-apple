@@ -44,7 +44,7 @@ struct DataCategory: Identifiable {
     let sources: [DataSource]
 }
 
-private let dataCategories: [DataCategory] = [
+let dataCategories: [DataCategory] = [
     DataCategory(
         id: "health",
         name: "Health & Body",
@@ -307,6 +307,7 @@ struct DataCollectView: View {
         List {
             // Sync status section
             Section {
+                // Row 1: Status + Sync Now
                 HStack {
                     if syncManager.state == .syncing {
                         ProgressView()
@@ -340,14 +341,18 @@ struct DataCollectView: View {
                             .font(.subheadline)
                     }
                     .disabled(syncManager.state != .idle)
+                }
 
-                    // Sync All button
-                    Button {
-                        syncManager.syncAll()
-                    } label: {
-                        Label("Sync All History", systemImage: "arrow.clockwise.circle.fill")
+                // Row 2: NavigationLink to full-history sync
+                NavigationLink {
+                    SyncDataView()
+                } label: {
+                    HStack {
+                        Text("Sync All History")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Spacer()
                     }
-                    .disabled(syncManager.state != .idle)
                 }
 
                 // Detailed sync breakdown
