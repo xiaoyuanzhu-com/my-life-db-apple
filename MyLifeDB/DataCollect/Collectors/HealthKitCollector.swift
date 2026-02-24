@@ -695,10 +695,10 @@ final class HealthKitCollector: DataCollector {
 
     // MARK: - HealthKit Queries
 
-    private func querySamples(type: HKSampleType, since startDate: Date) async throws -> [HKSample] {
+    private func querySamples(type: HKSampleType, since startDate: Date, until endDate: Date = Date()) async throws -> [HKSample] {
         let predicate = HKQuery.predicateForSamples(
             withStart: startDate,
-            end: Date(),
+            end: endDate,
             options: .strictStartDate
         )
 
@@ -717,6 +717,252 @@ final class HealthKitCollector: DataCollector {
             }
             store.execute(query)
         }
+    }
+
+    // MARK: - Date Range Discovery
+
+    /// Finds the earliest sample date across all enabled HealthKit types.
+    /// For each type, queries with limit 1 and ascending sort to get the oldest sample.
+    /// Returns (start, end) where end is now, or nil if no data exists.
+    func discoverDateRange() async -> (start: Date, end: Date)? {
+        let enabled = enabledSourceIDs
+        guard !enabled.isEmpty else { return nil }
+
+        let typesToQuery = allHKTypes(for: enabled)
+        var earliest: Date?
+
+        for type in typesToQuery {
+            do {
+                let oldest = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<HKSample?, Error>) in
+                    let q = HKSampleQuery(
+                        sampleType: type,
+                        predicate: nil,
+                        limit: 1,
+                        sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+                    ) { _, results, error in
+                        if let error { cont.resume(throwing: error) }
+                        else { cont.resume(returning: results?.first) }
+                    }
+                    store.execute(q)
+                }
+                if let sample = oldest {
+                    if earliest == nil || sample.startDate < earliest! {
+                        earliest = sample.startDate
+                    }
+                }
+            } catch {
+                print("[HealthKitCollector] Failed to discover range for \(type.identifier): \(error)")
+            }
+        }
+
+        guard let start = earliest else { return nil }
+        return (start: start, end: Date())
+    }
+
+    // MARK: - Month-Scoped Collection
+
+    /// Collects all enabled health sample types for a single calendar month.
+    /// Groups results by (day, type) using the same logic as `collectNewSamples`.
+    func collectSamplesForMonth(year: Int, month: Int) async throws -> CollectionResult {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            throw CollectorError.frameworkUnavailable("HealthKit is not available on this device")
+        }
+
+        let enabled = enabledSourceIDs
+        guard !enabled.isEmpty else {
+            throw CollectorError.noEnabledSources
+        }
+
+        let calendar = Calendar(identifier: .gregorian)
+
+        // Build date range: first of month through first of next month
+        guard let monthStart = calendar.date(from: DateComponents(year: year, month: month, day: 1)),
+              let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else {
+            return CollectionResult(batches: [], stats: CollectionStats(typesQueried: 0, typesWithData: 0, samplesCollected: 0))
+        }
+
+        let typesToQuery = allHKTypes(for: enabled)
+
+        // Query each type within the month range
+        var allRawSamples: [RawHealthSample] = []
+        var typesWithData = 0
+
+        for type in typesToQuery {
+            // Skip workout type — handled separately by collectWorkoutsForMonth
+            if type is HKWorkoutType { continue }
+
+            do {
+                let samples = try await querySamples(type: type, since: monthStart, until: monthEnd)
+                let rawSamples = samples.compactMap { encodeSample($0) }
+                if !rawSamples.isEmpty {
+                    typesWithData += 1
+                }
+                allRawSamples.append(contentsOf: rawSamples)
+            } catch {
+                print("[HealthKitCollector] Failed to query \(type.identifier) for \(year)-\(month): \(error)")
+            }
+        }
+
+        let stats = CollectionStats(
+            typesQueried: typesToQuery.count,
+            typesWithData: typesWithData,
+            samplesCollected: allRawSamples.count
+        )
+
+        guard !allRawSamples.isEmpty else {
+            return CollectionResult(batches: [], stats: stats)
+        }
+
+        // Group by (day, HK type) — same logic as collectNewSamples
+        struct GroupInfo {
+            var dayKey: SampleDayBucket.DayKey
+            var type: String
+            var unit: String?
+            var samples: [RawHealthSample]
+        }
+        var grouped: [String: GroupInfo] = [:]
+
+        for sample in allRawSamples {
+            let dayKey = SampleDayBucket.dayKey(sampleStart: sample.start, metadata: sample.metadata)
+
+            let fileBase: String
+            if sample.type == "HKWorkoutTypeIdentifier",
+               let meta = sample.metadata,
+               let activityName = meta["workoutActivityType"] as? String {
+                fileBase = HKTypeFileName.workoutFileName(activityName: activityName)
+            } else {
+                fileBase = HKTypeFileName.fileName(for: sample.type)
+            }
+
+            let key = "\(dayKey.date)/\(fileBase)"
+
+            if grouped[key] == nil {
+                grouped[key] = GroupInfo(dayKey: dayKey, type: sample.type, unit: sample.unit, samples: [])
+            }
+            grouped[key]!.samples.append(sample)
+        }
+
+        // Build TypeDayPayload for each group -> DaySamples batch
+        var batches: [DaySamples] = []
+
+        for (key, group) in grouped.sorted(by: { $0.key < $1.key }) {
+            let payload = TypeDayPayload(
+                type: group.type,
+                date: group.dayKey.date,
+                timezone: group.dayKey.timezone,
+                unit: group.unit,
+                samples: group.samples
+            )
+
+            guard let jsonData = try? TypeDayPayload.encode(payload) else {
+                continue
+            }
+
+            let pathComponents = group.dayKey.date.split(separator: "-")
+            guard pathComponents.count == 3 else { continue }
+            let fileBase = key.split(separator: "/").last!
+            let uploadPath = "imports/fitness/apple-health/\(pathComponents[0])/\(pathComponents[1])/\(pathComponents[2])/\(fileBase).json"
+
+            let dayDate = dayDateFormatter.date(from: group.dayKey.date) ?? Date()
+
+            batches.append(DaySamples(
+                date: dayDate,
+                collectorID: id,
+                uploadPath: uploadPath,
+                data: jsonData,
+                anchorToken: group.samples.map(\.end).max() ?? group.samples.map(\.start).max()
+            ))
+        }
+
+        return CollectionResult(batches: batches, stats: stats)
+    }
+
+    /// Queries workouts for a single calendar month. Processes them the same way
+    /// as `collectWorkouts(since:)` (GPS routes, stats, etc.) and returns `[DaySamples]`.
+    func collectWorkoutsForMonth(year: Int, month: Int) async throws -> [DaySamples] {
+        let calendar = Calendar(identifier: .gregorian)
+
+        guard let monthStart = calendar.date(from: DateComponents(year: year, month: month, day: 1)),
+              let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else {
+            return []
+        }
+
+        let predicate = HKQuery.predicateForSamples(
+            withStart: monthStart, end: monthEnd, options: .strictStartDate
+        )
+
+        let workouts = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<[HKSample], Error>) in
+            let q = HKSampleQuery(
+                sampleType: HKWorkoutType.workoutType(),
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+            ) { _, results, error in
+                if let error { cont.resume(throwing: error) }
+                else { cont.resume(returning: results ?? []) }
+            }
+            store.execute(q)
+        }
+
+        var batches: [DaySamples] = []
+        let deviceInfo = currentDeviceInfo()
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.sortedKeys]
+
+        for sample in workouts {
+            guard let workout = sample as? HKWorkout else { continue }
+
+            let uuid = workout.uuid.uuidString
+            let activityType = workoutActivityTypeName(for: workout.workoutActivityType.rawValue)
+
+            // Build stats dict
+            var stats: [String: StatValue] = [:]
+            if let energy = workout.statistics(for: HKQuantityType(.activeEnergyBurned))?.sumQuantity() {
+                stats["active_energy_burned"] = StatValue(value: energy.doubleValue(for: .kilocalorie()), unit: "kcal")
+            }
+            if let dist = workout.statistics(for: HKQuantityType(.distanceWalkingRunning))?.sumQuantity() {
+                stats["distance"] = StatValue(value: dist.doubleValue(for: .meter()), unit: "m")
+            }
+            if let strokes = workout.statistics(for: HKQuantityType(.swimmingStrokeCount))?.sumQuantity() {
+                stats["swimming_stroke_count"] = StatValue(value: strokes.doubleValue(for: .count()), unit: "count")
+            }
+
+            // Fetch GPS route (nil for indoor workouts)
+            let route = try? await fetchRoute(for: workout)
+
+            let workoutFile = WorkoutFile(
+                uuid: uuid,
+                activityType: activityType,
+                start: workout.startDate,
+                end: workout.endDate,
+                durationS: workout.duration,
+                source: workout.sourceRevision.source.bundleIdentifier,
+                device: workout.sourceRevision.productType ?? workout.device?.name,
+                syncedAt: Date(),
+                deviceInfo: deviceInfo,
+                stats: stats,
+                metadata: encodeMetadata(workout.metadata),
+                route: route
+            )
+
+            guard let jsonData = try? encoder.encode(workoutFile) else { continue }
+
+            let components = calendar.dateComponents([.year, .month, .day], from: workout.startDate)
+            guard let y = components.year, let mo = components.month, let d = components.day else { continue }
+            let uploadPath = String(format: "imports/fitness/apple-health/%04d/%02d/%02d/workout-%@.json",
+                                    y, mo, d, uuid)
+
+            batches.append(DaySamples(
+                date: workout.startDate,
+                collectorID: id,
+                uploadPath: uploadPath,
+                data: jsonData,
+                anchorToken: workout.endDate
+            ))
+        }
+
+        return batches
     }
 
     // MARK: - Sample Encoding
