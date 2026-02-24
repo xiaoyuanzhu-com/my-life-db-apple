@@ -27,7 +27,7 @@ struct SyncDataView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .automatic) {
                 if syncManager.state == .idle && syncManager.hasResumableFullSync {
                     Menu {
                         Button(role: .destructive) {

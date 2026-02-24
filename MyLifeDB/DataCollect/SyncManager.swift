@@ -44,7 +44,7 @@ final class SyncManager {
 
     /// Whether a full sync has prior progress that can be resumed
     var hasResumableFullSync: Bool {
-        let keys = UserDefaults.standard.stringArray(forKey: "sync.fullSync.completedMonths") ?? []
+        let keys = UserDefaults.standard.stringArray(forKey: Self.completedMonthsKey) ?? []
         return !keys.isEmpty
     }
 
@@ -52,6 +52,9 @@ final class SyncManager {
 
     /// Minimum interval between syncs (seconds)
     private let throttleInterval: TimeInterval = 300  // 5 minutes
+
+    /// UserDefaults key for persisted full sync progress
+    private static let completedMonthsKey = "sync.fullSync.completedMonths"
 
     // MARK: - Private
 
@@ -126,6 +129,7 @@ final class SyncManager {
     }
 
     /// Cancel any in-progress sync
+    @MainActor
     func cancelSync() {
         syncTask?.cancel()
         syncTask = nil
@@ -356,7 +360,7 @@ final class SyncManager {
 
         // Restore completed months from UserDefaults
         let completedKeys = Set(
-            UserDefaults.standard.stringArray(forKey: "sync.fullSync.completedMonths") ?? []
+            UserDefaults.standard.stringArray(forKey: Self.completedMonthsKey) ?? []
         )
         if !completedKeys.isEmpty {
             progress.restoreCompleted(completedKeys)
@@ -514,10 +518,10 @@ final class SyncManager {
             // After all days in a month, if month is done, persist to UserDefaults
             if fullSyncProgress!.months[monthIndex].status == .done {
                 var completedKeys = Set(
-                    UserDefaults.standard.stringArray(forKey: "sync.fullSync.completedMonths") ?? []
+                    UserDefaults.standard.stringArray(forKey: Self.completedMonthsKey) ?? []
                 )
                 completedKeys.insert(fullSyncProgress!.months[monthIndex].id)
-                UserDefaults.standard.set(Array(completedKeys), forKey: "sync.fullSync.completedMonths")
+                UserDefaults.standard.set(Array(completedKeys), forKey: Self.completedMonthsKey)
             }
         }
 
@@ -547,6 +551,6 @@ final class SyncManager {
     @MainActor
     func clearFullSyncProgress() {
         fullSyncProgress = nil
-        UserDefaults.standard.removeObject(forKey: "sync.fullSync.completedMonths")
+        UserDefaults.standard.removeObject(forKey: Self.completedMonthsKey)
     }
 }

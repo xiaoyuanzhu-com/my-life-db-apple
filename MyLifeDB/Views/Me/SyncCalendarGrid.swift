@@ -119,13 +119,9 @@ struct MonthCalendarGrid: View {
     }
 
     private var monthName: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM"
-        let dc = DateComponents(year: month.year, month: month.month, day: 1)
-        guard let date = Calendar(identifier: .gregorian).date(from: dc) else {
-            return "?"
-        }
-        return formatter.string(from: date)
+        let symbols = Calendar(identifier: .gregorian).shortMonthSymbols
+        guard month.month >= 1 && month.month <= symbols.count else { return "?" }
+        return symbols[month.month - 1]
     }
 }
 
