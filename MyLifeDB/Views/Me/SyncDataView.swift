@@ -26,6 +26,26 @@ struct SyncDataView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if syncManager.state == .idle && syncManager.hasResumableFullSync {
+                    Menu {
+                        Button(role: .destructive) {
+                            syncManager.clearFullSyncProgress()
+                            isLoading = true
+                            Task {
+                                await syncManager.prepareFullSync()
+                                isLoading = false
+                            }
+                        } label: {
+                            Label("Reset Progress", systemImage: "arrow.counterclockwise")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                }
+            }
+        }
         .task {
             if syncManager.fullSyncProgress == nil {
                 await syncManager.prepareFullSync()
