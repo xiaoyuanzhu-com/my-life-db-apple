@@ -11,6 +11,7 @@ import Foundation
 enum SyncState: Equatable {
     case idle
     case syncing
+    case syncingAll  // Full history sync in progress
 }
 
 /// Per-collector sync state
@@ -59,6 +60,8 @@ struct SyncDetail: Equatable {
     let typesWithData: Int
     /// Number of files uploaded to the server
     let filesUploaded: Int
+    /// Number of files skipped (unchanged per watermark)
+    let filesSkipped: Int
     /// Number of upload failures
     let filesFailed: Int
     /// Number of collectors that had enabled sources

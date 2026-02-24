@@ -313,6 +313,11 @@ struct DataCollectView: View {
                             .controlSize(.small)
                         Text("Syncing...")
                             .foregroundStyle(.secondary)
+                    } else if syncManager.state == .syncingAll {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Syncing all history...")
+                            .foregroundStyle(.secondary)
                     } else if let lastSync = syncManager.lastSyncDate {
                         syncResultIcon
                             .font(.caption)
@@ -334,11 +339,19 @@ struct DataCollectView: View {
                         Text("Sync Now")
                             .font(.subheadline)
                     }
-                    .disabled(syncManager.state == .syncing)
+                    .disabled(syncManager.state != .idle)
+
+                    // Sync All button
+                    Button {
+                        syncManager.syncAll()
+                    } label: {
+                        Label("Sync All History", systemImage: "arrow.clockwise.circle.fill")
+                    }
+                    .disabled(syncManager.state != .idle)
                 }
 
                 // Detailed sync breakdown
-                if let detail = syncManager.lastSyncDetail, syncManager.state != .syncing {
+                if let detail = syncManager.lastSyncDetail, syncManager.state == .idle {
                     syncDetailView(detail)
                 }
 
@@ -447,6 +460,9 @@ extension DataCollectView {
                 Label("\(detail.typesQueried) types", systemImage: "list.bullet")
                 Label("\(detail.samplesCollected) samples", systemImage: "waveform.path")
                 Label("\(detail.filesUploaded) files", systemImage: "arrow.up.doc")
+                if detail.filesSkipped > 0 {
+                    Label("\(detail.filesSkipped) skipped", systemImage: "checkmark.circle")
+                }
             }
             .font(.caption2)
             .foregroundStyle(.tertiary)

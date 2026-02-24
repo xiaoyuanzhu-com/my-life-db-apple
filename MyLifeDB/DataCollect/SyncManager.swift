@@ -52,6 +52,9 @@ final class SyncManager {
     @ObservationIgnored
     private var syncTask: Task<Void, Never>?
 
+    @ObservationIgnored
+    private let watermark = SyncWatermark()
+
     // MARK: - Background Task ID
 
     #if os(iOS)
@@ -84,7 +87,7 @@ final class SyncManager {
     @MainActor
     func sync(force: Bool = false) {
         // Don't sync if already syncing
-        guard state != .syncing else { return }
+        guard state == .idle else { return }
 
         // Throttle: skip if last sync was recent
         if !force, let last = lastSyncDate,
@@ -98,6 +101,18 @@ final class SyncManager {
         syncTask?.cancel()
         syncTask = Task {
             await performSync()
+        }
+    }
+
+    /// Trigger a full sync of all HealthKit history.
+    @MainActor
+    func syncAll() {
+        guard state == .idle else { return }
+        guard AuthManager.shared.isAuthenticated else { return }
+
+        syncTask?.cancel()
+        syncTask = Task {
+            await performSync(fullSync: true)
         }
     }
 
@@ -152,11 +167,12 @@ final class SyncManager {
     // MARK: - Core Sync Logic
 
     @MainActor
-    private func performSync() async {
-        state = .syncing
+    private func performSync(fullSync: Bool = false) async {
+        state = fullSync ? .syncingAll : .syncing
         lastError = nil
 
         var uploadedCount = 0
+        var skippedCount = 0
         var failures: [String: String] = [:]
         var collectorsRun = 0
         var totalSamplesCollected = 0
@@ -200,7 +216,7 @@ final class SyncManager {
 
             do {
                 // 1. Collect new samples (now returns CollectionResult with stats)
-                let result = try await collector.collectNewSamples(fullSync: false)
+                let result = try await collector.collectNewSamples(fullSync: fullSync)
                 let batches = result.batches
 
                 // Accumulate stats
@@ -223,13 +239,24 @@ final class SyncManager {
                         return
                     }
 
+                    // Watermark check: skip if file hasn't changed
+                    if !watermark.hasChanged(path: batch.uploadPath, data: batch.data) {
+                        skippedCount += 1
+                        let progress = Double(index + 1) / Double(batches.count)
+                        collectorStates[collector.id] = .uploading(progress: progress)
+                        continue
+                    }
+
                     do {
                         try await APIClient.shared.saveRawFile(
                             path: batch.uploadPath,
                             data: batch.data
                         )
 
-                        // 3. Commit anchor ONLY after successful upload
+                        // Record watermark AFTER successful upload
+                        watermark.recordUpload(path: batch.uploadPath, data: batch.data)
+
+                        // Commit anchor ONLY after successful upload
                         await collector.commitAnchor(for: batch)
                         uploadedCount += 1
 
@@ -273,6 +300,7 @@ final class SyncManager {
             typesQueried: totalTypesQueried,
             typesWithData: totalTypesWithData,
             filesUploaded: uploadedCount,
+            filesSkipped: skippedCount,
             filesFailed: errorCount,
             collectorsRun: collectorsRun,
             authorizationRequested: authorizationRequested
