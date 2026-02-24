@@ -21,6 +21,8 @@ jobs:
         env:
           CERTIFICATES_P12: ${{ secrets.CERTIFICATES_P12 }}
           CERTIFICATES_P12_PASSWORD: ${{ secrets.CERTIFICATES_P12_PASSWORD }}
+          DEV_CERTIFICATES_P12: ${{ secrets.DEV_CERTIFICATES_P12 }}
+          DEV_CERTIFICATES_P12_PASSWORD: ${{ secrets.DEV_CERTIFICATES_P12_PASSWORD }}
           APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
         run: |
@@ -32,16 +34,24 @@ jobs:
           security set-keychain-settings -t 3600 -u "$KEYCHAIN_PATH"
 
           # Import distribution certificate
-          echo "$CERTIFICATES_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
-          security import "$RUNNER_TEMP/certificate.p12" \
+          echo "$CERTIFICATES_P12" | base64 --decode > "$RUNNER_TEMP/dist-cert.p12"
+          security import "$RUNNER_TEMP/dist-cert.p12" \
             -k "$KEYCHAIN_PATH" \
             -P "$CERTIFICATES_P12_PASSWORD" \
             -T /usr/bin/codesign
+
+          # Import development certificate
+          echo "$DEV_CERTIFICATES_P12" | base64 --decode > "$RUNNER_TEMP/dev-cert.p12"
+          security import "$RUNNER_TEMP/dev-cert.p12" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$DEV_CERTIFICATES_P12_PASSWORD" \
+            -T /usr/bin/codesign
+
           security set-key-partition-list -S apple-tool:,apple: \
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Add temp keychain + login keychain to search list
-          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          # Use only our temp keychain (no login keychain dependency)
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
 
           # Write API key for altool and xcodebuild
           mkdir -p ~/private_keys
@@ -96,7 +106,7 @@ jobs:
         run: |
           security list-keychains -d user -s login.keychain-db
           security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
-          rm -f "$RUNNER_TEMP/certificate.p12"
+          rm -f "$RUNNER_TEMP/dist-cert.p12" "$RUNNER_TEMP/dev-cert.p12"
           rm -f ~/private_keys/AuthKey_*.p8
           rm -rf "$RUNNER_TEMP/MyLifeDB-iOS.xcarchive"
           rm -rf "$RUNNER_TEMP/ios-output"
@@ -112,6 +122,8 @@ jobs:
         env:
           CERTIFICATES_P12: ${{ secrets.CERTIFICATES_P12 }}
           CERTIFICATES_P12_PASSWORD: ${{ secrets.CERTIFICATES_P12_PASSWORD }}
+          DEV_CERTIFICATES_P12: ${{ secrets.DEV_CERTIFICATES_P12 }}
+          DEV_CERTIFICATES_P12_PASSWORD: ${{ secrets.DEV_CERTIFICATES_P12_PASSWORD }}
           APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
         run: |
@@ -123,17 +135,24 @@ jobs:
           security set-keychain-settings -t 3600 -u "$KEYCHAIN_PATH"
 
           # Import distribution certificate
-          echo "$CERTIFICATES_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
-          security import "$RUNNER_TEMP/certificate.p12" \
+          echo "$CERTIFICATES_P12" | base64 --decode > "$RUNNER_TEMP/dist-cert.p12"
+          security import "$RUNNER_TEMP/dist-cert.p12" \
             -k "$KEYCHAIN_PATH" \
             -P "$CERTIFICATES_P12_PASSWORD" \
             -T /usr/bin/codesign
+
+          # Import development certificate
+          echo "$DEV_CERTIFICATES_P12" | base64 --decode > "$RUNNER_TEMP/dev-cert.p12"
+          security import "$RUNNER_TEMP/dev-cert.p12" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$DEV_CERTIFICATES_P12_PASSWORD" \
+            -T /usr/bin/codesign
+
           security set-key-partition-list -S apple-tool:,apple: \
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Add temp keychain + login keychain to search list
-          # login keychain has the Apple Development cert for macOS dev signing
-          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          # Use only our temp keychain (no login keychain dependency)
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
 
           # Write API key for xcodebuild provisioning
           mkdir -p ~/private_keys
@@ -198,7 +217,7 @@ jobs:
         run: |
           security list-keychains -d user -s login.keychain-db
           security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
-          rm -f "$RUNNER_TEMP/certificate.p12"
+          rm -f "$RUNNER_TEMP/dist-cert.p12" "$RUNNER_TEMP/dev-cert.p12"
           rm -f ~/private_keys/AuthKey_*.p8
           rm -rf "$RUNNER_TEMP/MyLifeDB-macOS.xcarchive"
           rm -rf "$RUNNER_TEMP/macos-output"
