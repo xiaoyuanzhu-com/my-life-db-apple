@@ -865,7 +865,8 @@ final class HealthKitCollector: DataCollector {
 
 // MARK: - Codable Types for JSON Output
 
-/// Device information included in each sync file.
+/// Device information included in workout-<UUID>.json files.
+/// Used by `WorkoutFile` — not by the per-type-per-day health sync format.
 struct DeviceInfo: Encodable {
     let name: String
     let model: String
