@@ -50,8 +50,8 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: \
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Use only our temp keychain (no login keychain dependency)
-          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          # Set keychain search list: temp keychain + system (for Apple CA certs)
+          security list-keychains -d user -s "$KEYCHAIN_PATH" /Library/Keychains/System.keychain
 
           # Write API key for altool and xcodebuild
           mkdir -p ~/private_keys
@@ -151,8 +151,8 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: \
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Use only our temp keychain (no login keychain dependency)
-          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          # Set keychain search list: temp keychain + system (for Apple CA certs)
+          security list-keychains -d user -s "$KEYCHAIN_PATH" /Library/Keychains/System.keychain
 
           # Write API key for xcodebuild provisioning
           mkdir -p ~/private_keys
