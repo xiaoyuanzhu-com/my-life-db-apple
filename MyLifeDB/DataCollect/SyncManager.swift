@@ -200,7 +200,7 @@ final class SyncManager {
 
             do {
                 // 1. Collect new samples (now returns CollectionResult with stats)
-                let result = try await collector.collectNewSamples()
+                let result = try await collector.collectNewSamples(fullSync: false)
                 let batches = result.batches
 
                 // Accumulate stats

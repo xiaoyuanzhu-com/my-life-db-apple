@@ -37,10 +37,12 @@ protocol DataCollector {
     /// Check current authorization status without prompting.
     func authorizationStatus() -> CollectorAuthStatus
 
-    /// Collect new samples since the last anchor, grouped by day.
+    /// Collect new samples since the last anchor, grouped by (type, day).
     /// Only collects data for enabled sources.
+    /// - Parameter fullSync: When `true`, queries all available history instead of
+    ///   only samples since the last anchor.
     /// Returns a CollectionResult with batches and stats about what was collected.
-    func collectNewSamples() async throws -> CollectionResult
+    func collectNewSamples(fullSync: Bool) async throws -> CollectionResult
 
     /// Advance the anchor after successful upload of a batch.
     /// Called by SyncManager ONLY after the upload succeeds.

@@ -17,8 +17,8 @@ struct DaySamples {
     let collectorID: String
 
     /// The upload path on the backend
-    /// e.g., "imports/fitness/apple-health/2026/02/09/sample-2026-02-09T12-00-00Z.json"
-    /// or    "imports/fitness/apple-health/2026/02/09/workout-E3F2ABCD-….json"
+    /// e.g., "imports/fitness/apple-health/2026/02/09/step-count.json"
+    /// or    "imports/fitness/apple-health/2026/02/09/workout-running.json"
     let uploadPath: String
 
     /// The JSON data to upload (already encoded)
@@ -39,7 +39,7 @@ struct CollectionStats: Equatable {
     let samplesCollected: Int
 }
 
-/// Result of a collector's `collectNewSamples()` call.
+/// Result of a collector's `collectNewSamples(fullSync:)` call.
 struct CollectionResult {
     /// The day-grouped batches ready for upload
     let batches: [DaySamples]

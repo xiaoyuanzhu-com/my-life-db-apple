@@ -426,7 +426,7 @@ final class HealthKitCollector: DataCollector {
 
     // MARK: - Data Collection
 
-    func collectNewSamples() async throws -> CollectionResult {
+    func collectNewSamples(fullSync: Bool = false) async throws -> CollectionResult {
         guard HKHealthStore.isHealthDataAvailable() else {
             throw CollectorError.frameworkUnavailable("HealthKit is not available on this device")
         }
@@ -436,27 +436,33 @@ final class HealthKitCollector: DataCollector {
             throw CollectorError.noEnabledSources
         }
 
-        // Determine which HK types to query (deduplicate across source IDs)
         let typesToQuery = allHKTypes(for: enabled)
 
-        // Load anchor date (or default to N days ago)
-        let anchorDate = loadAnchorDate()
-            ?? Calendar.current.date(byAdding: .day, value: -initialLookbackDays, to: Date())!
+        // Determine start date:
+        // - fullSync: query all available history
+        // - incremental: from anchor's start-of-day (catches late-arriving data)
+        let startDate: Date
+        if fullSync {
+            startDate = Calendar.current.date(byAdding: .year, value: -50, to: Date())!
+        } else {
+            let anchor = loadAnchorDate()
+                ?? Calendar.current.date(byAdding: .day, value: -initialLookbackDays, to: Date())!
+            startDate = Calendar.current.startOfDay(for: anchor)
+        }
 
-        // Query each type and collect raw samples, tracking stats
+        // Query each type and collect raw samples
         var allRawSamples: [RawHealthSample] = []
         var typesWithData = 0
 
         for type in typesToQuery {
             do {
-                let samples = try await querySamples(type: type, since: anchorDate)
+                let samples = try await querySamples(type: type, since: startDate)
                 let rawSamples = samples.compactMap { encodeSample($0) }
                 if !rawSamples.isEmpty {
                     typesWithData += 1
                 }
                 allRawSamples.append(contentsOf: rawSamples)
             } catch {
-                // Per-query failure: log and continue with other types
                 print("[HealthKitCollector] Failed to query \(type.identifier): \(error)")
             }
         }
@@ -467,61 +473,71 @@ final class HealthKitCollector: DataCollector {
             samplesCollected: allRawSamples.count
         )
 
-        var batches: [DaySamples] = []
-
-        if !allRawSamples.isEmpty {
-            // Group samples by startDate's calendar day
-            let calendar = Calendar.current
-            let grouped = Dictionary(grouping: allRawSamples) { sample -> String in
-                let components = calendar.dateComponents([.year, .month, .day], from: sample.start)
-                return String(format: "%04d-%02d-%02d",
-                              components.year!, components.month!, components.day!)
-            }
-
-            // Build DaySamples for each day
-            let syncTimestamp = ISO8601DateFormatter().string(from: Date())
-                .replacingOccurrences(of: ":", with: "-")
-            let deviceInfo = currentDeviceInfo()
-            let encoder = JSONEncoder()
-            encoder.dateEncodingStrategy = .iso8601
-            encoder.outputFormatting = [.sortedKeys]
-
-            for (dayString, samples) in grouped.sorted(by: { $0.key < $1.key }) {
-                let sorted = samples.sorted { $0.start < $1.start }
-
-                let payload = SyncFilePayload(
-                    syncedAt: Date(),
-                    deviceInfo: deviceInfo,
-                    samples: sorted
-                )
-
-                guard let jsonData = try? encoder.encode(payload) else {
-                    continue
-                }
-
-                // Path: imports/fitness/apple-health/YYYY/MM/DD/sample-<timestamp>.json
-                let pathComponents = dayString.split(separator: "-")
-                guard pathComponents.count == 3 else { continue }
-                let uploadPath = "imports/fitness/apple-health/\(pathComponents[0])/\(pathComponents[1])/\(pathComponents[2])/sample-\(syncTimestamp).json"
-
-                let dayDate = dayDateFormatter.date(from: dayString) ?? Date()
-
-                batches.append(DaySamples(
-                    date: dayDate,
-                    collectorID: id,
-                    uploadPath: uploadPath,
-                    data: jsonData,
-                    anchorToken: sorted.last?.end ?? sorted.last?.start
-                ))
-            }
+        guard !allRawSamples.isEmpty else {
+            return CollectionResult(batches: [], stats: stats)
         }
 
-        // Also collect workouts (separate files, separate anchor)
-        if !allHKTypes(for: enabled).filter({ $0 is HKWorkoutType }).isEmpty {
-            let workoutStart = loadWorkoutAnchorDate()
-                ?? Calendar.current.date(byAdding: .day, value: -initialLookbackDays, to: Date())!
-            let workoutBatches = (try? await collectWorkouts(since: workoutStart)) ?? []
-            batches.append(contentsOf: workoutBatches)
+        // Group by (day, HK type) — using sample's own timezone for day boundary.
+        // For workouts, further split by activity type.
+        struct GroupInfo {
+            var dayKey: SampleDayBucket.DayKey
+            var type: String
+            var unit: String?
+            var samples: [RawHealthSample]
+        }
+        var grouped: [String: GroupInfo] = [:]  // key: "YYYY-MM-DD/<file-base>"
+
+        for sample in allRawSamples {
+            let dayKey = SampleDayBucket.dayKey(sampleStart: sample.start, metadata: sample.metadata)
+
+            let fileBase: String
+            if sample.type == "HKWorkoutTypeIdentifier",
+               let meta = sample.metadata,
+               let activityName = meta["workoutActivityType"] as? String {
+                fileBase = HKTypeFileName.workoutFileName(activityName: activityName)
+            } else {
+                fileBase = HKTypeFileName.fileName(for: sample.type)
+            }
+
+            let key = "\(dayKey.date)/\(fileBase)"
+
+            if grouped[key] == nil {
+                grouped[key] = GroupInfo(dayKey: dayKey, type: sample.type, unit: sample.unit, samples: [])
+            }
+            grouped[key]!.samples.append(sample)
+        }
+
+        // Build TypeDayPayload for each group -> DaySamples batch
+        var batches: [DaySamples] = []
+
+        for (key, group) in grouped.sorted(by: { $0.key < $1.key }) {
+            let payload = TypeDayPayload(
+                type: group.type,
+                date: group.dayKey.date,
+                timezone: group.dayKey.timezone,
+                unit: group.unit,
+                samples: group.samples
+            )
+
+            guard let jsonData = try? TypeDayPayload.encode(payload) else {
+                continue
+            }
+
+            // Path: imports/fitness/apple-health/YYYY/MM/DD/<type-kebab>.json
+            let pathComponents = group.dayKey.date.split(separator: "-")
+            guard pathComponents.count == 3 else { continue }
+            let fileBase = key.split(separator: "/").last!
+            let uploadPath = "imports/fitness/apple-health/\(pathComponents[0])/\(pathComponents[1])/\(pathComponents[2])/\(fileBase).json"
+
+            let dayDate = dayDateFormatter.date(from: group.dayKey.date) ?? Date()
+
+            batches.append(DaySamples(
+                date: dayDate,
+                collectorID: id,
+                uploadPath: uploadPath,
+                data: jsonData,
+                anchorToken: group.samples.map(\.end).max() ?? group.samples.map(\.start).max()
+            ))
         }
 
         return CollectionResult(batches: batches, stats: stats)
@@ -848,19 +864,6 @@ final class HealthKitCollector: DataCollector {
 }
 
 // MARK: - Codable Types for JSON Output
-
-/// The JSON payload written to each sync file.
-private struct SyncFilePayload: Encodable {
-    let syncedAt: Date
-    let deviceInfo: DeviceInfo
-    let samples: [RawHealthSample]
-
-    enum CodingKeys: String, CodingKey {
-        case syncedAt = "synced_at"
-        case deviceInfo = "device_info"
-        case samples
-    }
-}
 
 /// Device information included in each sync file.
 struct DeviceInfo: Encodable {

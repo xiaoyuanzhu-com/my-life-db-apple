@@ -11,17 +11,17 @@ import Foundation
 
 struct UploadPathTests {
 
-    @Test func sampleUploadPathShape() {
+    @Test func deterministicUploadPathShape() {
+        // Mirror the path construction used in HealthKitCollector.collectNewSamples()
         let dayString = "2026-02-20"
-        let syncTimestamp = "2026-02-20T09-58-48Z"
+        let fileBase = HKTypeFileName.fileName(for: "HKQuantityTypeIdentifierStepCount")
         let parts = dayString.split(separator: "-")
 
-        // Mirror the exact construction used in HealthKitCollector.collectNewSamples()
-        let uploadPath = "imports/fitness/apple-health/\(parts[0])/\(parts[1])/\(parts[2])/sample-\(syncTimestamp).json"
+        let uploadPath = "imports/fitness/apple-health/\(parts[0])/\(parts[1])/\(parts[2])/\(fileBase).json"
 
-        #expect(uploadPath == "imports/fitness/apple-health/2026/02/20/sample-2026-02-20T09-58-48Z.json")
+        #expect(uploadPath == "imports/fitness/apple-health/2026/02/20/step-count.json")
         #expect(!uploadPath.contains("/raw/"))
-        #expect(uploadPath.contains("/sample-"))
+        #expect(uploadPath.hasSuffix(".json"))
     }
 }
 
