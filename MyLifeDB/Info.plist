@@ -6,6 +6,8 @@
 	<string>MyLifeDB needs access to your photo library to attach photos and videos to inbox items.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>MyLifeDB reads health data to sync it to your personal life database. Data is only sent to your own server.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>MyLifeDB may write health data back to HealthKit as part of syncing with your personal life database.</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>com.mylifedb.sync</string>
