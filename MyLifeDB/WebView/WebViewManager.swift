@@ -128,84 +128,99 @@ final class TabWebViewModel {
         navigationTask?.cancel()
 
         navigationTask = Task { @MainActor [weak self] in
-            guard let navigations = self?.webPage.navigations else { return }
-            do {
-                for try await event in navigations {
-                    guard let self, !Task.isCancelled else { return }
-                    switch event {
-                    case .committed:
-                        // Inject bridge polyfill and platform detection as soon as content starts loading
-                        await self.injectBridgePolyfill()
+            // Wrap the observation in a loop so it restarts after recoverable
+            // errors (process termination, provisional navigation failure).
+            // The loop exits only when the task is cancelled, self is
+            // deallocated, or the navigation sequence ends normally.
+            while !Task.isCancelled {
+                guard let self else { return }
+                let navigations = self.webPage.navigations
+                do {
+                    for try await event in navigations {
+                        guard !Task.isCancelled else { return }
+                        switch event {
+                        case .committed:
+                            // Inject bridge polyfill and platform detection as soon as content starts loading
+                            await self.injectBridgePolyfill()
 
-                        // Inject auth cookies via JS immediately — ensures cookies are present
-                        // before React's first fetch, bypassing HTTPCookieStorage sync delay
-                        await self.injectAuthCookiesViaJS()
+                            // Inject auth cookies via JS immediately — ensures cookies are present
+                            // before React's first fetch, bypassing HTTPCookieStorage sync delay
+                            await self.injectAuthCookiesViaJS()
 
-                        // Inject real safe area insets as CSS custom properties.
-                        // Must happen before React renders so fullscreen overlays
-                        // can position elements outside the Dynamic Island / notch.
-                        await self.injectSafeAreaInsets()
+                            // Inject real safe area insets as CSS custom properties.
+                            // Must happen before React renders so fullscreen overlays
+                            // can position elements outside the Dynamic Island / notch.
+                            await self.injectSafeAreaInsets()
 
-                    case .finished:
-                        self.isLoaded = true
-                        self.loadError = nil
+                        case .finished:
+                            self.isLoaded = true
+                            self.loadError = nil
 
-                        // Sync theme on load
-                        self.syncTheme()
+                            // Sync theme on load
+                            self.syncTheme()
 
-                        // Signal the web frontend to re-check auth after a short delay.
-                        // The delay ensures React has mounted and registered its
-                        // "native-recheck-auth" event listener.
-                        Task { @MainActor [weak self] in
-                            try? await Task.sleep(for: .milliseconds(200))
-                            guard !Task.isCancelled else { return }
-                            _ = try? await self?.webPage.callJavaScript("window.__nativeRecheckAuth?.()")
+                            // Signal the web frontend to re-check auth after a short delay.
+                            // The delay ensures React has mounted and registered its
+                            // "native-recheck-auth" event listener.
+                            Task { @MainActor [weak self] in
+                                try? await Task.sleep(for: .milliseconds(200))
+                                guard !Task.isCancelled else { return }
+                                _ = try? await self?.webPage.callJavaScript("window.__nativeRecheckAuth?.()")
+                            }
+
+                            // Flush any navigation that was queued while loading
+                            if let pending = self.pendingNavigation {
+                                self.navigateTo(path: pending)
+                            }
+
+                        default:
+                            break
                         }
-
-                        // Flush any navigation that was queued while loading
-                        if let pending = self.pendingNavigation {
-                            self.navigateTo(path: pending)
-                        }
-
-                    default:
-                        break
                     }
-                }
-            } catch let error as WebPage.NavigationError {
-                guard let self, !Task.isCancelled else { return }
-                switch error {
-                case .failedProvisionalNavigation(let underlying):
-                    self.isLoaded = false
-                    self.loadError = underlying
-                    print("[TabWebViewModel:\(self.route)] Provisional navigation failed: \(underlying.localizedDescription)")
-                case .webContentProcessTerminated:
-                    // Debounce: if the process was terminated very recently,
-                    // skip the reload to avoid a crash→reload→crash spiral
-                    // that exhausts memory under pressure.
-                    if let last = self.lastProcessTermination,
-                       Date().timeIntervalSince(last) < Self.processTerminationCooldown {
-                        print("[TabWebViewModel:\(self.route)] WebView process terminated again within \(Self.processTerminationCooldown)s, skipping auto-reload")
+                    // Navigation sequence ended normally — no more events expected.
+                    break
+                } catch let error as WebPage.NavigationError {
+                    guard !Task.isCancelled else { return }
+                    switch error {
+                    case .failedProvisionalNavigation(let underlying):
+                        self.isLoaded = false
+                        self.loadError = underlying
+                        print("[TabWebViewModel:\(self.route)] Provisional navigation failed: \(underlying.localizedDescription)")
+                        // Loop restarts — will observe the next navigation attempt.
+                    case .webContentProcessTerminated:
+                        // Debounce: if the process was terminated very recently,
+                        // wait for the cooldown before retrying to avoid a
+                        // crash→reload→crash spiral that exhausts memory.
+                        if let last = self.lastProcessTermination,
+                           Date().timeIntervalSince(last) < Self.processTerminationCooldown {
+                            print("[TabWebViewModel:\(self.route)] WebView process terminated again within \(Self.processTerminationCooldown)s, waiting before retry")
+                            self.isLoaded = false
+                            self.bridgeInjected = false
+                            try? await Task.sleep(for: .seconds(Self.processTerminationCooldown))
+                            // After cooldown, loop restarts and re-observes.
+                            continue
+                        }
+                        print("[TabWebViewModel:\(self.route)] WebView process terminated, reloading...")
+                        self.lastProcessTermination = Date()
                         self.isLoaded = false
                         self.bridgeInjected = false
-                        break
+                        // Re-inject cookies via store before reload (JS not available after crash)
+                        if let baseURL = self.baseURL {
+                            self.injectAuthCookiesViaStore(for: baseURL)
+                        }
+                        self.webPage.reload()
+                        // Loop restarts — will observe the reload's navigation events.
+                    default:
+                        self.loadError = error
+                        print("[TabWebViewModel:\(self.route)] Navigation error: \(error)")
+                        // Loop restarts.
                     }
-                    print("[TabWebViewModel:\(self.route)] WebView process terminated, reloading...")
-                    self.lastProcessTermination = Date()
-                    self.isLoaded = false
-                    self.bridgeInjected = false
-                    // Re-inject cookies via store before reload (JS not available after crash)
-                    if let baseURL = self.baseURL {
-                        self.injectAuthCookiesViaStore(for: baseURL)
-                    }
-                    self.webPage.reload()
-                default:
+                } catch {
+                    guard !Task.isCancelled else { return }
                     self.loadError = error
-                    print("[TabWebViewModel:\(self.route)] Navigation error: \(error)")
+                    print("[TabWebViewModel:\(self.route)] Navigation failed: \(error.localizedDescription)")
+                    // Loop restarts.
                 }
-            } catch {
-                guard let self, !Task.isCancelled else { return }
-                self.loadError = error
-                print("[TabWebViewModel:\(self.route)] Navigation failed: \(error.localizedDescription)")
             }
         }
     }
