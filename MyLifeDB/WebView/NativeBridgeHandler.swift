@@ -169,11 +169,15 @@ final class NativeBridgeHandler: URLSchemeHandler {
         window.nativePlatform = '\(nativePlatform)';
 
         // Lock viewport to prevent zoom — keep viewport-fit=cover for safe-area insets.
+        // Also disable WebKit text auto-sizing which can cause apparent zoom changes
+        // during dynamic content updates (e.g. streaming messages) independent of the
+        // viewport zoom lock.
         (function() {
             var meta = document.querySelector('meta[name="viewport"]');
             if (meta) {
                 meta.content = 'width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
             }
+            document.documentElement.style.webkitTextSizeAdjust = '100%';
         })();
 
         // Standalone auth re-check function — callable by native at any time,
