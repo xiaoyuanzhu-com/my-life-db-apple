@@ -67,6 +67,11 @@ final class SyncManager {
     @ObservationIgnored
     private let watermark = SyncWatermark()
 
+    #if os(iOS)
+    @ObservationIgnored
+    private var backgroundTaskRegistered = false
+    #endif
+
     // MARK: - Background Task ID
 
     #if os(iOS)
@@ -139,8 +144,11 @@ final class SyncManager {
     // MARK: - Background Task Registration
 
     #if os(iOS)
-    /// Register the background task with the system. Call once at app launch.
+    /// Register the background task with the system. Safe to call multiple times.
     func registerBackgroundTask() {
+        guard !backgroundTaskRegistered else { return }
+        backgroundTaskRegistered = true
+
         BGTaskScheduler.shared.register(
             forTaskWithIdentifier: Self.backgroundTaskID,
             using: nil
