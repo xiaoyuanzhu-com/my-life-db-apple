@@ -15,6 +15,7 @@ struct LibraryGridView: View {
 
     let children: [FileTreeNode]
     let folderPath: String
+    var onRefresh: (() async -> Void)?
 
     private let columns = [
         GridItem(.adaptive(minimum: 90, maximum: 120), spacing: 12)
@@ -46,6 +47,9 @@ struct LibraryGridView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+        }
+        .refreshable {
+            await onRefresh?()
         }
     }
 

@@ -134,9 +134,6 @@ struct LibraryFolderView: View {
                 await loadChildren()
             }
         }
-        .refreshable {
-            await loadChildren(ignoreCache: true)
-        }
     }
 
     // MARK: - Content View
@@ -145,9 +142,13 @@ struct LibraryFolderView: View {
     private var contentView: some View {
         switch viewMode {
         case .grid:
-            LibraryGridView(children: children, folderPath: folderPath)
+            LibraryGridView(children: children, folderPath: folderPath, onRefresh: {
+                await loadChildren(ignoreCache: true)
+            })
         case .list:
-            LibraryListView(children: children, folderPath: folderPath)
+            LibraryListView(children: children, folderPath: folderPath, onRefresh: {
+                await loadChildren(ignoreCache: true)
+            })
         }
     }
 
