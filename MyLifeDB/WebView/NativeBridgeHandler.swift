@@ -16,16 +16,26 @@
 //  - copyToClipboard: Copy text to system clipboard
 //  - log: Forward console messages to native log
 //  - requestTokenRefresh: Await native token refresh (returns JSON response)
+//  - fullscreenPreview: Toggle fullscreen preview state (disables swipe-back)
 //
 
 import WebKit
+import Observation
 #if os(iOS)
 import UIKit
 #elseif os(macOS)
 import AppKit
 #endif
 
+@Observable
 final class NativeBridgeHandler: URLSchemeHandler {
+
+    // MARK: - Observable State
+
+    /// Whether the web frontend is showing a fullscreen preview (e.g. Estima slides).
+    /// When true, the hosting view should disable the NavigationStack's interactive
+    /// pop gesture so swipe gestures reach the iframe content instead.
+    private(set) var isFullscreenPreview = false
 
     // MARK: - URLSchemeHandler
 
@@ -87,6 +97,8 @@ final class NativeBridgeHandler: URLSchemeHandler {
             handleOpenExternal(body)
         case "copyToClipboard":
             handleCopyToClipboard(body)
+        case "fullscreenPreview":
+            handleFullscreenPreview(body)
         case "log":
             handleLog(body)
         default:
@@ -150,6 +162,11 @@ final class NativeBridgeHandler: URLSchemeHandler {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
         #endif
+    }
+
+    @MainActor
+    private func handleFullscreenPreview(_ body: [String: Any]) {
+        isFullscreenPreview = (body["isFullscreen"] as? Bool) ?? false
     }
 
     private func handleLog(_ body: [String: Any]) {

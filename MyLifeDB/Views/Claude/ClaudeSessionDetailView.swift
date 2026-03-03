@@ -50,6 +50,15 @@ struct ClaudeSessionDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
+        // Disable the NavigationStack's interactive pop gesture while the web
+        // frontend is showing a fullscreen preview (e.g. Estima slides).
+        // This lets swipe gestures reach the iframe content instead of
+        // triggering an unexpected navigation back to the session list.
+        .background(
+            InteractivePopGestureController(
+                disabled: webVM.bridgeHandler.isFullscreenPreview
+            )
+        )
         #else
         .navigationTitle(title ?? "Session")
         #endif
@@ -70,3 +79,26 @@ struct ClaudeSessionDetailView: View {
         }
     }
 }
+
+// MARK: - Interactive Pop Gesture Controller
+
+#if os(iOS)
+/// UIKit introspection helper that finds the hosting UINavigationController
+/// and toggles its `interactivePopGestureRecognizer.isEnabled`.
+///
+/// SwiftUI's NavigationStack doesn't expose this gesture recognizer directly,
+/// so we walk the responder chain from a dummy UIViewController to find it.
+private struct InteractivePopGestureController: UIViewControllerRepresentable {
+
+    let disabled: Bool
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        UIViewController()
+    }
+
+    func updateUIViewController(_ vc: UIViewController, context: Context) {
+        // Walk up to the UINavigationController (may not exist on first layout)
+        vc.navigationController?.interactivePopGestureRecognizer?.isEnabled = !disabled
+    }
+}
+#endif
