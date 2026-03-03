@@ -23,18 +23,6 @@ jobs:
           echo "Using iOS build number: $CI_BUILD_NUMBER"
           echo "CI_BUILD_NUMBER=$CI_BUILD_NUMBER" >> "$GITHUB_ENV"
 
-          set_plist_version() {
-            local plist="$1"
-            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $CI_BUILD_NUMBER" "$plist" >/dev/null 2>&1 || \
-              /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $CI_BUILD_NUMBER" "$plist"
-          }
-
-          set_plist_version "MyLifeDB/Info.plist"
-          set_plist_version "MyLifeDBShareExtension/Info.plist"
-
-          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" MyLifeDB/Info.plist
-          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" MyLifeDBShareExtension/Info.plist
-
       - name: Setup signing
         env:
           CERTIFICATES_P12: ${{ secrets.CERTIFICATES_P12 }}
@@ -193,18 +181,6 @@ jobs:
           CI_BUILD_NUMBER=$((GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT))
           echo "Using macOS build number: $CI_BUILD_NUMBER"
           echo "CI_BUILD_NUMBER=$CI_BUILD_NUMBER" >> "$GITHUB_ENV"
-
-          set_plist_version() {
-            local plist="$1"
-            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $CI_BUILD_NUMBER" "$plist" >/dev/null 2>&1 || \
-              /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $CI_BUILD_NUMBER" "$plist"
-          }
-
-          set_plist_version "MyLifeDB/Info.plist"
-          set_plist_version "MyLifeDBShareExtension/Info.plist"
-
-          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" MyLifeDB/Info.plist
-          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" MyLifeDBShareExtension/Info.plist
 
       - name: Setup signing
         env:

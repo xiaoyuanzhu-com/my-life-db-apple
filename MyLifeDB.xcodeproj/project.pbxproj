@@ -172,7 +172,6 @@
 				13D394832EE7C55F0032BA9F /* Frameworks */,
 				13D394842EE7C55F0032BA9F /* Resources */,
 				AA000002AAAA00010032BA9F /* Embed Foundation Extensions */,
-				BB000001BBBB00010032BA9F /* Set Build Number */,
 			);
 			buildRules = (
 			);
@@ -243,7 +242,6 @@
 				AA00000AAAAA00010032BA9F /* Sources */,
 				AA000008AAAA00010032BA9F /* Frameworks */,
 				AA00000BAAAA00010032BA9F /* Resources */,
-				BB000002BBBB00010032BA9F /* Set Build Number */,
 			);
 			buildRules = (
 			);
@@ -338,47 +336,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		BB000001BBBB00010032BA9F /* Set Build Number */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Set Build Number";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "BUILD_NUMBER=$(git rev-list --count HEAD)\n/usr/libexec/PlistBuddy -c \"Set :CFBundleVersion ${BUILD_NUMBER}\" \"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\necho \"Build number set to ${BUILD_NUMBER}\"\n";
-		};
-		BB000002BBBB00010032BA9F /* Set Build Number */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Set Build Number";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "BUILD_NUMBER=$(git rev-list --count HEAD)\n/usr/libexec/PlistBuddy -c \"Set :CFBundleVersion ${BUILD_NUMBER}\" \"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\necho \"Build number set to ${BUILD_NUMBER}\"\n";
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		13D394822EE7C55F0032BA9F /* Sources */ = {
