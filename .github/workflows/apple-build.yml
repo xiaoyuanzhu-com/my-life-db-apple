@@ -74,6 +74,9 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
+          CI_BUILD_NUMBER=$((GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT))
+          echo "Using iOS build number: $CI_BUILD_NUMBER"
+
           xcodebuild archive \
             -project MyLifeDB.xcodeproj \
             -scheme MyLifeDB \
@@ -82,7 +85,8 @@ jobs:
             -authenticationKeyPath ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8 \
             -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
             -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
-            -allowProvisioningUpdates
+            -allowProvisioningUpdates \
+            CURRENT_PROJECT_VERSION="$CI_BUILD_NUMBER"
 
       - name: Export IPA
         env:
@@ -219,6 +223,9 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
+          CI_BUILD_NUMBER=$((GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT))
+          echo "Using macOS build number: $CI_BUILD_NUMBER"
+
           xcodebuild archive \
             -project MyLifeDB.xcodeproj \
             -scheme MyLifeDB \
@@ -227,7 +234,8 @@ jobs:
             -authenticationKeyPath ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8 \
             -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
             -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
-            -allowProvisioningUpdates
+            -allowProvisioningUpdates \
+            CURRENT_PROJECT_VERSION="$CI_BUILD_NUMBER"
 
       - name: Export app
         env:
