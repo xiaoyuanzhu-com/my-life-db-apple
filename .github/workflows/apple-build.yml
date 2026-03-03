@@ -76,8 +76,9 @@ jobs:
         run: |
           CI_BUILD_NUMBER=$((GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT))
           echo "Using iOS build number: $CI_BUILD_NUMBER"
+          echo "CI_BUILD_NUMBER=$CI_BUILD_NUMBER" >> "$GITHUB_ENV"
 
-          xcodebuild archive \
+          xcodebuild \
             -project MyLifeDB.xcodeproj \
             -scheme MyLifeDB \
             -archivePath "$RUNNER_TEMP/MyLifeDB-iOS.xcarchive" \
@@ -86,7 +87,21 @@ jobs:
             -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
             -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
             -allowProvisioningUpdates \
-            CURRENT_PROJECT_VERSION="$CI_BUILD_NUMBER"
+            CURRENT_PROJECT_VERSION="$CI_BUILD_NUMBER" \
+            archive
+
+      - name: Verify iOS archive metadata
+        run: |
+          APP_INFO_PLIST="$RUNNER_TEMP/MyLifeDB-iOS.xcarchive/Products/Applications/MyLifeDB.app/Info.plist"
+          ARCHIVE_BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP_INFO_PLIST")
+          ARCHIVE_SHORT_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_INFO_PLIST")
+
+          echo "Archived iOS version: $ARCHIVE_SHORT_VERSION ($ARCHIVE_BUILD_NUMBER)"
+
+          if [ "$ARCHIVE_BUILD_NUMBER" != "$CI_BUILD_NUMBER" ]; then
+            echo "Expected build number $CI_BUILD_NUMBER but archive contains $ARCHIVE_BUILD_NUMBER"
+            exit 1
+          fi
 
       - name: Export IPA
         env:
@@ -107,47 +122,40 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
+          LOG_FILE="$RUNNER_TEMP/altool-validate.log"
+          set +e
           xcrun altool --validate-app \
             -f "$RUNNER_TEMP/ios-output/MyLifeDB.ipa" \
             --apiKey "$APP_STORE_CONNECT_KEY_ID" \
             --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID" \
-            --output-format json
+            --output-format json 2>&1 | tee "$LOG_FILE"
+          STATUS=${PIPESTATUS[0]}
+          set -e
+
+          if [ "$STATUS" -ne 0 ] || grep -q "ERROR:" "$LOG_FILE"; then
+            echo "altool validation failed"
+            exit 1
+          fi
 
       - name: Upload to TestFlight
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
+          LOG_FILE="$RUNNER_TEMP/altool-upload.log"
+          set +e
           xcrun altool --upload-app \
             -f "$RUNNER_TEMP/ios-output/MyLifeDB.ipa" \
             --apiKey "$APP_STORE_CONNECT_KEY_ID" \
             --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID" \
-            --output-format json
+            --output-format json 2>&1 | tee "$LOG_FILE"
+          STATUS=${PIPESTATUS[0]}
+          set -e
 
-      - name: Wait for App Store processing
-        env:
-          APP_STORE_APPLE_ID: ${{ secrets.APP_STORE_APPLE_ID }}
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-        run: |
-          if [ -z "$APP_STORE_APPLE_ID" ]; then
-            echo "APP_STORE_APPLE_ID is not set; skipping App Store processing wait."
-            exit 0
+          if [ "$STATUS" -ne 0 ] || grep -q "ERROR:" "$LOG_FILE"; then
+            echo "altool upload failed"
+            exit 1
           fi
-
-          APP_INFO_PLIST="$RUNNER_TEMP/MyLifeDB-iOS.xcarchive/Products/Applications/MyLifeDB.app/Info.plist"
-          BUNDLE_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP_INFO_PLIST")
-          SHORT_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_INFO_PLIST")
-
-          xcrun altool --build-status \
-            --apple-id "$APP_STORE_APPLE_ID" \
-            --bundle-version "$BUNDLE_VERSION" \
-            --bundle-short-version-string "$SHORT_VERSION" \
-            --platform ios \
-            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
-            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID" \
-            --wait \
-            --output-format json
 
       - name: Cleanup
         if: always()
@@ -226,7 +234,7 @@ jobs:
           CI_BUILD_NUMBER=$((GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT))
           echo "Using macOS build number: $CI_BUILD_NUMBER"
 
-          xcodebuild archive \
+          xcodebuild \
             -project MyLifeDB.xcodeproj \
             -scheme MyLifeDB \
             -archivePath "$RUNNER_TEMP/MyLifeDB-macOS.xcarchive" \
@@ -235,7 +243,8 @@ jobs:
             -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
             -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
             -allowProvisioningUpdates \
-            CURRENT_PROJECT_VERSION="$CI_BUILD_NUMBER"
+            CURRENT_PROJECT_VERSION="$CI_BUILD_NUMBER" \
+            archive
 
       - name: Export app
         env:
