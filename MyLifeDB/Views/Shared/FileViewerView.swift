@@ -224,13 +224,13 @@ struct FileViewerView: View {
     private func fileContentView(_ file: FileRecord) -> some View {
         if file.isImage {
             // ImageFileView handles both double-tap (zoom) and single-tap (dismiss) internally.
-            ImageFileView(path: filePath, onTap: dismissAction)
+            ImageFileView(path: filePath, modifiedAt: file.modifiedAt, onTap: dismissAction)
         } else if file.isText {
-            TextFileView(path: filePath)
+            TextFileView(path: filePath, modifiedAt: file.modifiedAt)
                 .contentShape(Rectangle())
                 .onTapGesture { dismissAction() }
         } else if file.isPDF {
-            PDFFileView(path: filePath)
+            PDFFileView(path: filePath, modifiedAt: file.modifiedAt)
                 .contentShape(Rectangle())
                 .onTapGesture { dismissAction() }
         } else if file.isVideo {

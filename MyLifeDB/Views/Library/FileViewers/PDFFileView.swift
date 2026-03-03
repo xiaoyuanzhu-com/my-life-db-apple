@@ -12,6 +12,7 @@ import PDFKit
 struct PDFFileView: View {
 
     let path: String
+    var modifiedAt: Int64? = nil
 
     @State private var pdfDocument: PDFDocument?
     @State private var isLoading = true
@@ -47,7 +48,7 @@ struct PDFFileView: View {
 
         do {
             let url = APIClient.shared.rawFileURL(path: path)
-            let data = try await FileCache.shared.data(for: url)
+            let data = try await FileCache.shared.data(for: url, expectedModifiedAt: modifiedAt)
             pdfDocument = PDFDocument(data: data)
             if pdfDocument == nil {
                 self.error = NSError(

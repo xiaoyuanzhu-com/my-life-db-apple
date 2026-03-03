@@ -11,6 +11,7 @@ import SwiftUI
 struct ImageFileView: View {
 
     let path: String
+    var modifiedAt: Int64? = nil
     /// Called on single tap (used for dismiss). Double-tap is handled internally for zoom.
     var onTap: (() -> Void)?
 
@@ -153,7 +154,7 @@ struct ImageFileView: View {
 
         do {
             let url = APIClient.shared.rawFileURL(path: path)
-            imageData = try await FileCache.shared.data(for: url)
+            imageData = try await FileCache.shared.data(for: url, expectedModifiedAt: modifiedAt)
         } catch {
             self.error = error
         }

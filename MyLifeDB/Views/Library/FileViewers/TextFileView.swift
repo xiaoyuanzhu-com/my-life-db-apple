@@ -11,6 +11,7 @@ import SwiftUI
 struct TextFileView: View {
 
     let path: String
+    var modifiedAt: Int64? = nil
 
     @State private var content: String?
     @State private var isLoading = true
@@ -51,7 +52,7 @@ struct TextFileView: View {
 
         do {
             let url = APIClient.shared.rawFileURL(path: path)
-            let data = try await FileCache.shared.data(for: url)
+            let data = try await FileCache.shared.data(for: url, expectedModifiedAt: modifiedAt)
             content = String(data: data, encoding: .utf8)
             if content == nil {
                 // Try Latin-1 as fallback for non-UTF8 files
