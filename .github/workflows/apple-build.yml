@@ -19,7 +19,7 @@ jobs:
 
       - name: Set iOS build number
         run: |
-          CI_BUILD_NUMBER=$((GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT))
+          CI_BUILD_NUMBER=$GITHUB_RUN_NUMBER
           echo "Using iOS build number: $CI_BUILD_NUMBER"
           echo "CI_BUILD_NUMBER=$CI_BUILD_NUMBER" >> "$GITHUB_ENV"
 
@@ -178,7 +178,7 @@ jobs:
 
       - name: Set macOS build number
         run: |
-          CI_BUILD_NUMBER=$((GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT))
+          CI_BUILD_NUMBER=$GITHUB_RUN_NUMBER
           echo "Using macOS build number: $CI_BUILD_NUMBER"
           echo "CI_BUILD_NUMBER=$CI_BUILD_NUMBER" >> "$GITHUB_ENV"
 
