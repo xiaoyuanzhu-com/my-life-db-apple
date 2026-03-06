@@ -20,6 +20,10 @@ import AppKit
 
 extension Notification.Name {
     static let webViewShouldReload = Notification.Name("webViewShouldReload")
+
+    /// Posted by NativeBridgeHandler when the web frontend requests native navigation
+    /// (e.g. clicking a file link in a Claude session that should switch to the Library tab).
+    static let nativeNavigateRequest = Notification.Name("nativeNavigateRequest")
 }
 
 // MARK: - TabWebViewModel

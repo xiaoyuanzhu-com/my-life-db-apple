@@ -164,6 +164,10 @@ private struct SharedModifiers: ViewModifier {
                 handleDeepLink(path)
                 deepLinkPath = nil
             }
+            .onReceive(NotificationCenter.default.publisher(for: .nativeNavigateRequest)) { notification in
+                guard let path = notification.userInfo?["path"] as? String else { return }
+                handleDeepLink(path)
+            }
     }
 
     private func handleDeepLink(_ path: String) {

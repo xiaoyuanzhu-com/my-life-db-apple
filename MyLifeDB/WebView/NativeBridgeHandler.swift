@@ -17,6 +17,7 @@
 //  - log: Forward console messages to native log
 //  - requestTokenRefresh: Await native token refresh (returns JSON response)
 //  - fullscreenPreview: Toggle fullscreen preview state (disables swipe-back)
+//  - navigate: Navigate to a route in the native app (switches tabs)
 //
 
 import WebKit
@@ -99,6 +100,8 @@ final class NativeBridgeHandler: URLSchemeHandler {
             handleCopyToClipboard(body)
         case "fullscreenPreview":
             handleFullscreenPreview(body)
+        case "navigate":
+            handleNavigate(body)
         case "log":
             handleLog(body)
         default:
@@ -167,6 +170,16 @@ final class NativeBridgeHandler: URLSchemeHandler {
     @MainActor
     private func handleFullscreenPreview(_ body: [String: Any]) {
         isFullscreenPreview = (body["isFullscreen"] as? Bool) ?? false
+    }
+
+    @MainActor
+    private func handleNavigate(_ body: [String: Any]) {
+        guard let path = body["path"] as? String else { return }
+        NotificationCenter.default.post(
+            name: .nativeNavigateRequest,
+            object: nil,
+            userInfo: ["path": path]
+        )
     }
 
     private func handleLog(_ body: [String: Any]) {
