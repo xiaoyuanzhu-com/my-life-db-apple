@@ -87,6 +87,9 @@ final class SyncManager {
             // Future: LocationCollector(),
             // Future: ScreenTimeCollector(),
         ]
+        #if os(macOS)
+        collectors.append(ClaudeCodeCollector())
+        #endif
 
         // Initialize per-collector states
         for collector in collectors {
