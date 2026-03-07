@@ -29,6 +29,7 @@ struct MyLifeDBApp: App {
 
     @State private var authManager = AuthManager.shared
     @State private var deepLinkPath: String?
+    @State private var refreshID = UUID()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
@@ -46,6 +47,7 @@ struct MyLifeDBApp: App {
 
                 case .authenticated:
                     MainTabView(deepLinkPath: $deepLinkPath)
+                        .id(refreshID)
                         .task {
                             // Sync API base URL to shared UserDefaults so the
                             // Share Extension can access it via App Group.
@@ -62,6 +64,9 @@ struct MyLifeDBApp: App {
             .animation(.default, value: authManager.state)
             .onOpenURL { url in
                 handleDeepLink(url)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .webViewShouldReload)) { _ in
+                refreshID = UUID()
             }
         }
         .modelContainer(sharedModelContainer)
