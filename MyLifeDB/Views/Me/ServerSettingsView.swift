@@ -14,6 +14,7 @@ struct ServerSettingsView: View {
     @State private var validationError: String?
     @State private var isCheckingConnection = false
     @State private var connectionStatus: ConnectionStatus = .unknown
+    @State private var initialURL: String = ""
 
     enum ConnectionStatus {
         case unknown, connected, unreachable
@@ -91,6 +92,12 @@ struct ServerSettingsView: View {
         .navigationTitle("Server")
         .onAppear {
             urlInput = apiBaseURL
+            initialURL = apiBaseURL
+        }
+        .onDisappear {
+            if apiBaseURL != initialURL {
+                NotificationCenter.default.post(name: .webViewShouldReload, object: nil)
+            }
         }
     }
 
@@ -103,7 +110,6 @@ struct ServerSettingsView: View {
         guard !urlString.isEmpty else {
             apiBaseURL = "https://my.xiaoyuanzhu.com"
             SharedConstants.sharedDefaults.set(apiBaseURL, forKey: SharedConstants.apiBaseURLKey)
-            reloadWebViewIfNeeded()
             return
         }
 
@@ -123,16 +129,6 @@ struct ServerSettingsView: View {
         // Also sync to shared UserDefaults for the Share Extension
         SharedConstants.sharedDefaults.set(urlString, forKey: SharedConstants.apiBaseURLKey)
 
-        // If the URL actually changed, reload the WebView with the new backend
-        if oldURL != urlString {
-            reloadWebViewIfNeeded()
-        }
-    }
-
-    /// Notify all WebViews to reload with the new server URL.
-    private func reloadWebViewIfNeeded() {
-        guard let newURL = URL(string: apiBaseURL) else { return }
-        NotificationCenter.default.post(name: .webViewShouldReload, object: newURL)
     }
 
     private func checkConnection() {
