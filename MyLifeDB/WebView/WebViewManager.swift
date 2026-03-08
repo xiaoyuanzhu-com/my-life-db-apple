@@ -86,6 +86,9 @@ final class TabWebViewModel {
         self.featureFlags = featureFlags
         let config = WebViewConfiguration.create(bridgeHandler: bridgeHandler)
         self.webPage = WebPage(configuration: config)
+        #if DEBUG
+        self.webPage.isInspectable = true
+        #endif
     }
 
     deinit {
@@ -439,6 +442,9 @@ final class TabWebViewModel {
         // Create a fresh WebPage with new configuration
         let config = WebViewConfiguration.create(bridgeHandler: bridgeHandler)
         self.webPage = WebPage(configuration: config)
+        #if DEBUG
+        self.webPage.isInspectable = true
+        #endif
 
         self.baseURL = baseURL
         injectAuthCookiesViaStore(for: baseURL)
