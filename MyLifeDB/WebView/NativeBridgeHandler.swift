@@ -40,17 +40,34 @@ final class NativeBridgeHandler: URLSchemeHandler {
 
     // MARK: - URLSchemeHandler
 
+    // CORS headers required because the WebView's page origin (e.g. http://192.168.x.x:12346)
+    // differs from the nativebridge:// scheme, triggering cross-origin enforcement in WebKit.
+    private static let corsHeaders: [String: String] = [
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+    ]
+
     func reply(for request: URLRequest) -> AsyncThrowingStream<URLSchemeTaskResult, any Error> {
         // Capture request data before entering the stream
         let body = request.httpBody
         let url = request.url ?? URL(string: "nativebridge://message")!
+        let method = request.httpMethod ?? "POST"
 
         return AsyncThrowingStream { continuation in
+            // Handle CORS preflight
+            if method == "OPTIONS" {
+                let response = HTTPURLResponse(url: url, statusCode: 204, httpVersion: nil, headerFields: Self.corsHeaders)!
+                continuation.yield(.response(response))
+                continuation.finish()
+                return
+            }
+
             guard let body,
                   let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
                   let action = json["action"] as? String else {
                 print("[NativeBridge] Invalid message format from URL scheme request")
-                let response = HTTPURLResponse(url: url, statusCode: 204, httpVersion: nil, headerFields: nil)!
+                let response = HTTPURLResponse(url: url, statusCode: 204, httpVersion: nil, headerFields: Self.corsHeaders)!
                 continuation.yield(.response(response))
                 continuation.finish()
                 return
@@ -69,11 +86,13 @@ final class NativeBridgeHandler: URLSchemeHandler {
                     let responseBody = (try? JSONSerialization.data(
                         withJSONObject: result
                     )) ?? Data("{}".utf8)
+                    var headers = Self.corsHeaders
+                    headers["Content-Type"] = "application/json"
                     let response = HTTPURLResponse(
                         url: url,
                         statusCode: 200,
                         httpVersion: nil,
-                        headerFields: ["Content-Type": "application/json"]
+                        headerFields: headers
                     )!
                     continuation.yield(.response(response))
                     continuation.yield(.data(responseBody))
@@ -84,7 +103,7 @@ final class NativeBridgeHandler: URLSchemeHandler {
                 Task { @MainActor [weak self] in
                     self?.dispatch(action: action, body: json)
                 }
-                let response = HTTPURLResponse(url: url, statusCode: 204, httpVersion: nil, headerFields: nil)!
+                let response = HTTPURLResponse(url: url, statusCode: 204, httpVersion: nil, headerFields: Self.corsHeaders)!
                 continuation.yield(.response(response))
                 continuation.finish()
             }
