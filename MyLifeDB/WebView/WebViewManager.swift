@@ -2,10 +2,13 @@
 //  TabWebViewModel.swift
 //  MyLifeDB
 //
-//  Per-tab WebView model. Each web tab (Inbox, Claude) creates its own
-//  instance, which owns an independent WebPage loaded at a fixed route.
+//  Per-tab WebView model. Each web tab creates its own instance,
+//  which owns an independent WebPage loaded at a fixed route.
 //
-//  Uses the SwiftUI-native WebView/WebPage API (iOS 26+).
+//  Auth strategy: WKUserScript at documentStart injects the bridge polyfill,
+//  access token, and feature flags BEFORE any page JS executes. The web
+//  frontend reads window.__nativeAccessToken and adds Authorization: Bearer
+//  headers via fetchWithRefresh. See hybrid.md for the full design.
 //
 
 import WebKit
@@ -37,8 +40,6 @@ final class TabWebViewModel {
     let route: String
 
     /// Feature flags to inject into the WebView before React mounts.
-    /// Keys map to FeatureFlags properties on the web side (e.g. "sessionSidebar").
-    /// Only flags explicitly set here are injected; missing flags keep their web-side defaults.
     let featureFlags: [String: Bool]
 
     // MARK: - Observable State
@@ -54,26 +55,16 @@ final class TabWebViewModel {
 
     // MARK: - Non-observable State
 
-    /// The base URL of the backend (e.g., http://localhost:12345).
     private var baseURL: URL?
-
-    /// Whether the bridge polyfill has been injected for the current page load.
-    private var bridgeInjected = false
-
-    /// Queued path to navigate to once the page finishes loading.
-    /// Set when `navigateTo` is called while `isLoaded` is false.
     private var pendingNavigation: String?
-
-    /// The running navigation observation task.  Stored so it can be
-    /// cancelled when `teardownAndReload` replaces the WebPage, preventing
-    /// the old task from keeping `self` alive via the async `for await` loop.
     private var navigationTask: Task<Void, Never>?
-
-    /// Tracks the last process-termination time to avoid a crash→reload spiral
-    /// under memory pressure.  If the process crashes again within this window,
-    /// we skip the automatic reload.
     private var lastProcessTermination: Date?
     private static let processTerminationCooldown: TimeInterval = 10
+
+    /// Shared user content controller. Holds the WKUserScript that injects
+    /// the bridge polyfill + access token at documentStart. Persists across
+    /// reloads; updated before each load/reload to use the freshest token.
+    private let userContentController = WKUserContentController()
 
     // MARK: - Bridge
 
@@ -84,7 +75,18 @@ final class TabWebViewModel {
     init(route: String, featureFlags: [String: Bool] = [:]) {
         self.route = route
         self.featureFlags = featureFlags
-        let config = WebViewConfiguration.create(bridgeHandler: bridgeHandler)
+
+        // Register the document-start user script with bridge + token + flags.
+        Self.registerBridgeScript(
+            on: userContentController,
+            featureFlags: featureFlags,
+            accessToken: AuthManager.shared.accessToken
+        )
+
+        let config = WebViewConfiguration.create(
+            bridgeHandler: bridgeHandler,
+            userContentController: userContentController
+        )
         self.webPage = WebPage(configuration: config)
         #if DEBUG
         self.webPage.isInspectable = true
@@ -97,11 +99,8 @@ final class TabWebViewModel {
 
     // MARK: - Setup
 
-    /// Inject auth cookies and load the base URL + route.
-    /// Call this after authentication is confirmed.
     @MainActor
     func setup(baseURL: URL) async {
-        // Avoid double-setup
         guard self.baseURL == nil else {
             if self.baseURL != baseURL {
                 await teardownAndReload(baseURL: baseURL)
@@ -111,34 +110,59 @@ final class TabWebViewModel {
 
         self.baseURL = baseURL
 
-        // Inject auth cookies via cookie store before loading (awaited for sync)
-        injectAuthCookiesViaStore(for: baseURL)
+        // Refresh the user script with the latest token (may have changed since init).
+        Self.registerBridgeScript(
+            on: userContentController,
+            featureFlags: featureFlags,
+            accessToken: AuthManager.shared.accessToken
+        )
 
-        // Load the SPA at this tab's route
-        let loadURL: URL
-        if route == "/" {
-            loadURL = baseURL
-        } else {
-            loadURL = baseURL.appendingPathComponent(route)
-        }
+        // Also set cookies in WebKit store (belt-and-suspenders).
+        await injectAuthCookiesViaWebKitStore(for: baseURL)
+
+        let loadURL = route == "/" ? baseURL : baseURL.appendingPathComponent(route)
         webPage.load(URLRequest(url: loadURL))
-
-        // Start observing navigation events
         observeNavigationEvents()
+    }
+
+    // MARK: - WKUserScript Management
+
+    /// Build and register the document-start user script on the given UCC.
+    /// Called before every page load/reload to ensure the freshest token.
+    private static func registerBridgeScript(
+        on ucc: WKUserContentController,
+        featureFlags: [String: Bool],
+        accessToken: String?
+    ) {
+        ucc.removeAllUserScripts()
+
+        var script = NativeBridgeHandler.bridgePolyfillScript
+
+        if !featureFlags.isEmpty {
+            let pairs = featureFlags
+                .map { "\($0.key): \($0.value)" }
+                .joined(separator: ", ")
+            script += "\nwindow.__featureFlags = { \(pairs) };"
+        }
+
+        if let accessToken {
+            script += "\nwindow.__nativeAccessToken = '\(accessToken.escapedForJS)';"
+        }
+
+        let userScript = WKUserScript(
+            source: script,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        ucc.addUserScript(userScript)
     }
 
     // MARK: - Navigation Event Observation
 
     private func observeNavigationEvents() {
-        // Cancel any previous observation task so it doesn't keep self alive
-        // via the long-lived `for await` loop on the old WebPage's navigations.
         navigationTask?.cancel()
 
         navigationTask = Task { @MainActor [weak self] in
-            // Wrap the observation in a loop so it restarts after recoverable
-            // errors (process termination, provisional navigation failure).
-            // The loop exits only when the task is cancelled, self is
-            // deallocated, or the navigation sequence ends normally.
             while !Task.isCancelled {
                 guard let self else { return }
                 let navigations = self.webPage.navigations
@@ -147,35 +171,26 @@ final class TabWebViewModel {
                         guard !Task.isCancelled else { return }
                         switch event {
                         case .committed:
-                            // Inject bridge polyfill and platform detection as soon as content starts loading
-                            await self.injectBridgePolyfill()
-
-                            // Inject auth cookies via JS immediately — ensures cookies are present
-                            // before React's first fetch, bypassing HTTPCookieStorage sync delay
-                            await self.injectAuthCookiesViaJS()
-
-                            // Inject real safe area insets as CSS custom properties.
-                            // Must happen before React renders so fullscreen overlays
-                            // can position elements outside the Dynamic Island / notch.
+                            // Bridge polyfill + token + flags already injected
+                            // via WKUserScript at documentStart.
+                            // Only inject safe area insets (requires UIKit at runtime).
                             await self.injectSafeAreaInsets()
+                            self.syncTheme()
 
                         case .finished:
                             self.isLoaded = true
                             self.loadError = nil
-
-                            // Sync theme on load
                             self.syncTheme()
 
-                            // Signal the web frontend to re-check auth after a short delay.
-                            // The delay ensures React has mounted and registered its
-                            // "native-recheck-auth" event listener.
+                            // Safety net: trigger auth recheck after React mounts.
+                            // With WKUserScript, the first checkAuth() should succeed,
+                            // but late-mounting components may need this signal.
                             Task { @MainActor [weak self] in
                                 try? await Task.sleep(for: .milliseconds(200))
-                                guard !Task.isCancelled else { return }
-                                _ = try? await self?.webPage.callJavaScript("window.__nativeRecheckAuth?.()")
+                                guard !Task.isCancelled, let self else { return }
+                                _ = try? await self.webPage.callJavaScript("window.__nativeRecheckAuth?.()")
                             }
 
-                            // Flush any navigation that was queued while loading
                             if let pending = self.pendingNavigation {
                                 self.navigateTo(path: pending)
                             }
@@ -184,7 +199,6 @@ final class TabWebViewModel {
                             break
                         }
                     }
-                    // Navigation sequence ended normally — no more events expected.
                     break
                 } catch let error as WebPage.NavigationError {
                     guard !Task.isCancelled else { return }
@@ -193,76 +207,41 @@ final class TabWebViewModel {
                         self.isLoaded = false
                         self.loadError = underlying
                         print("[TabWebViewModel:\(self.route)] Provisional navigation failed: \(underlying.localizedDescription)")
-                        // Loop restarts — will observe the next navigation attempt.
                     case .webContentProcessTerminated:
-                        // Debounce: if the process was terminated very recently,
-                        // wait for the cooldown before retrying to avoid a
-                        // crash→reload→crash spiral that exhausts memory.
                         if let last = self.lastProcessTermination,
                            Date().timeIntervalSince(last) < Self.processTerminationCooldown {
-                            print("[TabWebViewModel:\(self.route)] WebView process terminated again within \(Self.processTerminationCooldown)s, waiting before retry")
                             self.isLoaded = false
-                            self.bridgeInjected = false
                             try? await Task.sleep(for: .seconds(Self.processTerminationCooldown))
-                            // After cooldown, loop restarts and re-observes.
                             continue
                         }
-                        print("[TabWebViewModel:\(self.route)] WebView process terminated, reloading...")
                         self.lastProcessTermination = Date()
                         self.isLoaded = false
-                        self.bridgeInjected = false
-                        // Re-inject cookies via store before reload (JS not available after crash)
+
+                        // Refresh user script + cookies before reload
+                        Self.registerBridgeScript(
+                            on: self.userContentController,
+                            featureFlags: self.featureFlags,
+                            accessToken: AuthManager.shared.accessToken
+                        )
                         if let baseURL = self.baseURL {
-                            self.injectAuthCookiesViaStore(for: baseURL)
+                            await self.injectAuthCookiesViaWebKitStore(for: baseURL)
                         }
                         self.webPage.reload()
-                        // Loop restarts — will observe the reload's navigation events.
                     default:
                         self.loadError = error
                         print("[TabWebViewModel:\(self.route)] Navigation error: \(error)")
-                        // Loop restarts.
                     }
                 } catch {
                     guard !Task.isCancelled else { return }
                     self.loadError = error
                     print("[TabWebViewModel:\(self.route)] Navigation failed: \(error.localizedDescription)")
-                    // Loop restarts.
                 }
             }
         }
     }
 
-    // MARK: - Bridge Injection
-
-    @MainActor
-    private func injectBridgePolyfill() async {
-        guard !bridgeInjected else { return }
-        bridgeInjected = true
-
-        var script = NativeBridgeHandler.bridgePolyfillScript
-
-        // Inject feature flags if any are configured.
-        // Sets window.__featureFlags before React mounts so the web frontend
-        // can read them synchronously during initial render.
-        if !featureFlags.isEmpty {
-            let pairs = featureFlags
-                .map { "\($0.key): \($0.value)" }
-                .joined(separator: ", ")
-            script += "\nwindow.__featureFlags = { \(pairs) };"
-        }
-
-        _ = try? await webPage.callJavaScript(script)
-
-        // Also apply theme immediately
-        syncTheme()
-    }
-
     // MARK: - Navigation (for deep links only)
 
-    /// Navigate the React Router to a given path (no page reload).
-    /// Used for deep links that target a sub-path within this tab's route.
-    /// If the page hasn't finished loading yet, the navigation is queued
-    /// and will be dispatched automatically once the load completes.
     @MainActor
     func navigateTo(path: String) {
         guard isLoaded else {
@@ -277,29 +256,23 @@ final class TabWebViewModel {
         }
     }
 
-    /// Load a path directly via URL (full page load). Use when JS bridge
-    /// navigation may not work (e.g. WebPage not attached to a view).
     @MainActor
     func loadPath(_ path: String) {
         guard let baseURL else { return }
-        let url: URL
-        if path == "/" {
-            url = baseURL
-        } else {
-            url = baseURL.appendingPathComponent(path)
-        }
+        let url = path == "/" ? baseURL : baseURL.appendingPathComponent(path)
         pendingNavigation = nil
-        bridgeInjected = false
+
+        // Refresh user script with latest token before loading new page
+        Self.registerBridgeScript(
+            on: userContentController,
+            featureFlags: featureFlags,
+            accessToken: AuthManager.shared.accessToken
+        )
         webPage.load(URLRequest(url: url))
     }
 
     // MARK: - Safe Area Inset Injection
 
-    /// Push the device's real safe area insets to the WebView as CSS custom properties.
-    /// `.ignoresSafeArea()` on the SwiftUI WebView zeroes out the UIView's safeAreaInsets,
-    /// which causes CSS `env(safe-area-inset-*)` to return 0px. This method reads the
-    /// actual insets from the key window and injects them as `--native-sat/sar/sab/sal`
-    /// so web content can use them as a fallback.
     @MainActor
     func injectSafeAreaInsets() async {
         #if os(iOS)
@@ -322,7 +295,6 @@ final class TabWebViewModel {
 
     // MARK: - Theme Sync
 
-    /// Push the current system appearance to the WebView.
     @MainActor
     func syncTheme() {
         let isDark: Bool
@@ -341,79 +313,93 @@ final class TabWebViewModel {
         }
     }
 
-    // MARK: - Auth Cookie Management
+    // MARK: - Auth Token Management
 
-    /// Inject auth cookies via `document.cookie` JavaScript evaluation.
-    /// This is the preferred runtime method — takes effect immediately in the
-    /// WebView's JS context, bypassing HTTPCookieStorage sync delays.
-    /// Requires a loaded page (JS evaluation needs a document).
+    /// Update the access token in the running page's JS context.
+    /// Called after token refresh to update window.__nativeAccessToken
+    /// so subsequent fetch() calls use the fresh token.
     @MainActor
-    private func injectAuthCookiesViaJS() async {
-        let auth = AuthManager.shared
-        let isSecure = baseURL?.scheme == "https"
-        let secureFlag = isSecure ? " secure;" : ""
-
-        if let accessToken = auth.accessToken {
-            let maxAge = auth.accessTokenMaxAge
-            let js = "document.cookie = 'access_token=\(accessToken.escapedForJS); path=/; max-age=\(maxAge);\(secureFlag) samesite=lax'"
-            _ = try? await webPage.callJavaScript(js)
-        }
-
-        if let refreshToken = auth.refreshTokenForCookie {
-            let js = "document.cookie = 'refresh_token=\(refreshToken.escapedForJS); path=/api/oauth; max-age=2592000;\(secureFlag) samesite=lax'"
-            _ = try? await webPage.callJavaScript(js)
+    private func updateAccessTokenInJS() async {
+        if let accessToken = AuthManager.shared.accessToken {
+            _ = try? await webPage.callJavaScript(
+                "window.__nativeAccessToken = '\(accessToken.escapedForJS)'"
+            )
         }
     }
 
-    /// Inject auth cookies via HTTPCookieStorage (system cookie store).
-    /// Used before initial page load when JS evaluation is not yet available.
-    /// Sets both cookies with explicit expiry (never session cookies).
+    /// Push fresh auth token to the WebView (no recheck).
+    /// Use from `.authTokensDidChange` to avoid refresh loop.
     @MainActor
-    func injectAuthCookiesViaStore(for baseURL: URL) {
+    func pushAuthCookies() async {
+        guard let baseURL else { return }
+        // Update user script so future reloads use fresh token
+        Self.registerBridgeScript(
+            on: userContentController,
+            featureFlags: featureFlags,
+            accessToken: AuthManager.shared.accessToken
+        )
+        // Update running page
+        await injectAuthCookiesViaWebKitStore(for: baseURL)
+        await updateAccessTokenInJS()
+    }
+
+    /// Push fresh auth token AND signal the web frontend to re-check auth.
+    /// Use on foreground resume (scenePhase), NOT from token-change notifications.
+    @MainActor
+    func pushAuthCookiesAndRecheck() async {
+        guard let baseURL else { return }
+        Self.registerBridgeScript(
+            on: userContentController,
+            featureFlags: featureFlags,
+            accessToken: AuthManager.shared.accessToken
+        )
+        await injectAuthCookiesViaWebKitStore(for: baseURL)
+        await updateAccessTokenInJS()
+        _ = try? await webPage.callJavaScript("window.__nativeRecheckAuth?.()")
+    }
+
+    // MARK: - Cookie Management (belt-and-suspenders)
+
+    /// Inject auth cookies via WebKit's cookie store (WKHTTPCookieStore).
+    /// Supplementary to the Authorization header approach — ensures cookies
+    /// are present for any code paths that don't go through fetchWithRefresh.
+    @MainActor
+    private func injectAuthCookiesViaWebKitStore(for baseURL: URL) async {
         guard let host = baseURL.host else { return }
         let auth = AuthManager.shared
         let isSecure = baseURL.scheme == "https"
+        let cookieStore = WKWebsiteDataStore.default().httpCookieStore
 
         if let accessToken = auth.accessToken {
             let expiry = auth.accessTokenExpiry ?? Date().addingTimeInterval(3600)
-            let cookie = HTTPCookie(properties: [
+            if let cookie = HTTPCookie(properties: [
                 .name: "access_token",
                 .value: accessToken,
                 .domain: host,
                 .path: "/",
                 .expires: expiry,
                 .secure: isSecure ? "TRUE" : "FALSE",
-            ])
-            if let cookie { HTTPCookieStorage.shared.setCookie(cookie) }
+            ]) {
+                await cookieStore.setCookie(cookie)
+            }
         }
 
         if let refreshToken = auth.refreshTokenForCookie {
-            let cookie = HTTPCookie(properties: [
+            if let cookie = HTTPCookie(properties: [
                 .name: "refresh_token",
                 .value: refreshToken,
                 .domain: host,
                 .path: "/api/oauth",
-                .expires: Date().addingTimeInterval(60 * 60 * 24 * 30), // 30 days
+                .expires: Date().addingTimeInterval(60 * 60 * 24 * 30),
                 .secure: isSecure ? "TRUE" : "FALSE",
-            ])
-            if let cookie { HTTPCookieStorage.shared.setCookie(cookie) }
+            ]) {
+                await cookieStore.setCookie(cookie)
+            }
         }
-    }
-
-    /// Push fresh auth cookies to the WebView via JS and signal re-check.
-    /// Call this after token refresh or on foreground resume.
-    @MainActor
-    func pushAuthCookiesAndRecheck() async {
-        guard baseURL != nil else { return }
-        await injectAuthCookiesViaJS()
-        _ = try? await webPage.callJavaScript("window.__nativeRecheckAuth?.()")
     }
 
     // MARK: - Cleanup
 
-    /// Cancel the navigation observation task.
-    /// Call this when the hosting view disappears to release resources
-    /// promptly instead of waiting for `deinit`.
     @MainActor
     func cancelObservation() {
         navigationTask?.cancel()
@@ -422,39 +408,46 @@ final class TabWebViewModel {
 
     // MARK: - Reload
 
-    /// Reload the current page.
     @MainActor
     func reload() {
         loadError = nil
-        bridgeInjected = false
+        // Refresh user script with latest token before reload
+        Self.registerBridgeScript(
+            on: userContentController,
+            featureFlags: featureFlags,
+            accessToken: AuthManager.shared.accessToken
+        )
         webPage.reload()
     }
 
     // MARK: - Teardown
 
-    /// Create a new WebPage and reload from scratch.
     @MainActor
     func teardownAndReload(baseURL: URL) async {
         isLoaded = false
         loadError = nil
-        bridgeInjected = false
 
-        // Create a fresh WebPage with new configuration
-        let config = WebViewConfiguration.create(bridgeHandler: bridgeHandler)
+        self.baseURL = baseURL
+
+        // Refresh user script with latest token
+        Self.registerBridgeScript(
+            on: userContentController,
+            featureFlags: featureFlags,
+            accessToken: AuthManager.shared.accessToken
+        )
+
+        let config = WebViewConfiguration.create(
+            bridgeHandler: bridgeHandler,
+            userContentController: userContentController
+        )
         self.webPage = WebPage(configuration: config)
         #if DEBUG
         self.webPage.isInspectable = true
         #endif
 
-        self.baseURL = baseURL
-        injectAuthCookiesViaStore(for: baseURL)
+        await injectAuthCookiesViaWebKitStore(for: baseURL)
 
-        let loadURL: URL
-        if route == "/" {
-            loadURL = baseURL
-        } else {
-            loadURL = baseURL.appendingPathComponent(route)
-        }
+        let loadURL = route == "/" ? baseURL : baseURL.appendingPathComponent(route)
         webPage.load(URLRequest(url: loadURL))
         observeNavigationEvents()
     }
@@ -463,7 +456,6 @@ final class TabWebViewModel {
 // MARK: - String Extension for JS Escaping
 
 private extension String {
-    /// Escape a string for safe embedding in a JavaScript single-quoted string literal.
     var escapedForJS: String {
         self.replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "'", with: "\\'")

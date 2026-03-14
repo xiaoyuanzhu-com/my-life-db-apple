@@ -57,11 +57,17 @@ final class NativeBridgeHandler: URLSchemeHandler {
             }
 
             if action == "requestTokenRefresh" {
-                // Async action: await native token refresh before responding
+                // Async action: await native token refresh before responding.
+                // Include the new access token so the web side can update its
+                // Authorization header immediately (before the async notification).
                 Task { @MainActor in
                     let success = await AuthManager.shared.refreshAccessToken()
+                    var result: [String: Any] = ["success": success]
+                    if success, let token = AuthManager.shared.accessToken {
+                        result["accessToken"] = token
+                    }
                     let responseBody = (try? JSONSerialization.data(
-                        withJSONObject: ["success": success]
+                        withJSONObject: result
                     )) ?? Data("{}".utf8)
                     let response = HTTPURLResponse(
                         url: url,

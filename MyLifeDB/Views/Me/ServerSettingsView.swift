@@ -123,7 +123,6 @@ struct ServerSettingsView: View {
         }
 
         // Valid - save it
-        let oldURL = apiBaseURL
         apiBaseURL = urlString
 
         // Also sync to shared UserDefaults for the Share Extension

@@ -72,7 +72,7 @@ struct ClaudeSessionDetailView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .authTokensDidChange)) { _ in
-            Task { await webVM.pushAuthCookiesAndRecheck() }
+            Task { await webVM.pushAuthCookies() }
         }
         .onDisappear {
             webVM.cancelObservation()
