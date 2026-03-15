@@ -28,9 +28,15 @@ struct InboxDocumentCard: View {
 
             Spacer(minLength: 8)
 
-            Image(systemName: documentIcon)
-                .font(.title2)
-                .foregroundStyle(documentColor)
+            if let sqlarPath = item.screenshotSqlar {
+                AuthenticatedSqlarImage(path: sqlarPath)
+                    .frame(width: 48, height: 48)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            } else {
+                Image(systemName: documentIcon)
+                    .font(.title2)
+                    .foregroundStyle(documentColor)
+            }
         }
         .frame(maxWidth: .infinity)
     }

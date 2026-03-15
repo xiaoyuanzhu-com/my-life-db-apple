@@ -23,8 +23,14 @@ struct InboxImageCard: View {
     }
 
     var body: some View {
-        AuthenticatedImage(path: item.path)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            .frame(maxWidth: screenSize.width * 0.8, maxHeight: screenSize.height * 0.2, alignment: .trailing)
+        Group {
+            if let sqlarPath = item.screenshotSqlar {
+                AuthenticatedSqlarImage(path: sqlarPath)
+            } else {
+                AuthenticatedImage(path: item.path)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .frame(maxWidth: screenSize.width * 0.8, maxHeight: screenSize.height * 0.2, alignment: .trailing)
     }
 }
