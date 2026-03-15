@@ -14,10 +14,16 @@ struct LibraryGridItem: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Image(systemName: node.systemImage)
-                .font(.system(size: 36))
-                .foregroundStyle(iconColor)
-                .frame(height: 44)
+            if let sqlarPath = node.previewSqlar {
+                AuthenticatedSqlarImage(path: sqlarPath)
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            } else {
+                Image(systemName: node.systemImage)
+                    .font(.system(size: 36))
+                    .foregroundStyle(iconColor)
+                    .frame(height: 44)
+            }
 
             Text(node.name)
                 .font(.caption)

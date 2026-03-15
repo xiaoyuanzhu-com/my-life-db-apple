@@ -153,6 +153,8 @@ struct FileTreeNode: Codable, Identifiable, Hashable {
     let modifiedAt: Int64?
     /// Children (populated for folders when depth allows)
     let children: [FileTreeNode]?
+    /// SQLAR path for preview thumbnail (nil if no preview available)
+    let previewSqlar: String?
 
     // MARK: - Computed Properties
 
