@@ -362,7 +362,21 @@ final class TabWebViewModel {
 
     /// Inject auth cookies via WebKit's cookie store (WKHTTPCookieStore).
     /// Supplementary to the Authorization header approach — ensures cookies
-    /// are present for any code paths that don't go through fetchWithRefresh.
+    /// are present for any code paths that don't go through fetchWithRefresh
+    /// (e.g. nested iframe navigations like `<iframe src="/raw/.generated/...">`
+    /// inside srcdoc preview iframes, which can't attach Authorization headers).
+    ///
+    /// Two attributes are critical for WKWebView cookie delivery:
+    ///
+    /// - **SameSite=Lax**: Must be set explicitly. Without it, WKWebView may
+    ///   not send cookies for same-origin iframe navigations originating from
+    ///   srcdoc contexts. Regular Safari defaults unset SameSite to Lax via
+    ///   the Set-Cookie header, but programmatic HTTPCookie creation does not.
+    ///
+    /// - **Secure flag**: Must be *omitted* (not set to "FALSE") for HTTP.
+    ///   Apple docs: "String value must be either TRUE or there should be no
+    ///   value." Setting "FALSE" still marks the cookie as secure, causing it
+    ///   to be withheld from HTTP requests.
     @MainActor
     private func injectAuthCookiesViaWebKitStore(for baseURL: URL) async {
         guard let host = baseURL.host else { return }
@@ -372,27 +386,31 @@ final class TabWebViewModel {
 
         if let accessToken = auth.accessToken {
             let expiry = auth.accessTokenExpiry ?? Date().addingTimeInterval(3600)
-            if let cookie = HTTPCookie(properties: [
+            var accessProps: [HTTPCookiePropertyKey: Any] = [
                 .name: "access_token",
                 .value: accessToken,
                 .domain: host,
                 .path: "/",
                 .expires: expiry,
-                .secure: isSecure ? "TRUE" : "FALSE",
-            ]) {
+                .sameSitePolicy: HTTPCookieStringPolicy.sameSiteLax,
+            ]
+            if isSecure { accessProps[.secure] = "TRUE" }
+            if let cookie = HTTPCookie(properties: accessProps) {
                 await cookieStore.setCookie(cookie)
             }
         }
 
         if let refreshToken = auth.refreshTokenForCookie {
-            if let cookie = HTTPCookie(properties: [
+            var refreshProps: [HTTPCookiePropertyKey: Any] = [
                 .name: "refresh_token",
                 .value: refreshToken,
                 .domain: host,
                 .path: "/api/oauth",
                 .expires: Date().addingTimeInterval(60 * 60 * 24 * 30),
-                .secure: isSecure ? "TRUE" : "FALSE",
-            ]) {
+                .sameSitePolicy: HTTPCookieStringPolicy.sameSiteLax,
+            ]
+            if isSecure { refreshProps[.secure] = "TRUE" }
+            if let cookie = HTTPCookie(properties: refreshProps) {
                 await cookieStore.setCookie(cookie)
             }
         }
