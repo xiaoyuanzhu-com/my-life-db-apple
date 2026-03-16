@@ -14,13 +14,21 @@ struct InboxDocumentCard: View {
         item.previewSqlar != nil
     }
 
+    private var screenSize: CGSize {
+        #if os(iOS) || os(visionOS)
+        let scene = UIApplication.shared.connectedScenes
+            .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+        return scene?.screen.bounds.size ?? CGSize(width: 393, height: 800)
+        #elseif os(macOS)
+        return NSScreen.main?.frame.size ?? CGSize(width: 800, height: 800)
+        #endif
+    }
+
     var body: some View {
         if let sqlarPath = item.previewSqlar {
             // Screenshot-prominent layout (matches web doc-card)
             VStack(spacing: 0) {
                 AuthenticatedSqlarImage(path: sqlarPath)
-                    .frame(maxWidth: 226)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
 
                 HStack {
                     Text(item.name)
@@ -39,6 +47,8 @@ struct InboxDocumentCard: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
             }
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .frame(maxWidth: screenSize.width * 0.8, maxHeight: screenSize.height * 0.2, alignment: .trailing)
         } else {
             // Fallback: icon + filename layout
             HStack(spacing: 0) {
