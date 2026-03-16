@@ -26,7 +26,7 @@ struct InboxItem: Codable, Identifiable, Hashable {
     let createdAt: Int64
     let digests: [Digest]
     let textPreview: String?
-    let screenshotSqlar: String?
+    let previewSqlar: String?
     let isPinned: Bool
 
     // MARK: - Hashable (without digests for simplicity)
@@ -53,7 +53,7 @@ struct InboxItem: Codable, Identifiable, Hashable {
             modifiedAt: modifiedAt,
             createdAt: createdAt,
             textPreview: textPreview,
-            screenshotSqlar: screenshotSqlar
+            previewSqlar: previewSqlar
         )
     }
 

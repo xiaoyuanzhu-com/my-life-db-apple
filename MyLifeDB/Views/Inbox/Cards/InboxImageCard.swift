@@ -24,7 +24,7 @@ struct InboxImageCard: View {
 
     var body: some View {
         Group {
-            if let sqlarPath = item.screenshotSqlar {
+            if let sqlarPath = item.previewSqlar {
                 AuthenticatedSqlarImage(path: sqlarPath)
             } else {
                 AuthenticatedImage(path: item.path)

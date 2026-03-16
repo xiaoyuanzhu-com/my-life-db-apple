@@ -27,7 +27,7 @@ struct SearchResultItem: Codable, Identifiable {
     let score: Double
     let snippet: String
     let textPreview: String?
-    let screenshotSqlar: String?
+    let previewSqlar: String?
     let highlights: [String: String]?
     let matchContext: MatchContext?
     let matchedObject: MatchedObject?

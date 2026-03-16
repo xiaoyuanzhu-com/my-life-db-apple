@@ -37,8 +37,12 @@ struct InboxItemCard: View {
             InboxAudioCard(item: item)
                 .cardFrame()
         case .document:
-            InboxDocumentCard(item: item)
-                .cardFrame()
+            let card = InboxDocumentCard(item: item)
+            if card.hasPreview {
+                card
+            } else {
+                card.cardFrame()
+            }
         case .fallback:
             InboxFallbackCard(item: item)
                 .cardFrame()

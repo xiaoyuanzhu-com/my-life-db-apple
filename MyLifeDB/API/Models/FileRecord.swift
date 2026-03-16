@@ -25,7 +25,7 @@ struct FileRecord: Codable, Identifiable, Hashable {
     let modifiedAt: Int64
     let createdAt: Int64
     let textPreview: String?
-    let screenshotSqlar: String?
+    let previewSqlar: String?
 
     // MARK: - Computed Properties
 
@@ -81,9 +81,9 @@ struct FileRecord: Codable, Identifiable, Hashable {
 
 extension FileRecord {
 
-    /// Whether this file has a screenshot preview
-    var hasScreenshot: Bool {
-        screenshotSqlar != nil
+    /// Whether this file has a preview thumbnail
+    var hasPreview: Bool {
+        previewSqlar != nil
     }
 
     /// First line of text preview

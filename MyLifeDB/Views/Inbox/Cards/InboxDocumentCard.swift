@@ -10,35 +10,60 @@ import SwiftUI
 struct InboxDocumentCard: View {
     let item: InboxItem
 
+    var hasPreview: Bool {
+        item.previewSqlar != nil
+    }
+
     var body: some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
-
-                if let size = item.formattedSize {
-                    Text(size)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.vertical, 4)
-
-            Spacer(minLength: 8)
-
-            if let sqlarPath = item.screenshotSqlar {
+        if let sqlarPath = item.previewSqlar {
+            // Screenshot-prominent layout (matches web doc-card)
+            VStack(spacing: 0) {
                 AuthenticatedSqlarImage(path: sqlarPath)
-                    .frame(width: 48, height: 48)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-            } else {
+                    .frame(maxWidth: 226)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                HStack {
+                    Text(item.name)
+                        .font(.caption)
+                        .lineLimit(1)
+                        .foregroundStyle(.secondary)
+
+                    Spacer(minLength: 4)
+
+                    if let size = item.formattedSize {
+                        Text(size)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+            }
+        } else {
+            // Fallback: icon + filename layout
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.name)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+
+                    if let size = item.formattedSize {
+                        Text(size)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 4)
+
+                Spacer(minLength: 8)
+
                 Image(systemName: documentIcon)
                     .font(.title2)
                     .foregroundStyle(documentColor)
             }
+            .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity)
     }
 
     private var documentIcon: String {
