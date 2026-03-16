@@ -38,6 +38,10 @@ final class NativeBridgeHandler: URLSchemeHandler {
     /// pop gesture so swipe gestures reach the iframe content instead.
     private(set) var isFullscreenPreview = false
 
+    /// Set to true when the web frontend requests a back navigation (e.g. edge swipe).
+    /// The hosting SwiftUI view should observe this and call dismiss().
+    private(set) var isRequestingGoBack = false
+
     // MARK: - URLSchemeHandler
 
     // CORS headers required because the WebView's page origin (e.g. http://192.168.x.x:12346)
@@ -127,6 +131,8 @@ final class NativeBridgeHandler: URLSchemeHandler {
             handleFullscreenPreview(body)
         case "navigate":
             handleNavigate(body)
+        case "goBack":
+            isRequestingGoBack = true
         case "log":
             handleLog(body)
         default:

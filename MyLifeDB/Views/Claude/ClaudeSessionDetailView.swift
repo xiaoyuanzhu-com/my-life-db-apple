@@ -85,6 +85,9 @@ struct ClaudeSessionDetailView: View {
         .onReceive(NotificationCenter.default.publisher(for: .authTokensDidChange)) { _ in
             Task { await webVM.pushAuthCookies() }
         }
+        .onChange(of: webVM.bridgeHandler.isRequestingGoBack) { _, requesting in
+            if requesting { dismiss() }
+        }
         .onDisappear {
             webVM.cancelObservation()
         }

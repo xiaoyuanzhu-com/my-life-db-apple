@@ -15,6 +15,7 @@ struct WebViewContainer: View {
 
     var body: some View {
         WebView(viewModel.webPage)
+            .webViewBackForwardNavigationGestures(.disabled)
             .ignoresSafeArea()
             #if os(iOS)
             // Re-inject safe area insets when the device rotates.
