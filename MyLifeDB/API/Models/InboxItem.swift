@@ -157,7 +157,7 @@ struct PinnedItem: Codable, Identifiable {
 
     let path: String
     let name: String
-    let pinnedAt: Int64
+    let pinnedAt: String
     let displayText: String
     let cursor: String
 }
