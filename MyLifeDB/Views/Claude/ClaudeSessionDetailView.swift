@@ -16,6 +16,7 @@ struct ClaudeSessionDetailView: View {
 
     @State private var webVM: TabWebViewModel
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dismiss) private var dismiss
 
     init(sessionId: String, title: String? = nil) {
         self.sessionId = sessionId
@@ -46,9 +47,19 @@ struct ClaudeSessionDetailView: View {
             }
         }
         #if os(iOS)
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        // Hide the system navigation bar entirely to prevent the iOS 26
+        // Liquid Glass material from rendering a translucent overlay on
+        // top of the web content. Use a custom GlassCircleButton instead
+        // (same pattern as FileViewerView). The interactive pop gesture
+        // still works — InteractivePopGestureController manages it below.
+        .overlay(alignment: .topLeading) {
+            GlassCircleButton(systemName: "chevron.left") {
+                dismiss()
+            }
+            .padding(.leading, 16)
+            .padding(.top, 8)
+        }
+        .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         // Disable the NavigationStack's interactive pop gesture while the web
         // frontend is showing a fullscreen preview (e.g. Estima slides).
