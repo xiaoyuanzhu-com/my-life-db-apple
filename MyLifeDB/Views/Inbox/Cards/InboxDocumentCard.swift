@@ -27,28 +27,20 @@ struct InboxDocumentCard: View {
     var body: some View {
         if let sqlarPath = item.previewSqlar {
             // Screenshot-prominent layout (matches web doc-card)
-            VStack(spacing: 0) {
-                AuthenticatedSqlarImage(path: sqlarPath)
-
-                HStack {
+            AuthenticatedSqlarImage(path: sqlarPath)
+                .overlay(alignment: .bottomLeading) {
                     Text(item.name)
                         .font(.caption)
                         .lineLimit(1)
+                        .truncationMode(.middle)
                         .foregroundStyle(.secondary)
-
-                    Spacer(minLength: 4)
-
-                    if let size = item.formattedSize {
-                        Text(size)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.ultraThinMaterial)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            .frame(maxWidth: screenSize.width * 0.8, maxHeight: screenSize.height * 0.2, alignment: .trailing)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .frame(maxWidth: screenSize.width * 0.8, maxHeight: screenSize.height * 0.2, alignment: .trailing)
         } else {
             // Fallback: icon + filename layout
             HStack(spacing: 0) {
