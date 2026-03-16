@@ -97,22 +97,113 @@ struct ClaudeSessionDetailView: View {
 // MARK: - Interactive Pop Gesture Controller
 
 #if os(iOS)
-/// UIKit introspection helper that finds the hosting UINavigationController
-/// and toggles its `interactivePopGestureRecognizer.isEnabled`.
+/// UIKit introspection helper that makes the UINavigationController's
+/// interactive pop gesture work over a WebView with hidden navigation bar.
 ///
-/// SwiftUI's NavigationStack doesn't expose this gesture recognizer directly,
-/// so we walk the responder chain from a dummy UIViewController to find it.
+/// Two things are needed:
+/// 1. A custom gesture delegate — UIKit's default delegate blocks the pop
+///    gesture when the navigation bar is hidden.
+/// 2. `require(toFail:)` on the WebView's internal scroll view pan gesture —
+///    otherwise the scroll view swallows edge touches before the pop gesture
+///    recognizer can claim them.
+///
+/// Uses `viewDidAppear` + a deferred retry to walk the view hierarchy once
+/// the WebView's backing scroll view exists, then sets up the dependency.
 private struct InteractivePopGestureController: UIViewControllerRepresentable {
 
     let disabled: Bool
 
-    func makeUIViewController(context: Context) -> UIViewController {
-        UIViewController()
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
     }
 
-    func updateUIViewController(_ vc: UIViewController, context: Context) {
-        // Walk up to the UINavigationController (may not exist on first layout)
-        vc.navigationController?.interactivePopGestureRecognizer?.isEnabled = !disabled
+    func makeUIViewController(context: Context) -> GestureSetupController {
+        let vc = GestureSetupController()
+        vc.coordinator = context.coordinator
+        return vc
+    }
+
+    func updateUIViewController(_ vc: GestureSetupController, context: Context) {
+        vc.isGestureDisabled = disabled
+        vc.configureGesture()
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        weak var viewController: UIViewController?
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            (viewController?.navigationController?.viewControllers.count ?? 0) > 1
+        }
+
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer
+        ) -> Bool {
+            otherGestureRecognizer is UIPanGestureRecognizer
+        }
+    }
+}
+
+/// Custom UIViewController that sets up the pop gesture after the view
+/// hierarchy is fully assembled (WebView's scroll view may not exist on
+/// the first layout pass).
+private final class GestureSetupController: UIViewController {
+    var coordinator: InteractivePopGestureController.Coordinator?
+    var isGestureDisabled = false
+    private var scrollViewConfigured = false
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        coordinator?.viewController = self
+        configureGesture()
+    }
+
+    func configureGesture() {
+        guard let nav = navigationController,
+              let popGesture = nav.interactivePopGestureRecognizer else { return }
+
+        popGesture.isEnabled = !isGestureDisabled
+
+        guard !isGestureDisabled else { return }
+        popGesture.delegate = coordinator
+
+        // Walk the top view controller's view hierarchy to find the WebView's
+        // internal UIScrollView and make its pan gesture yield to the pop gesture.
+        if let contentView = nav.topViewController?.view {
+            scrollViewConfigured = Self.requirePopGestureToFail(in: contentView, popGesture: popGesture)
+        }
+
+        // The WebView may not have laid out its scroll view yet — retry once.
+        if !scrollViewConfigured {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self, !self.scrollViewConfigured,
+                      let nav = self.navigationController,
+                      let popGesture = nav.interactivePopGestureRecognizer,
+                      let contentView = nav.topViewController?.view else { return }
+                self.scrollViewConfigured = Self.requirePopGestureToFail(
+                    in: contentView, popGesture: popGesture
+                )
+            }
+        }
+    }
+
+    /// Recursively find UIScrollViews and set `require(toFail:)` on their
+    /// pan gesture recognizer so the navigation pop gesture takes priority.
+    @discardableResult
+    private static func requirePopGestureToFail(
+        in view: UIView, popGesture: UIGestureRecognizer
+    ) -> Bool {
+        var found = false
+        if let scrollView = view as? UIScrollView {
+            scrollView.panGestureRecognizer.require(toFail: popGesture)
+            found = true
+        }
+        for subview in view.subviews {
+            if requirePopGestureToFail(in: subview, popGesture: popGesture) {
+                found = true
+            }
+        }
+        return found
     }
 }
 #endif
