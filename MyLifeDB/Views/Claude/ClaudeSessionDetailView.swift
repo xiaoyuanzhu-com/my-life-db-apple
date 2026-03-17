@@ -109,7 +109,7 @@ struct ClaudeSessionDetailView: View {
 ///
 /// Uses `viewDidAppear` + a deferred retry to walk the view hierarchy once
 /// the WebView's backing scroll view exists, then sets up the dependency.
-private struct InteractivePopGestureController: UIViewControllerRepresentable {
+struct InteractivePopGestureController: UIViewControllerRepresentable {
 
     let disabled: Bool
 
@@ -147,7 +147,7 @@ private struct InteractivePopGestureController: UIViewControllerRepresentable {
 /// Custom UIViewController that sets up the pop gesture after the view
 /// hierarchy is fully assembled (WebView's scroll view may not exist on
 /// the first layout pass).
-private final class GestureSetupController: UIViewController {
+final class GestureSetupController: UIViewController {
     var coordinator: InteractivePopGestureController.Coordinator?
     var isGestureDisabled = false
     private var scrollViewConfigured = false

@@ -460,6 +460,7 @@ private struct NewClaudeSessionView: View {
         ]
     )
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ZStack {
@@ -478,10 +479,20 @@ private struct NewClaudeSessionView: View {
             }
         }
         #if os(iOS)
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .overlay(alignment: .topLeading) {
+            GlassCircleButton(systemName: "chevron.left") {
+                dismiss()
+            }
+            .padding(.leading, 16)
+            .padding(.top, 8)
+        }
+        .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
+        .background(
+            InteractivePopGestureController(
+                disabled: webVM.bridgeHandler.isFullscreenPreview
+            )
+        )
         #else
         .navigationTitle("New Session")
         #endif
@@ -496,6 +507,9 @@ private struct NewClaudeSessionView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .authTokensDidChange)) { _ in
             Task { await webVM.pushAuthCookies() }
+        }
+        .onChange(of: webVM.bridgeHandler.isRequestingGoBack) { _, requesting in
+            if requesting { dismiss() }
         }
         .onDisappear {
             webVM.cancelObservation()
