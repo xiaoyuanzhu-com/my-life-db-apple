@@ -168,18 +168,12 @@ final class AuthManager {
         self.accessToken = accessToken
         self.refreshToken = refreshToken
 
-        // Validate and extract username
-        Task {
-            let result = await validateToken(accessToken)
-            switch result {
-            case .valid(let username):
-                state = .authenticated(username)
-            default:
-                // Token was just issued, shouldn't fail. But handle gracefully.
-                state = .authenticated("User")
-            }
-            NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
-        }
+        // Set authenticated state SYNCHRONOUSLY — the token was just issued
+        // by the OAuth provider, no need to validate via network before
+        // transitioning the UI. Extract username from JWT payload directly.
+        let username = jwtUsername(accessToken) ?? "User"
+        state = .authenticated(username)
+        NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
     }
 
     // MARK: - Token Refresh
@@ -375,12 +369,25 @@ final class AuthManager {
 
     // MARK: - JWT Helpers
 
+    /// Extract the username from a JWT's payload (checks "username", "sub",
+    /// "preferred_username", "name" claims in order).
+    private func jwtUsername(_ token: String) -> String? {
+        guard let json = jwtPayload(token) else { return nil }
+        for key in ["username", "sub", "preferred_username", "name"] {
+            if let value = json[key] as? String, !value.isEmpty {
+                return value
+            }
+        }
+        return nil
+    }
+
     private func isTokenExpiringSoon(_ token: String) -> Bool {
         guard let exp = jwtExpiration(token) else { return true }
         return exp.timeIntervalSinceNow < 120 // Less than 2 minutes
     }
 
-    private func jwtExpiration(_ token: String) -> Date? {
+    /// Decode the payload (second segment) of a JWT into a dictionary.
+    private func jwtPayload(_ token: String) -> [String: Any]? {
         let parts = token.split(separator: ".")
         guard parts.count >= 2 else { return nil }
 
@@ -397,11 +404,17 @@ final class AuthManager {
             .replacingOccurrences(of: "_", with: "/")
 
         guard let data = Data(base64Encoded: base64),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        return json
+    }
+
+    private func jwtExpiration(_ token: String) -> Date? {
+        guard let json = jwtPayload(token),
               let exp = json["exp"] as? TimeInterval else {
             return nil
         }
-
         return Date(timeIntervalSince1970: exp)
     }
 }
