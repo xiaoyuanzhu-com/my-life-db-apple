@@ -48,6 +48,7 @@ struct LibraryGridView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
+        .scrollBounceBehavior(.always)
         .refreshable {
             await onRefresh?()
         }

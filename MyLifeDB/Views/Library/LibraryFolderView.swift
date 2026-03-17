@@ -223,7 +223,13 @@ struct LibraryFolderView: View {
     // MARK: - Data Fetching
 
     private func loadChildren(ignoreCache: Bool = false) async {
-        isLoading = true
+        // Only show loading indicator on initial load (no data yet).
+        // During pull-to-refresh, .refreshable handles its own spinner;
+        // setting isLoading here would cause unnecessary state churn that
+        // can interrupt the refresh gesture on ScrollView.
+        if children.isEmpty {
+            isLoading = true
+        }
         error = nil
 
         do {
