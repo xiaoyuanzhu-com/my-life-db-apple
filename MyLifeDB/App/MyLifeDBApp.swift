@@ -45,6 +45,9 @@ struct MyLifeDBApp: App {
                 case .unauthenticated:
                     LoginView()
 
+                case .provisioning:
+                    ProvisioningView()
+
                 case .authenticated:
                     MainTabView(deepLinkPath: $deepLinkPath)
                         .id(refreshID)

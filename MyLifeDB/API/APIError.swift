@@ -33,6 +33,9 @@ enum APIError: LocalizedError {
     /// Resource conflict (409)
     case conflict(String?)
 
+    /// Backend instance is being provisioned (503 with provisioning flag)
+    case provisioning
+
     // MARK: - Server Errors
 
     /// Server error with status code
@@ -78,6 +81,8 @@ enum APIError: LocalizedError {
             return "Resource not found"
         case .conflict(let message):
             return message ?? "Resource conflict"
+        case .provisioning:
+            return "Setting up your space"
         case .serverError(let code, let message):
             return message ?? "Server error (\(code))"
         case .unexpectedStatusCode(let code):
@@ -120,6 +125,8 @@ enum APIError: LocalizedError {
             return "No internet connection. Please check your network."
         case .timeout:
             return "The request timed out. Please try again."
+        case .provisioning:
+            return "Setting up your space. This may take a moment."
         case .serverError:
             return "Server error. Please try again later."
         default:

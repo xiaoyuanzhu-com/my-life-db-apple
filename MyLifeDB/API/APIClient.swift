@@ -162,6 +162,12 @@ final class APIClient {
             throw APIError.notFound
         case 409:
             throw APIError.conflict(parseErrorMessage(from: data))
+        case 503:
+            if isProvisioningResponse(data) {
+                await AuthManager.shared.handleProvisioning()
+                throw APIError.provisioning
+            }
+            throw APIError.serverError(httpResponse.statusCode, parseErrorMessage(from: data))
         case 500...599:
             throw APIError.serverError(httpResponse.statusCode, parseErrorMessage(from: data))
         default:
@@ -218,6 +224,12 @@ final class APIClient {
             throw APIError.notFound
         case 409:
             throw APIError.conflict(parseErrorMessage(from: data))
+        case 503:
+            if isProvisioningResponse(data) {
+                await AuthManager.shared.handleProvisioning()
+                throw APIError.provisioning
+            }
+            throw APIError.serverError(httpResponse.statusCode, parseErrorMessage(from: data))
         case 500...599:
             throw APIError.serverError(httpResponse.statusCode, parseErrorMessage(from: data))
         default:
@@ -413,6 +425,26 @@ final class APIClient {
             return response.error ?? response.message
         }
         return nil
+    }
+
+    /// Check if a 503 response body contains the provisioning flag
+    private func isProvisioningResponse(_ data: Data) -> Bool {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return false
+        }
+        return json["provisioning"] as? Bool == true
+    }
+
+    /// Check if the backend is reachable (for provisioning polling, bypasses normal error handling)
+    func isBackendReady() async -> Bool {
+        do {
+            let request = try buildRequest(path: "api/settings")
+            let (_, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else { return false }
+            return (200...299).contains(httpResponse.statusCode)
+        } catch {
+            return false
+        }
     }
 }
 

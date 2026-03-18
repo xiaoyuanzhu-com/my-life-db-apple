@@ -30,6 +30,7 @@ final class AuthManager {
         case unknown
         case checking
         case authenticated(String) // username
+        case provisioning(String)  // username — backend instance being set up
         case unauthenticated
     }
 
@@ -42,6 +43,7 @@ final class AuthManager {
 
     var username: String? {
         if case .authenticated(let name) = state { return name }
+        if case .provisioning(let name) = state { return name }
         return nil
     }
 
@@ -304,6 +306,23 @@ final class AuthManager {
             // Transient error (network, server 5xx, etc.) — don't destroy
             // tokens, the user may recover on retry or foreground resume.
             return false
+        }
+    }
+
+    // MARK: - 503 Provisioning Handler (called by APIClient)
+
+    @MainActor
+    func handleProvisioning() {
+        // Already in provisioning state — no-op
+        if case .provisioning = state { return }
+        let currentUsername = username ?? jwtUsername(accessToken ?? "") ?? "User"
+        state = .provisioning(currentUsername)
+    }
+
+    @MainActor
+    func handleProvisioningComplete() {
+        if case .provisioning(let name) = state {
+            state = .authenticated(name)
         }
     }
 
