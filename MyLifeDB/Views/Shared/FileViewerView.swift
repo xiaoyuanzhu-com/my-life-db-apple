@@ -143,6 +143,9 @@ struct FileViewerView: View {
     @State private var isLoading = false
     @State private var error: Error?
     @State private var isDownloadingForShare = false
+    /// Bumped to force SwiftUI to recreate the content sub-view,
+    /// which re-triggers its `.task` and fetches fresh data.
+    @State private var refreshID = UUID()
 
     @Environment(\.dismiss) private var dismiss
 
@@ -158,6 +161,7 @@ struct FileViewerView: View {
         Group {
             if let file = resolvedFile {
                 fileContentView(file)
+                    .id(refreshID)
             } else if isLoading {
                 loadingView
             } else if let error = error {
@@ -182,29 +186,40 @@ struct FileViewerView: View {
         }
         .overlay(alignment: .topTrailing) {
             if !isMediaFile {
-                if isDownloadingForShare {
-                    ProgressView()
-                        .frame(width: 44, height: 44)
-                        .padding(.trailing, 16)
-                        .padding(.top, 8)
-                } else {
-                    GlassCircleButton(systemName: "square.and.arrow.up") {
-                        isDownloadingForShare = true
-                        Task {
-                            defer { isDownloadingForShare = false }
-                            do {
-                                let data = try await APIClient.shared.getRawFile(path: filePath)
-                                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
-                                try data.write(to: tempURL)
-                                presentShareSheet(items: [tempURL])
-                            } catch {
-                                print("[FileViewer] Failed to download file for sharing: \(error)")
+                HStack(spacing: 8) {
+                    if isDownloadingForShare {
+                        ProgressView()
+                            .frame(width: 44, height: 44)
+                    } else {
+                        GlassCircleButton(systemName: "square.and.arrow.up") {
+                            isDownloadingForShare = true
+                            Task {
+                                defer { isDownloadingForShare = false }
+                                do {
+                                    let data = try await APIClient.shared.getRawFile(path: filePath)
+                                    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+                                    try data.write(to: tempURL)
+                                    presentShareSheet(items: [tempURL])
+                                } catch {
+                                    print("[FileViewer] Failed to download file for sharing: \(error)")
+                                }
                             }
                         }
+
+                        Menu {
+                            Button {
+                                forceRefresh()
+                            } label: {
+                                Label("Refresh from Server", systemImage: "arrow.clockwise")
+                            }
+                        } label: {
+                            GlassCircleButton(systemName: "ellipsis") { }
+                                .allowsHitTesting(false)
+                        }
                     }
-                    .padding(.trailing, 16)
-                    .padding(.top, 8)
                 }
+                .padding(.trailing, 16)
+                .padding(.top, 8)
             }
         }
         .task {
@@ -284,6 +299,15 @@ struct FileViewerView: View {
             .buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Force Refresh
+
+    /// Invalidate cached file data and recreate the content view.
+    private func forceRefresh() {
+        let url = APIClient.shared.rawFileURL(path: filePath)
+        FileCache.shared.invalidate(for: url)
+        refreshID = UUID()
     }
 
     // MARK: - Data Fetching

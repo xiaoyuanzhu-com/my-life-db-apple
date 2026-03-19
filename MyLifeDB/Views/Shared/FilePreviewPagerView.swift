@@ -129,9 +129,10 @@ struct FilePreviewPagerView: View {
             if item.isLikelyImage {
                 activePrefetchTasks += 1
                 let url = APIClient.shared.rawFileURL(path: item.path)
+                let expectedMod = item.file?.modifiedAt
                 Task {
                     defer { activePrefetchTasks -= 1 }
-                    _ = try? await FileCache.shared.data(for: url)
+                    _ = try? await FileCache.shared.data(for: url, expectedModifiedAt: expectedMod)
                 }
             }
         }
