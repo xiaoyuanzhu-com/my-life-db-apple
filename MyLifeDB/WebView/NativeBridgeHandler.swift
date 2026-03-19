@@ -260,6 +260,19 @@ final class NativeBridgeHandler: URLSchemeHandler {
                 }).catch(function() {});
             }
         };
+
+        // Open target="_blank" links (external URLs) in Safari instead of the WebView.
+        // WebPage doesn't expose WKUIDelegate's createWebViewWith, so target="_blank"
+        // links would silently do nothing without this handler.
+        document.addEventListener('click', function(e) {
+            var a = e.target.closest('a[target="_blank"]');
+            if (!a) return;
+            var href = a.href;
+            if (href && /^https?:\\/\\//.test(href)) {
+                e.preventDefault();
+                window.webkit.messageHandlers.native.postMessage({ action: 'openExternal', url: href });
+            }
+        }, true);
         """
 
     private static var nativePlatform: String {
