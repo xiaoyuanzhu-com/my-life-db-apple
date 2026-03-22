@@ -12,8 +12,8 @@ struct ImageFileView: View {
 
     let path: String
     var modifiedAt: Int64? = nil
-    /// Called on single tap (used for dismiss). Double-tap is handled internally for zoom.
-    var onTap: (() -> Void)?
+    /// Called on single tap (used to toggle overlay toolbar). Double-tap is handled internally for zoom.
+    var onSingleTap: (() -> Void)?
 
     @State private var imageData: Data?
     @State private var isLoading = true
@@ -180,7 +180,7 @@ struct ImageFileView: View {
             guard pendingSingleTapToken == token else { return }
             pendingSingleTapToken = nil
             guard scale <= 1.0 else { return }
-            onTap?()
+            onSingleTap?()
         }
     }
 

@@ -115,53 +115,39 @@ struct FileViewerView: View {
     // MARK: - Initializers
 
     /// Create a viewer when you already have file metadata.
-    init(file: FileRecord, onDismiss: (() -> Void)? = nil) {
+    init(file: FileRecord, onSingleTap: (() -> Void)? = nil) {
         self._resolvedFile = State(initialValue: file)
         self.filePath = file.path
         self.fileName = file.name
         self._needsFetch = State(initialValue: false)
-        self.onDismiss = onDismiss
+        self.onSingleTap = onSingleTap
     }
 
     /// Create a viewer that fetches metadata on appear.
-    init(filePath: String, fileName: String, onDismiss: (() -> Void)? = nil) {
+    init(filePath: String, fileName: String, onSingleTap: (() -> Void)? = nil) {
         self._resolvedFile = State(initialValue: nil)
         self.filePath = filePath
         self.fileName = fileName
         self._needsFetch = State(initialValue: true)
-        self.onDismiss = onDismiss
+        self.onSingleTap = onSingleTap
     }
 
     // MARK: - Properties
 
     private let filePath: String
     private let fileName: String
-    private let onDismiss: (() -> Void)?
+    private let onSingleTap: (() -> Void)?
 
     @State private var resolvedFile: FileRecord?
     @State private var needsFetch: Bool
     @State private var isLoading = false
     @State private var error: Error?
-    @State private var isDownloadingForShare = false
-    /// Bumped to force SwiftUI to recreate the content sub-view,
-    /// which re-triggers its `.task` and fetches fresh data.
-    @State private var refreshID = UUID()
-
-    @Environment(\.dismiss) private var dismiss
-
-    /// Whether the resolved file is image or video (use tap-to-dismiss, no overlay buttons).
-    private var isMediaFile: Bool {
-        guard let file = resolvedFile else { return false }
-        return file.isImage || file.isVideo
-    }
-
     // MARK: - Body
 
     var body: some View {
         Group {
             if let file = resolvedFile {
                 fileContentView(file)
-                    .id(refreshID)
             } else if isLoading {
                 loadingView
             } else if let error = error {
@@ -171,57 +157,6 @@ struct FileViewerView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .overlay(alignment: .topLeading) {
-            if !isMediaFile {
-                GlassCircleButton(systemName: onDismiss != nil ? "xmark" : "chevron.left") {
-                    if let onDismiss {
-                        onDismiss()
-                    } else {
-                        dismiss()
-                    }
-                }
-                .padding(.leading, 16)
-                .padding(.top, 8)
-            }
-        }
-        .overlay(alignment: .topTrailing) {
-            if !isMediaFile {
-                HStack(spacing: 8) {
-                    if isDownloadingForShare {
-                        ProgressView()
-                            .frame(width: 44, height: 44)
-                    } else {
-                        GlassCircleButton(systemName: "square.and.arrow.up") {
-                            isDownloadingForShare = true
-                            Task {
-                                defer { isDownloadingForShare = false }
-                                do {
-                                    let data = try await APIClient.shared.getRawFile(path: filePath)
-                                    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
-                                    try data.write(to: tempURL)
-                                    presentShareSheet(items: [tempURL])
-                                } catch {
-                                    print("[FileViewer] Failed to download file for sharing: \(error)")
-                                }
-                            }
-                        }
-
-                        Menu {
-                            Button {
-                                forceRefresh()
-                            } label: {
-                                Label("Refresh from Server", systemImage: "arrow.clockwise")
-                            }
-                        } label: {
-                            GlassCircleButton(systemName: "ellipsis") { }
-                                .allowsHitTesting(false)
-                        }
-                    }
-                }
-                .padding(.trailing, 16)
-                .padding(.top, 8)
-            }
-        }
         .task {
             if needsFetch {
                 await loadFileInfo()
@@ -231,35 +166,21 @@ struct FileViewerView: View {
 
     // MARK: - Content Dispatch
 
-    private var dismissAction: () -> Void {
-        if let onDismiss { onDismiss } else { { dismiss() } }
-    }
-
     @ViewBuilder
     private func fileContentView(_ file: FileRecord) -> some View {
         if file.isImage {
-            // ImageFileView handles both double-tap (zoom) and single-tap (dismiss) internally.
-            ImageFileView(path: filePath, modifiedAt: file.modifiedAt, onTap: dismissAction)
+            // ImageFileView handles both double-tap (zoom) and single-tap (toggle toolbar) internally.
+            ImageFileView(path: filePath, modifiedAt: file.modifiedAt, onSingleTap: onSingleTap)
         } else if file.isText {
             TextFileView(path: filePath, modifiedAt: file.modifiedAt)
-                .contentShape(Rectangle())
-                .onTapGesture { dismissAction() }
         } else if file.isPDF {
             PDFFileView(path: filePath, modifiedAt: file.modifiedAt)
-                .contentShape(Rectangle())
-                .onTapGesture { dismissAction() }
         } else if file.isVideo {
             VideoFileView(path: filePath)
-                .contentShape(Rectangle())
-                .onTapGesture { dismissAction() }
         } else if file.isAudio {
             AudioFileView(path: filePath, fileName: fileName)
-                .contentShape(Rectangle())
-                .onTapGesture { dismissAction() }
         } else {
             GenericFileInfoView(file: file, filePath: filePath)
-                .contentShape(Rectangle())
-                .onTapGesture { dismissAction() }
         }
     }
 
@@ -299,15 +220,6 @@ struct FileViewerView: View {
             .buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    // MARK: - Force Refresh
-
-    /// Invalidate cached file data and recreate the content view.
-    private func forceRefresh() {
-        let url = APIClient.shared.rawFileURL(path: filePath)
-        FileCache.shared.invalidate(for: url)
-        refreshID = UUID()
     }
 
     // MARK: - Data Fetching

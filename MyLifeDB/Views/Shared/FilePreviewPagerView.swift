@@ -52,48 +52,80 @@ struct FilePreviewPagerView: View {
         self._currentID = State(initialValue: startID)
     }
 
+    /// The currently visible item, tracked so the overlay targets the correct file.
+    private var currentItem: PreviewItem? {
+        items.first(where: { $0.id == currentID })
+    }
+
+    /// Whether the current item is a media file (image or video).
+    private var currentIsMedia: Bool {
+        guard let item = currentItem else { return true }
+        if let file = item.file {
+            return file.isImage || file.isVideo
+        }
+        // Fallback: pager items are typically media, assume true
+        return true
+    }
+
     var body: some View {
         #if os(macOS)
-        // macOS: fall back to single file viewer
-        if let item = items.first(where: { $0.id == currentID }) {
-            FileViewerView(filePath: item.path, fileName: item.name, onDismiss: onDismiss)
+        // macOS: fall back to single file viewer wrapped in overlay
+        if let item = currentItem {
+            let isMedia = item.file?.isImage == true || item.file?.isVideo == true
+            FilePreviewOverlay(
+                filePath: item.path,
+                fileName: item.name,
+                file: item.file,
+                isMedia: isMedia,
+                onDismiss: onDismiss
+            ) { toggleToolbar in
+                FileViewerView(filePath: item.path, fileName: item.name, onSingleTap: isMedia ? toggleToolbar : nil)
+            }
         }
         #else
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal) {
-                LazyHStack(spacing: 0) {
-                    ForEach(items) { item in
-                        Group {
-                            if let file = item.file {
-                                FileViewerView(file: file, onDismiss: onDismiss)
-                            } else {
-                                FileViewerView(filePath: item.path, fileName: item.name, onDismiss: onDismiss)
+        FilePreviewOverlay(
+            filePath: currentItem?.path ?? "",
+            fileName: currentItem?.name ?? "",
+            file: currentItem?.file,
+            isMedia: currentIsMedia,
+            onDismiss: onDismiss
+        ) { toggleToolbar in
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(items) { item in
+                            Group {
+                                if let file = item.file {
+                                    FileViewerView(file: file, onSingleTap: toggleToolbar)
+                                } else {
+                                    FileViewerView(filePath: item.path, fileName: item.name, onSingleTap: toggleToolbar)
+                                }
                             }
+                            .containerRelativeFrame(.horizontal)
+                            .id(item.id)
                         }
-                        .containerRelativeFrame(.horizontal)
-                        .id(item.id)
                     }
                 }
-            }
-            .scrollTargetBehavior(.paging)
-            .scrollPosition(id: $currentID)
-            .scrollIndicators(.hidden)
-            .ignoresSafeArea()
-            .onAppear {
-                if let id = currentID {
-                    proxy.scrollTo(id, anchor: .center)
-                    prefetchAdjacentItems(around: id)
+                .scrollTargetBehavior(.paging)
+                .scrollPosition(id: $currentID)
+                .scrollIndicators(.hidden)
+                .ignoresSafeArea()
+                .onAppear {
+                    if let id = currentID {
+                        proxy.scrollTo(id, anchor: .center)
+                        prefetchAdjacentItems(around: id)
+                    }
                 }
-            }
-            .onChange(of: currentID) { _, newID in
-                guard let newID else { return }
-                // Load more older items when approaching the left end (oldest side).
-                if let idx = items.firstIndex(where: { $0.id == newID }),
-                   idx <= 2 && hasMoreOlder && !isLoadingMore {
-                    Task { await loadMoreItems() }
+                .onChange(of: currentID) { _, newID in
+                    guard let newID else { return }
+                    // Load more older items when approaching the left end (oldest side).
+                    if let idx = items.firstIndex(where: { $0.id == newID }),
+                       idx <= 2 && hasMoreOlder && !isLoadingMore {
+                        Task { await loadMoreItems() }
+                    }
+                    // Prefetch adjacent images for smoother swiping.
+                    prefetchAdjacentItems(around: newID)
                 }
-                // Prefetch adjacent images for smoother swiping.
-                prefetchAdjacentItems(around: newID)
             }
         }
         #endif

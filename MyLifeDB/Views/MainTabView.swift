@@ -140,10 +140,21 @@ struct MainTabView: View {
         let dismiss = { filePreview = nil }
         if let context = preview.pagerContext {
             FilePreviewPagerView(context: context, onDismiss: dismiss)
-        } else if let file = preview.file {
-            FileViewerView(file: file, onDismiss: dismiss)
         } else {
-            FileViewerView(filePath: preview.path, fileName: preview.name, onDismiss: dismiss)
+            let isMedia = preview.file?.isImage == true || preview.file?.isVideo == true
+            FilePreviewOverlay(
+                filePath: preview.path,
+                fileName: preview.name,
+                file: preview.file,
+                isMedia: isMedia,
+                onDismiss: dismiss
+            ) { toggleToolbar in
+                if let file = preview.file {
+                    FileViewerView(file: file, onSingleTap: isMedia ? toggleToolbar : nil)
+                } else {
+                    FileViewerView(filePath: preview.path, fileName: preview.name)
+                }
+            }
         }
     }
 }
