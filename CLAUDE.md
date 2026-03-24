@@ -154,6 +154,19 @@ To continue work in the same session, start a **new worktree** — the full cycl
     git worktree remove .worktrees/<name>
     git branch -d <branch>
 
+## Development Principles
+
+### Evidence-Based Debugging (CRITICAL)
+
+**Never treat a hypothesis as a conclusion.** The correct flow is: **observe → hypothesize → verify → fix**. Skipping verification leads to wrong fixes that waste time and erode trust.
+
+**Rules:**
+1. **Hypotheses are not assertions** — When you don't know the root cause, say "I think X might be happening" not "X is the problem". Never state a guess as fact.
+2. **Verify before fixing** — If you can't prove the root cause, add instrumentation (logging, counters, traces) to gather evidence first. A 5-line log statement that confirms the theory is worth more than a 50-line fix based on a guess.
+3. **Check your own pipeline before blaming externals** — Before claiming "library X has a bug" or "the SDK does Y wrong", verify that your own code isn't the cause. Trace the data flow through YOUR code first.
+4. **After 2-3 failed guesses, stop guessing harder** — Step back, add observability, and let the data tell you. More guessing compounds the problem; more visibility solves it.
+5. **Prove it, then fix it** — The debugging session should produce evidence (logs, repro steps, seq numbers) that clearly point to the root cause. Only then write the fix.
+
 ## Naming Conventions
 
 | Category | Convention | Example |
