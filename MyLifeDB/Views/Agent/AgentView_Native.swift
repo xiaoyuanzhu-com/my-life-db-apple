@@ -1,15 +1,15 @@
 #if LEGACY_NATIVE_VIEWS
 //
-//  ClaudeView.swift
+//  AgentView.swift
 //  MyLifeDB
 //
-//  AI chat interface for interacting with Claude.
+//  AI chat interface for interacting with agents.
 //  Users can ask questions about their data, get summaries, etc.
 //
 
 import SwiftUI
 
-struct ClaudeView: View {
+struct AgentView: View {
     @State private var messageText: String = ""
 
     var body: some View {
@@ -19,7 +19,7 @@ struct ClaudeView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 12) {
                         // TODO: Display chat messages
-                        Text("Start a conversation with Claude")
+                        Text("Start a conversation")
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .padding()
@@ -30,7 +30,7 @@ struct ClaudeView: View {
 
                 // Message input area
                 HStack(spacing: 12) {
-                    TextField("Ask Claude...", text: $messageText)
+                    TextField("Ask a question...", text: $messageText)
                         .textFieldStyle(.roundedBorder)
 
                     Button {
@@ -43,7 +43,7 @@ struct ClaudeView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Claude")
+            .navigationTitle("Agent")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
             #endif
@@ -52,7 +52,7 @@ struct ClaudeView: View {
 }
 
 #Preview {
-    ClaudeView()
+    AgentView()
 }
 
 #endif // LEGACY_NATIVE_VIEWS

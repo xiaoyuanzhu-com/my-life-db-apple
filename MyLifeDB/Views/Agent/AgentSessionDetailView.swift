@@ -1,15 +1,15 @@
 //
-//  ClaudeSessionDetailView.swift
+//  AgentSessionDetailView.swift
 //  MyLifeDB
 //
-//  WebView wrapper for viewing a single Claude session.
-//  Creates its own WebPage and loads /claude/{sessionId} directly.
+//  WebView wrapper for viewing a single agent session.
+//  Creates its own WebPage and loads /agent/{sessionId} directly.
 //  No JS bridge navigation — SwiftUI owns all navigation state.
 //
 
 import SwiftUI
 
-struct ClaudeSessionDetailView: View {
+struct AgentSessionDetailView: View {
 
     let sessionId: String
     let title: String?
@@ -22,7 +22,7 @@ struct ClaudeSessionDetailView: View {
         self.sessionId = sessionId
         self.title = title
         self._webVM = State(initialValue: TabWebViewModel(
-            route: "/claude/\(sessionId)",
+            route: "/agent/\(sessionId)",
             featureFlags: [
                 "sessionSidebar": false,
                 "sessionCreateNew": false,

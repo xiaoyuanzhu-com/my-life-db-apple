@@ -5,10 +5,10 @@
 //  Root navigation view with four tabs:
 //  - Inbox: Native SwiftUI inbox feed
 //  - Library: Native SwiftUI file browser
-//  - Claude: Native session list → dedicated WebView per session detail
+//  - Agent: Native session list -> dedicated WebView per session detail
 //  - Me: Native SwiftUI (profile and settings)
 //
-//  Each Claude session detail creates its own WebPage instance.
+//  Each agent session detail creates its own WebPage instance.
 //  Uses native SwiftUI TabView on iOS/iPadOS and NavigationSplitView on macOS.
 //
 
@@ -19,14 +19,14 @@ import SwiftUI
 enum AppTab: String, CaseIterable {
     case inbox = "Inbox"
     case library = "Library"
-    case claude = "Claude"
+    case agent = "Agent"
     case me = "Me"
 
     var icon: String {
         switch self {
         case .inbox: return "tray"
         case .library: return "folder"
-        case .claude: return "bubble.left.and.bubble.right"
+        case .agent: return "bubble.left.and.bubble.right"
         case .me: return "person.circle"
         }
     }
@@ -41,7 +41,7 @@ struct MainTabView: View {
     @Namespace private var previewNamespace
     @State private var selectedTab: AppTab = .inbox
     @State private var filePreview: FilePreviewDestination?
-    @State private var claudeDeepLink: String?
+    @State private var agentDeepLink: String?
 
     var body: some View {
         #if os(macOS)
@@ -85,8 +85,8 @@ struct MainTabView: View {
                 Tab(AppTab.library.rawValue, systemImage: AppTab.library.icon, value: .library) {
                     NativeLibraryBrowserView()
                 }
-                Tab(AppTab.claude.rawValue, systemImage: AppTab.claude.icon, value: .claude) {
-                    ClaudeSessionListView(deepLink: $claudeDeepLink)
+                Tab(AppTab.agent.rawValue, systemImage: AppTab.agent.icon, value: .agent) {
+                    AgentSessionListView(deepLink: $agentDeepLink)
                 }
                 Tab(AppTab.me.rawValue, systemImage: AppTab.me.icon, value: .me) {
                     MeView()
@@ -95,7 +95,7 @@ struct MainTabView: View {
             .modifier(SharedModifiers(
                 selectedTab: $selectedTab,
                 deepLinkPath: $deepLinkPath,
-                claudeDeepLink: $claudeDeepLink
+                agentDeepLink: $agentDeepLink
             ))
         )
     }
@@ -118,8 +118,8 @@ struct MainTabView: View {
                     NativeInboxView()
                 case .library:
                     NativeLibraryBrowserView()
-                case .claude:
-                    ClaudeSessionListView(deepLink: $claudeDeepLink)
+                case .agent:
+                    AgentSessionListView(deepLink: $agentDeepLink)
                 case .me:
                     MeView()
                 }
@@ -127,7 +127,7 @@ struct MainTabView: View {
             .modifier(SharedModifiers(
                 selectedTab: $selectedTab,
                 deepLinkPath: $deepLinkPath,
-                claudeDeepLink: $claudeDeepLink
+                agentDeepLink: $agentDeepLink
             ))
         )
     }
@@ -166,7 +166,7 @@ struct MainTabView: View {
 private struct SharedModifiers: ViewModifier {
     @Binding var selectedTab: AppTab
     @Binding var deepLinkPath: String?
-    @Binding var claudeDeepLink: String?
+    @Binding var agentDeepLink: String?
 
     func body(content: Content) -> some View {
         content
@@ -186,9 +186,9 @@ private struct SharedModifiers: ViewModifier {
             selectedTab = .inbox
         } else if path.hasPrefix("/library") || path.hasPrefix("/file") {
             selectedTab = .library
-        } else if path.hasPrefix("/claude") {
-            selectedTab = .claude
-            claudeDeepLink = path
+        } else if path.hasPrefix("/agent") {
+            selectedTab = .agent
+            agentDeepLink = path
         } else if path.hasPrefix("/settings") || path.hasPrefix("/people") {
             selectedTab = .me
         }

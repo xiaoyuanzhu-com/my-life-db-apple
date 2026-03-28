@@ -25,7 +25,7 @@ extension Notification.Name {
     static let webViewShouldReload = Notification.Name("webViewShouldReload")
 
     /// Posted by NativeBridgeHandler when the web frontend requests native navigation
-    /// (e.g. clicking a file link in a Claude session that should switch to the Library tab).
+    /// (e.g. clicking a file link in an agent session that should switch to the Library tab).
     static let nativeNavigateRequest = Notification.Name("nativeNavigateRequest")
 }
 
@@ -36,7 +36,7 @@ final class TabWebViewModel {
 
     // MARK: - Configuration
 
-    /// The route this WebView is pinned to (e.g. "/", "/claude").
+    /// The route this WebView is pinned to (e.g. "/", "/agent").
     let route: String
 
     /// Feature flags to inject into the WebView before React mounts.

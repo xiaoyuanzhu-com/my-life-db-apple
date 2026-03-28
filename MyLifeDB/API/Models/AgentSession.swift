@@ -1,8 +1,8 @@
 //
-//  ClaudeSession.swift
+//  AgentSession.swift
 //  MyLifeDB
 //
-//  Claude session model matching backend ListAllClaudeSessions response.
+//  Agent session model matching backend ListAllAgentSessions response.
 //
 
 import Foundation
@@ -12,40 +12,40 @@ import Foundation
 ///
 /// "unread" refers specifically to unread *result* messages (completed turns),
 /// NOT intermediate messages like assistant text, tool calls, or progress
-/// updates that stream while Claude is working.
+/// updates that stream while the agent is working.
 enum SessionState: String, Codable, Hashable {
     case idle       // User is up to date, nothing needs attention
-    case working    // Claude is mid-turn (processing)
+    case working    // Agent is mid-turn (processing)
     case unread     // Unread result messages or pending permission
     case archived   // User explicitly archived
 }
 
-/// Represents a Claude Code session
-struct ClaudeSession: Codable, Identifiable, Hashable {
+/// Represents an agent session
+struct AgentSession: Codable, Identifiable, Hashable {
 
     let id: String
     let title: String
     let workingDir: String
     let createdAt: Int64           // epoch milliseconds
     let lastActivity: Int64        // epoch milliseconds
-    let lastUserActivity: Int64?   // epoch milliseconds — last user (not Claude) interaction, used for stable list ordering
+    let lastUserActivity: Int64?   // epoch milliseconds — last user (not agent) interaction, used for stable list ordering
     let messageCount: Int
     let isSidechain: Bool
     var sessionState: SessionState
-    let git: ClaudeSessionGitInfo?
+    let git: AgentSessionGitInfo?
 
     var isArchived: Bool { sessionState == .archived }
 
     /// Returns a copy with the given session state
-    func withSessionState(_ state: SessionState) -> ClaudeSession {
+    func withSessionState(_ state: SessionState) -> AgentSession {
         var copy = self
         copy.sessionState = state
         return copy
     }
 }
 
-/// Git repository info for a Claude session
-struct ClaudeSessionGitInfo: Codable, Hashable {
+/// Git repository info for an agent session
+struct AgentSessionGitInfo: Codable, Hashable {
     let isRepo: Bool
     let branch: String?
     let remoteUrl: String?
@@ -53,14 +53,14 @@ struct ClaudeSessionGitInfo: Codable, Hashable {
 
 // MARK: - API Response Types
 
-/// Response from GET /api/claude/sessions/all
-struct ClaudeSessionsResponse: Codable {
-    let sessions: [ClaudeSession]
-    let pagination: ClaudeSessionsPagination
+/// Response from GET /api/agent/sessions/all
+struct AgentSessionsResponse: Codable {
+    let sessions: [AgentSession]
+    let pagination: AgentSessionsPagination
 }
 
 /// Pagination info for session list
-struct ClaudeSessionsPagination: Codable {
+struct AgentSessionsPagination: Codable {
     let hasMore: Bool
     let nextCursor: String?
     let totalCount: Int

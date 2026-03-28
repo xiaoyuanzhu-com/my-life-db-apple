@@ -1,17 +1,17 @@
 //
-//  ClaudeAPI.swift
+//  AgentAPI.swift
 //  MyLifeDB
 //
-//  Claude session API endpoints.
+//  Agent session API endpoints.
 //
 //  Endpoints:
-//  - GET /api/claude/sessions/all  - List all sessions (paginated)
+//  - GET /api/agent/sessions/all  - List all sessions (paginated)
 //
 
 import Foundation
 
-/// API endpoints for Claude session management
-struct ClaudeAPI {
+/// API endpoints for agent session management
+struct AgentAPI {
 
     private let client: APIClient
 
@@ -21,7 +21,7 @@ struct ClaudeAPI {
 
     // MARK: - List Operations
 
-    /// List all Claude sessions (newest first)
+    /// List all agent sessions (newest first)
     /// - Parameters:
     ///   - limit: Number of sessions to fetch (default 20, max 100)
     ///   - cursor: Pagination cursor from previous response
@@ -30,7 +30,7 @@ struct ClaudeAPI {
         limit: Int = 20,
         cursor: String? = nil,
         status: String = "active"
-    ) async throws -> ClaudeSessionsResponse {
+    ) async throws -> AgentSessionsResponse {
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "limit", value: String(limit)),
             URLQueryItem(name: "status", value: status)
@@ -41,25 +41,25 @@ struct ClaudeAPI {
         }
 
         return try await client.request(
-            path: "/api/claude/sessions/all",
+            path: "/api/agent/sessions/all",
             queryItems: queryItems
         )
     }
 
     // MARK: - Archive/Unarchive Operations
 
-    /// Archive a Claude session from the default session list
+    /// Archive an agent session from the default session list
     func archive(sessionId: String) async throws {
         try await client.requestVoid(
-            path: "/api/claude/sessions/\(sessionId)/archive",
+            path: "/api/agent/sessions/\(sessionId)/archive",
             method: .post
         )
     }
 
-    /// Unarchive a Claude session (make it visible in the default session list)
+    /// Unarchive an agent session (make it visible in the default session list)
     func unarchive(sessionId: String) async throws {
         try await client.requestVoid(
-            path: "/api/claude/sessions/\(sessionId)/unarchive",
+            path: "/api/agent/sessions/\(sessionId)/unarchive",
             method: .post
         )
     }

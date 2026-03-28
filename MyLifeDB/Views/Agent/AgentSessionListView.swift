@@ -1,8 +1,8 @@
 //
-//  ClaudeSessionListView.swift
+//  AgentSessionListView.swift
 //  MyLifeDB
 //
-//  Native session list for the Claude tab.
+//  Native session list for the Agent tab.
 //  Fetches sessions from the API and displays them in a SwiftUI List.
 //  Tapping a session pushes a detail view with its own dedicated WebView.
 //
@@ -11,25 +11,25 @@ import SwiftUI
 
 // MARK: - Navigation Destination
 
-enum ClaudeDestination: Hashable {
-    case session(ClaudeSession)
+enum AgentDestination: Hashable {
+    case session(AgentSession)
     case sessionById(String)
     case newSession
 }
 
-struct ClaudeSessionListView: View {
+struct AgentSessionListView: View {
 
     @Binding var deepLink: String?
 
     @Environment(\.scenePhase) private var scenePhase
 
-    @State private var sessions: [ClaudeSession] = []
+    @State private var sessions: [AgentSession] = []
     @State private var isLoading = false
     @State private var error: Error?
     @State private var hasMore = false
     @State private var nextCursor: String?
     @State private var path = NavigationPath()
-    @State private var sseManager = ClaudeSessionSSEManager()
+    @State private var sseManager = AgentSessionSSEManager()
     @State private var statusFilter = "active"
 
     var body: some View {
@@ -57,20 +57,20 @@ struct ClaudeSessionListView: View {
                         .tag("archived")
                 }
             }
-            .navigationDestination(for: ClaudeDestination.self) { dest in
+            .navigationDestination(for: AgentDestination.self) { dest in
                 switch dest {
                 case .session(let session):
-                    ClaudeSessionDetailView(sessionId: session.id, title: session.title)
+                    AgentSessionDetailView(sessionId: session.id, title: session.title)
                 case .sessionById(let id):
-                    ClaudeSessionDetailView(sessionId: id)
+                    AgentSessionDetailView(sessionId: id)
                 case .newSession:
-                    NewClaudeSessionView()
+                    NewAgentSessionView()
                 }
             }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        path.append(ClaudeDestination.newSession)
+                        path.append(AgentDestination.newSession)
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -110,17 +110,17 @@ struct ClaudeSessionListView: View {
             guard let link else { return }
             deepLink = nil
 
-            // Parse /claude/{sessionId} from deep link path
+            // Parse /agent/{sessionId} from deep link path
             let components = link.split(separator: "/").map(String.init)
-            if components.count >= 2, components[0] == "claude" {
+            if components.count >= 2, components[0] == "agent" {
                 let sessionId = components[1]
                 if let session = sessions.first(where: { $0.id == sessionId }) {
-                    path.append(ClaudeDestination.session(session))
+                    path.append(AgentDestination.session(session))
                 } else {
-                    path.append(ClaudeDestination.sessionById(sessionId))
+                    path.append(AgentDestination.sessionById(sessionId))
                 }
-            } else if link == "/claude" {
-                path.append(ClaudeDestination.newSession)
+            } else if link == "/agent" {
+                path.append(AgentDestination.newSession)
             }
         }
     }
@@ -137,7 +137,7 @@ struct ClaudeSessionListView: View {
 
     // MARK: - Session List
 
-    private var groupedSessions: [(title: String, sessions: [ClaudeSession])] {
+    private var groupedSessions: [(title: String, sessions: [AgentSession])] {
         let calendar = Calendar.current
         let now = Date()
         let startOfToday = calendar.startOfDay(for: now)
@@ -147,11 +147,11 @@ struct ClaudeSessionListView: View {
               let startOfMonth = calendar.date(byAdding: .month, value: -1, to: startOfToday)
         else { return [("All", sessions)] }
 
-        var today: [ClaudeSession] = []
-        var yesterday: [ClaudeSession] = []
-        var pastWeek: [ClaudeSession] = []
-        var pastMonth: [ClaudeSession] = []
-        var earlier: [ClaudeSession] = []
+        var today: [AgentSession] = []
+        var yesterday: [AgentSession] = []
+        var pastWeek: [AgentSession] = []
+        var pastMonth: [AgentSession] = []
+        var earlier: [AgentSession] = []
 
         for session in sessions {
             let date = (session.lastUserActivity ?? session.lastActivity).asDate
@@ -168,7 +168,7 @@ struct ClaudeSessionListView: View {
             }
         }
 
-        var result: [(String, [ClaudeSession])] = []
+        var result: [(String, [AgentSession])] = []
         if !today.isEmpty { result.append(("Today", today)) }
         if !yesterday.isEmpty { result.append(("Yesterday", yesterday)) }
         if !pastWeek.isEmpty { result.append(("Past Week", pastWeek)) }
@@ -205,7 +205,7 @@ struct ClaudeSessionListView: View {
         }
     }
 
-    private func sessionButton(_ session: ClaudeSession) -> some View {
+    private func sessionButton(_ session: AgentSession) -> some View {
         Button {
             // Optimistically clear unread dot — the subscribe WS will confirm
             // the read state on the server when the detail view connects.
@@ -213,7 +213,7 @@ struct ClaudeSessionListView: View {
                let index = sessions.firstIndex(where: { $0.id == session.id }) {
                 sessions[index] = session.withSessionState(.idle)
             }
-            path.append(ClaudeDestination.session(session))
+            path.append(AgentDestination.session(session))
         } label: {
             SessionRow(session: session)
                 .contentShape(Rectangle())
@@ -307,7 +307,7 @@ struct ClaudeSessionListView: View {
         error = nil
 
         do {
-            let response = try await APIClient.shared.claude.listAll(
+            let response = try await APIClient.shared.agent.listAll(
                 status: statusFilter
             )
             sessions = response.sessions
@@ -326,7 +326,7 @@ struct ClaudeSessionListView: View {
     /// sessions not in the first page, and re-sort.
     private func refreshSessions() async {
         do {
-            let response = try await APIClient.shared.claude.listAll(
+            let response = try await APIClient.shared.agent.listAll(
                 status: statusFilter
             )
             let newList = response.sessions
@@ -371,7 +371,7 @@ struct ClaudeSessionListView: View {
             error = nil
         } catch {
             // Silent failure for background refresh — don't overwrite visible data
-            print("[ClaudeSessionListView] Background refresh failed: \(error)")
+            print("[AgentSessionListView] Background refresh failed: \(error)")
         }
     }
 
@@ -380,7 +380,7 @@ struct ClaudeSessionListView: View {
         isLoading = true
 
         do {
-            let response = try await APIClient.shared.claude.listAll(
+            let response = try await APIClient.shared.agent.listAll(
                 cursor: cursor,
                 status: statusFilter
             )
@@ -389,7 +389,7 @@ struct ClaudeSessionListView: View {
             nextCursor = response.pagination.nextCursor
         } catch {
             // Silently fail on load-more; user can scroll up and try again
-            print("[ClaudeSessionListView] Load more failed: \(error)")
+            print("[AgentSessionListView] Load more failed: \(error)")
         }
 
         isLoading = false
@@ -397,7 +397,7 @@ struct ClaudeSessionListView: View {
 
     // MARK: - Archive / Unarchive
 
-    private func archiveSession(_ session: ClaudeSession) async {
+    private func archiveSession(_ session: AgentSession) async {
         // Optimistic update
         if let index = sessions.firstIndex(where: { $0.id == session.id }) {
             if statusFilter == "all" {
@@ -414,15 +414,15 @@ struct ClaudeSessionListView: View {
         }
 
         do {
-            try await APIClient.shared.claude.archive(sessionId: session.id)
+            try await APIClient.shared.agent.archive(sessionId: session.id)
         } catch {
             // Revert on failure
-            print("[ClaudeSessionListView] Archive failed: \(error)")
+            print("[AgentSessionListView] Archive failed: \(error)")
             await refreshSessions()
         }
     }
 
-    private func unarchiveSession(_ session: ClaudeSession) async {
+    private func unarchiveSession(_ session: AgentSession) async {
         // Optimistic update
         if let index = sessions.firstIndex(where: { $0.id == session.id }) {
             if statusFilter == "all" {
@@ -439,10 +439,10 @@ struct ClaudeSessionListView: View {
         }
 
         do {
-            try await APIClient.shared.claude.unarchive(sessionId: session.id)
+            try await APIClient.shared.agent.unarchive(sessionId: session.id)
         } catch {
             // Revert on failure
-            print("[ClaudeSessionListView] Unarchive failed: \(error)")
+            print("[AgentSessionListView] Unarchive failed: \(error)")
             await refreshSessions()
         }
     }
@@ -450,10 +450,10 @@ struct ClaudeSessionListView: View {
 
 // MARK: - New Session View
 
-private struct NewClaudeSessionView: View {
+private struct NewAgentSessionView: View {
 
     @State private var webVM = TabWebViewModel(
-        route: "/claude",
+        route: "/agent",
         featureFlags: [
             "sessionSidebar": false,
             "sessionCreateNew": false,
@@ -521,7 +521,7 @@ private struct NewClaudeSessionView: View {
 
 private struct SessionRow: View {
 
-    let session: ClaudeSession
+    let session: AgentSession
 
     var body: some View {
         HStack(spacing: 8) {
@@ -563,7 +563,7 @@ private struct SessionRow: View {
 // MARK: - Unread Dot Indicator
 
 /// Static dot indicating session activity.
-/// - `.working` (amber): Claude is still working
+/// - `.working` (amber): Agent is still working
 /// - `.unread` (green): unread result (completed turn) or pending permission
 private struct UnreadDot: View {
 
@@ -573,7 +573,7 @@ private struct UnreadDot: View {
         Circle()
             .fill(state == .working ? Color.orange : Color.green)
             .frame(width: 8, height: 8)
-            .accessibilityLabel(state == .working ? "Claude is working" : "Unread results")
+            .accessibilityLabel(state == .working ? "Agent is working" : "Unread results")
     }
 }
 
@@ -581,5 +581,5 @@ private struct UnreadDot: View {
 
 #Preview {
     @Previewable @State var deepLink: String? = nil
-    ClaudeSessionListView(deepLink: $deepLink)
+    AgentSessionListView(deepLink: $deepLink)
 }

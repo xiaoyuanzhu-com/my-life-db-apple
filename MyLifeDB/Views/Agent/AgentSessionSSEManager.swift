@@ -1,8 +1,8 @@
 //
-//  ClaudeSessionSSEManager.swift
+//  AgentSessionSSEManager.swift
 //  MyLifeDB
 //
-//  Server-Sent Events manager for Claude session real-time updates.
+//  Server-Sent Events manager for agent session real-time updates.
 //  Connects to GET /api/notifications/stream and listens for
 //  claude-session-updated events to trigger session list refreshes.
 //
@@ -10,7 +10,7 @@
 import Foundation
 
 @Observable
-final class ClaudeSessionSSEManager {
+final class AgentSessionSSEManager {
 
     var onSessionUpdated: (() -> Void)?
 
@@ -62,7 +62,7 @@ final class ClaudeSessionSSEManager {
 
         let baseURL = AuthManager.shared.baseURL
         guard let url = URL(string: "\(baseURL)/api/notifications/stream") else {
-            print("[ClaudeSSE] Invalid URL")
+            print("[AgentSSE] Invalid URL")
             return
         }
 
@@ -76,7 +76,7 @@ final class ClaudeSessionSSEManager {
 
         buffer = "" // Reset buffer for new connection
 
-        let delegate = ClaudeSSESessionDelegate(manager: self)
+        let delegate = AgentSSESessionDelegate(manager: self)
         session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
         task = session?.dataTask(with: request)
         task?.resume()
@@ -92,7 +92,7 @@ final class ClaudeSessionSSEManager {
     /// Format:  `data: {"type":"claude-session-updated",...}\n\n`
     ///
     /// This matches how the web frontend parses events
-    /// (`EventSource.onmessage` → `JSON.parse` → `data.type`).
+    /// (`EventSource.onmessage` -> `JSON.parse` -> `data.type`).
     fileprivate func handleData(_ data: Data) {
         guard let text = String(data: data, encoding: .utf8) else { return }
         buffer.append(text)
@@ -122,7 +122,7 @@ final class ClaudeSessionSSEManager {
 
         DispatchQueue.main.async { [weak self] in
             switch type {
-            case "claude-session-updated":
+            case "agent-session-updated":
                 self?.onSessionUpdated?()
             default:
                 break
@@ -159,10 +159,10 @@ final class ClaudeSessionSSEManager {
 
 // MARK: - URLSession Delegate
 
-private class ClaudeSSESessionDelegate: NSObject, URLSessionDataDelegate {
-    weak var manager: ClaudeSessionSSEManager?
+private class AgentSSESessionDelegate: NSObject, URLSessionDataDelegate {
+    weak var manager: AgentSessionSSEManager?
 
-    init(manager: ClaudeSessionSSEManager) {
+    init(manager: AgentSessionSSEManager) {
         self.manager = manager
     }
 
