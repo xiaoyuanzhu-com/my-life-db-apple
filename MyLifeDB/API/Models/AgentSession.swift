@@ -42,6 +42,21 @@ struct AgentSession: Codable, Identifiable, Hashable {
         copy.sessionState = state
         return copy
     }
+
+    // Custom decoder to handle fields the backend may not include
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        workingDir = try container.decode(String.self, forKey: .workingDir)
+        createdAt = try container.decode(Int64.self, forKey: .createdAt)
+        lastActivity = try container.decode(Int64.self, forKey: .lastActivity)
+        lastUserActivity = try container.decodeIfPresent(Int64.self, forKey: .lastUserActivity)
+        messageCount = try container.decodeIfPresent(Int.self, forKey: .messageCount) ?? 0
+        isSidechain = try container.decodeIfPresent(Bool.self, forKey: .isSidechain) ?? false
+        sessionState = try container.decode(SessionState.self, forKey: .sessionState)
+        git = try container.decodeIfPresent(AgentSessionGitInfo.self, forKey: .git)
+    }
 }
 
 /// Git repository info for an agent session
