@@ -230,15 +230,48 @@ final class NativeBridgeHandler: URLSchemeHandler {
         window.nativePlatform = '\(nativePlatform)';
 
         // Lock viewport to prevent zoom — keep viewport-fit=cover for safe-area insets.
+        // Three layers of defense:
+        //   1. Native: .webViewAllowsMagnification(false) on the SwiftUI WebView (primary)
+        //   2. Viewport meta: create-or-update with user-scalable=no (belt-and-suspenders)
+        //   3. JS gesture prevention: block pinch/double-tap zoom at the event level
         // Also disable WebKit text auto-sizing which can cause apparent zoom changes
-        // during dynamic content updates (e.g. streaming messages) independent of the
-        // viewport zoom lock.
+        // during dynamic content updates (e.g. streaming messages).
         (function() {
-            var meta = document.querySelector('meta[name="viewport"]');
-            if (meta) {
-                meta.content = 'width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
-            }
+            var viewportContent = 'width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+
+            // At document-start the <head> may not be parsed yet, so create the
+            // meta tag immediately (it will be the first element in <head>).
+            // If the HTML later declares its own viewport meta, we update it via
+            // a DOMContentLoaded listener below.
+            var meta = document.createElement('meta');
+            meta.name = 'viewport';
+            meta.content = viewportContent;
+            document.documentElement.appendChild(meta);
+
+            // Once the DOM is fully parsed, ensure the viewport meta is correct
+            // (the HTML's own <meta viewport> may have overwritten ours).
+            document.addEventListener('DOMContentLoaded', function() {
+                var tags = document.querySelectorAll('meta[name="viewport"]');
+                // Keep only one, with our locked content
+                for (var i = 0; i < tags.length; i++) {
+                    if (i === 0) {
+                        tags[i].content = viewportContent;
+                    } else {
+                        tags[i].remove();
+                    }
+                }
+            });
+
             document.documentElement.style.webkitTextSizeAdjust = '100%';
+
+            // CSS touch-action: disable pinch-zoom and double-tap-zoom at the
+            // rendering level. 'manipulation' allows pan + tap but blocks zoom.
+            document.documentElement.style.touchAction = 'manipulation';
+
+            // Block Safari/WebKit gesture events (pinch-to-zoom).
+            document.addEventListener('gesturestart', function(e) { e.preventDefault(); }, { passive: false, capture: true });
+            document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false, capture: true });
+            document.addEventListener('gestureend', function(e) { e.preventDefault(); }, { passive: false, capture: true });
         })();
 
         // Standalone auth re-check function — callable by native at any time,

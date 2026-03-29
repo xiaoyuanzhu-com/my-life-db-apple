@@ -15,6 +15,7 @@ struct WebViewContainer: View {
 
     var body: some View {
         WebView(viewModel.webPage)
+            .webViewAllowsMagnification(false)
             .webViewBackForwardNavigationGestures(.disabled)
             .ignoresSafeArea()
             #if os(iOS)
