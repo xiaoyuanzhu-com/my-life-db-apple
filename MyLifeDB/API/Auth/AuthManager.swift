@@ -312,7 +312,7 @@ final class AuthManager {
     // MARK: - 503 Provisioning Handler (called by APIClient)
 
     @MainActor
-    func handleProvisioning() {
+    func handleProvisioning() async {
         // Already in provisioning state — no-op
         if case .provisioning = state { return }
         let currentUsername = username ?? jwtUsername(accessToken ?? "") ?? "User"
@@ -320,7 +320,7 @@ final class AuthManager {
     }
 
     @MainActor
-    func handleProvisioningComplete() {
+    func handleProvisioningComplete() async {
         if case .provisioning(let name) = state {
             state = .authenticated(name)
         }
