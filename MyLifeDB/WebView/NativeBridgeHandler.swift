@@ -230,10 +230,9 @@ final class NativeBridgeHandler: URLSchemeHandler {
         window.nativePlatform = '\(nativePlatform)';
 
         // Lock viewport to prevent zoom — keep viewport-fit=cover for safe-area insets.
-        // Three layers of defense:
-        //   1. Native: .webViewAllowsMagnification(false) on the SwiftUI WebView (primary)
-        //   2. Viewport meta: create-or-update with user-scalable=no (belt-and-suspenders)
-        //   3. JS gesture prevention: block pinch/double-tap zoom at the event level
+        // Two layers of defense:
+        //   1. Viewport meta: create-or-update with user-scalable=no
+        //   2. JS gesture prevention: block pinch/double-tap zoom at the event level
         // Also disable WebKit text auto-sizing which can cause apparent zoom changes
         // during dynamic content updates (e.g. streaming messages).
         (function() {
