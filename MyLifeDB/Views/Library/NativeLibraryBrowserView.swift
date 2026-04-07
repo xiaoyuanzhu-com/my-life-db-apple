@@ -2,7 +2,7 @@
 //  NativeLibraryBrowserView.swift
 //  MyLifeDB
 //
-//  Root view for the native Library tab.
+//  Root view for the native Data tab.
 //  Provides NavigationStack-based folder drill-down,
 //  similar to the iOS Files app experience.
 //  File preview is handled by the full-screen overlay in MainTabView.
@@ -46,13 +46,14 @@ struct NativeLibraryBrowserView: View {
 
     @State private var navigationPath = NavigationPath()
     @AppStorage("libraryViewMode") private var viewMode: LibraryViewMode = .grid
+    @State private var searchText = ""
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
             // Root folder (path = "")
             LibraryFolderView(
                 folderPath: "",
-                folderName: "Library",
+                folderName: "Data",
                 viewMode: $viewMode,
                 navigationPath: $navigationPath
             )
@@ -70,6 +71,7 @@ struct NativeLibraryBrowserView: View {
                 }
             }
         }
+        .searchable(text: $searchText, prompt: "Search files...")
     }
 }
 

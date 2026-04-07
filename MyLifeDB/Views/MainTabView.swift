@@ -2,9 +2,8 @@
 //  MainTabView.swift
 //  MyLifeDB
 //
-//  Root navigation view with four tabs:
-//  - Inbox: Native SwiftUI inbox feed
-//  - Library: Native SwiftUI file browser
+//  Root navigation view with three tabs:
+//  - Data: Native SwiftUI file browser
 //  - Agent: Native session list -> dedicated WebView per session detail
 //  - Me: Native SwiftUI (profile and settings)
 //
@@ -17,15 +16,13 @@ import SwiftUI
 // MARK: - Tab Definition
 
 enum AppTab: String, CaseIterable {
-    case inbox = "Inbox"
-    case library = "Library"
+    case data = "Data"
     case agent = "Agent"
     case me = "Me"
 
     var icon: String {
         switch self {
-        case .inbox: return "tray"
-        case .library: return "folder"
+        case .data: return "folder"
         case .agent: return "bubble.left.and.bubble.right"
         case .me: return "person.circle"
         }
@@ -39,7 +36,7 @@ struct MainTabView: View {
     @Binding var deepLinkPath: String?
 
     @Namespace private var previewNamespace
-    @State private var selectedTab: AppTab = .inbox
+    @State private var selectedTab: AppTab = .data
     @State private var filePreview: FilePreviewDestination?
     @State private var agentDeepLink: String?
 
@@ -79,10 +76,7 @@ struct MainTabView: View {
     private var iOSLayout: some View {
         withFilePreview(
             TabView(selection: $selectedTab) {
-                Tab(AppTab.inbox.rawValue, systemImage: AppTab.inbox.icon, value: .inbox) {
-                    NativeInboxView()
-                }
-                Tab(AppTab.library.rawValue, systemImage: AppTab.library.icon, value: .library) {
+                Tab(AppTab.data.rawValue, systemImage: AppTab.data.icon, value: .data) {
                     NativeLibraryBrowserView()
                 }
                 Tab(AppTab.agent.rawValue, systemImage: AppTab.agent.icon, value: .agent) {
@@ -114,9 +108,7 @@ struct MainTabView: View {
                 .navigationSplitViewColumnWidth(min: 180, ideal: 200)
             } detail: {
                 switch selectedTab {
-                case .inbox:
-                    NativeInboxView()
-                case .library:
+                case .data:
                     NativeLibraryBrowserView()
                 case .agent:
                     AgentSessionListView(deepLink: $agentDeepLink)
@@ -182,14 +174,12 @@ private struct SharedModifiers: ViewModifier {
     }
 
     private func handleDeepLink(_ path: String) {
-        if path == "/" || path.hasPrefix("/inbox") {
-            selectedTab = .inbox
-        } else if path.hasPrefix("/library") || path.hasPrefix("/file") {
-            selectedTab = .library
+        if path == "/" || path.hasPrefix("/file") {
+            selectedTab = .data
         } else if path.hasPrefix("/agent") {
             selectedTab = .agent
             agentDeepLink = path
-        } else if path.hasPrefix("/settings") || path.hasPrefix("/people") {
+        } else if path.hasPrefix("/me") {
             selectedTab = .me
         }
     }
