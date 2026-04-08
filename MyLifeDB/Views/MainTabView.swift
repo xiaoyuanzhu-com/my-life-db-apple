@@ -17,12 +17,14 @@ import SwiftUI
 
 enum AppTab: String, CaseIterable {
     case data = "Data"
+    case explore = "Explore"
     case agent = "Agent"
     case me = "Me"
 
     var icon: String {
         switch self {
         case .data: return "folder"
+        case .explore: return "safari"
         case .agent: return "bubble.left.and.bubble.right"
         case .me: return "person.circle"
         }
@@ -79,6 +81,9 @@ struct MainTabView: View {
                 Tab(AppTab.data.rawValue, systemImage: AppTab.data.icon, value: .data) {
                     NativeLibraryBrowserView()
                 }
+                Tab(AppTab.explore.rawValue, systemImage: AppTab.explore.icon, value: .explore) {
+                    ExploreView()
+                }
                 Tab(AppTab.agent.rawValue, systemImage: AppTab.agent.icon, value: .agent) {
                     AgentSessionListView(deepLink: $agentDeepLink)
                 }
@@ -110,6 +115,8 @@ struct MainTabView: View {
                 switch selectedTab {
                 case .data:
                     NativeLibraryBrowserView()
+                case .explore:
+                    ExploreView()
                 case .agent:
                     AgentSessionListView(deepLink: $agentDeepLink)
                 case .me:
@@ -176,6 +183,8 @@ private struct SharedModifiers: ViewModifier {
     private func handleDeepLink(_ path: String) {
         if path == "/" || path.hasPrefix("/file") {
             selectedTab = .data
+        } else if path.hasPrefix("/explore") {
+            selectedTab = .explore
         } else if path.hasPrefix("/agent") {
             selectedTab = .agent
             agentDeepLink = path

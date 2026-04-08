@@ -38,6 +38,7 @@ final class APIClient {
     lazy var digest = DigestAPI(client: self)
     lazy var settings = SettingsAPI(client: self)
     lazy var agent = AgentAPI(client: self)
+    lazy var explore = ExploreAPI(client: self)
 
     // MARK: - Initialization
 
