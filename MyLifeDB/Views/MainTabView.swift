@@ -17,15 +17,15 @@ import SwiftUI
 
 enum AppTab: String, CaseIterable {
     case data = "Data"
-    case explore = "Explore"
     case agent = "Agent"
+    case explore = "Explore"
     case me = "Me"
 
     var icon: String {
         switch self {
         case .data: return "folder"
-        case .explore: return "safari"
         case .agent: return "bubble.left.and.bubble.right"
+        case .explore: return "safari"
         case .me: return "person.circle"
         }
     }
@@ -81,11 +81,11 @@ struct MainTabView: View {
                 Tab(AppTab.data.rawValue, systemImage: AppTab.data.icon, value: .data) {
                     NativeLibraryBrowserView()
                 }
-                Tab(AppTab.explore.rawValue, systemImage: AppTab.explore.icon, value: .explore) {
-                    ExploreView()
-                }
                 Tab(AppTab.agent.rawValue, systemImage: AppTab.agent.icon, value: .agent) {
                     AgentSessionListView(deepLink: $agentDeepLink)
+                }
+                Tab(AppTab.explore.rawValue, systemImage: AppTab.explore.icon, value: .explore) {
+                    ExploreView()
                 }
                 Tab(AppTab.me.rawValue, systemImage: AppTab.me.icon, value: .me) {
                     MeView()
@@ -115,10 +115,10 @@ struct MainTabView: View {
                 switch selectedTab {
                 case .data:
                     NativeLibraryBrowserView()
-                case .explore:
-                    ExploreView()
                 case .agent:
                     AgentSessionListView(deepLink: $agentDeepLink)
+                case .explore:
+                    ExploreView()
                 case .me:
                     MeView()
                 }
