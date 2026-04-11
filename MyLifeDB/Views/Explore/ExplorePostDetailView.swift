@@ -12,40 +12,32 @@ struct ExplorePostDetailView: View {
 
     let postId: String
 
-    @Environment(\.dismiss) private var dismiss
     @State private var postData: ExplorePostWithComments?
     @State private var isLoading = true
     @State private var error: Error?
     @State private var currentImageIndex = 0
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if isLoading {
-                    ProgressView("Loading post...")
-                } else if let error {
-                    VStack(spacing: 12) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.largeTitle)
-                            .foregroundStyle(.secondary)
-                        Text(error.localizedDescription)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                } else if let data = postData {
-                    contentView(data)
+        Group {
+            if isLoading {
+                ProgressView("Loading post...")
+            } else if let error {
+                VStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle)
+                        .foregroundStyle(.secondary)
+                    Text(error.localizedDescription)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-            }
-            .navigationTitle("Post")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
+            } else if let data = postData {
+                contentView(data)
             }
         }
+        .navigationTitle("Post")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
         .task {
             await loadPost()
         }

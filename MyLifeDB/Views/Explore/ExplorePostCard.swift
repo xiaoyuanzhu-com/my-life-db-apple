@@ -47,49 +47,19 @@ struct ExplorePostCard: View {
                 }
             }
 
-            // Content area
-            VStack(alignment: .leading, spacing: 6) {
-                // Title
+            // Content area — compact: title + author only
+            VStack(alignment: .leading, spacing: 4) {
                 Text(post.title)
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .lineLimit(2)
 
-                // Content preview
-                if let content = post.content, !content.isEmpty {
-                    Text(content)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-
-                // Tags
-                if let tags = post.tags, !tags.isEmpty {
-                    FlowLayout(spacing: 4) {
-                        ForEach(tags, id: \.self) { tag in
-                            Text("#\(tag)")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.secondary.opacity(0.1))
-                                .clipShape(Capsule())
-                        }
-                    }
-                }
-
-                // Author + date
-                HStack(spacing: 4) {
-                    Text(post.author)
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                    Spacer()
-                    Text(post.formattedDate)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
+                Text(post.author)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
-            .padding(10)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
         }
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))

@@ -58,18 +58,10 @@ struct ExploreMasonryGrid: View {
     }
 
     private func estimatedHeight(for post: ExplorePost) -> CGFloat {
-        var height: CGFloat = 60 // base (title + author + padding)
+        var height: CGFloat = 50 // base (title + author + padding)
 
         if post.hasMedia {
             height += 180 // image/video placeholder
-        }
-
-        if post.content != nil {
-            height += 40 // content text
-        }
-
-        if let tags = post.tags, !tags.isEmpty {
-            height += 24 // tags row
         }
 
         return height

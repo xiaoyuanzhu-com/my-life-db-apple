@@ -16,10 +16,11 @@ struct ExploreView: View {
     @State private var hasMoreOlder = false
     @State private var lastCursor: String?
     @State private var loadingMore = false
-    @State private var selectedPost: ExplorePost?
+
+    @State private var navigationPath = NavigationPath()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             Group {
                 if isLoading && posts.isEmpty {
                     loadingView
@@ -35,14 +36,14 @@ struct ExploreView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
             #endif
+            .navigationDestination(for: ExplorePost.self) { post in
+                ExplorePostDetailView(postId: post.id)
+            }
         }
         .task {
             if posts.isEmpty {
                 await loadPosts()
             }
-        }
-        .sheet(item: $selectedPost) { post in
-            ExplorePostDetailView(postId: post.id)
         }
     }
 
@@ -51,7 +52,7 @@ struct ExploreView: View {
     private var feedView: some View {
         ScrollView {
             ExploreMasonryGrid(posts: posts, onPostTap: { post in
-                selectedPost = post
+                navigationPath.append(post)
             })
             .padding(.horizontal)
 
