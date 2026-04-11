@@ -15,7 +15,6 @@ struct LibraryListView: View {
 
     let children: [FileTreeNode]
     let folderPath: String
-    var onRefresh: (() async -> Void)?
 
     var body: some View {
         List {
@@ -44,9 +43,6 @@ struct LibraryListView: View {
         #else
         .listStyle(.sidebar)
         #endif
-        .refreshable {
-            await onRefresh?()
-        }
     }
 
     // MARK: - Helpers

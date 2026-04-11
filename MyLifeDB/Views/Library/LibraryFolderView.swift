@@ -36,7 +36,8 @@ struct LibraryFolderView: View {
 
     // Search state
     @State private var searchText = ""
-    @State private var isSearchPresented = false
+    @State private var isSearchActive = false
+    @FocusState private var isSearchFocused: Bool
 
     // Upload state
     @State private var showFilePicker = false
@@ -59,18 +60,23 @@ struct LibraryFolderView: View {
     }
 
     var body: some View {
-        Group {
-            if isLoading && children.isEmpty {
-                loadingView
-            } else if let error = error, children.isEmpty {
-                errorView(error)
-            } else if filteredChildren.isEmpty && !isLoading {
-                emptyView
-            } else {
-                contentView
+        VStack(spacing: 0) {
+            if isSearchActive {
+                searchBar
+            }
+            Group {
+                if isLoading && children.isEmpty {
+                    loadingView
+                } else if let error = error, children.isEmpty {
+                    errorView(error)
+                } else if filteredChildren.isEmpty && !isLoading {
+                    emptyView
+                } else {
+                    contentView
+                }
             }
         }
-        .searchable(text: $searchText, isPresented: $isSearchPresented, prompt: "Search files...")
+        .animation(.easeOut(duration: 0.2), value: isSearchActive)
         .overlay {
             if isUploading {
                 uploadOverlay
@@ -95,7 +101,8 @@ struct LibraryFolderView: View {
             ToolbarItem(placement: .automatic) {
                 Menu {
                     Button {
-                        isSearchPresented = true
+                        isSearchActive = true
+                        isSearchFocused = true
                     } label: {
                         Label("Search", systemImage: "magnifyingglass")
                     }
@@ -182,14 +189,50 @@ struct LibraryFolderView: View {
     private var contentView: some View {
         switch viewMode {
         case .grid:
-            LibraryGridView(children: filteredChildren, folderPath: folderPath, onRefresh: {
-                await loadChildren(ignoreCache: true)
-            })
+            LibraryGridView(children: filteredChildren, folderPath: folderPath)
         case .list:
-            LibraryListView(children: filteredChildren, folderPath: folderPath, onRefresh: {
-                await loadChildren(ignoreCache: true)
-            })
+            LibraryListView(children: filteredChildren, folderPath: folderPath)
         }
+    }
+
+    // MARK: - Search Bar
+
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .font(.subheadline)
+
+            TextField("Search files...", text: $searchText)
+                .textFieldStyle(.plain)
+                .focused($isSearchFocused)
+                .submitLabel(.search)
+                .autocorrectionDisabled()
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                #endif
+
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Button("Cancel") {
+                searchText = ""
+                isSearchFocused = false
+                isSearchActive = false
+            }
+            .font(.callout)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.platformGray6)
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
 
     // MARK: - Upload Overlay
@@ -317,7 +360,8 @@ struct LibraryFolderView: View {
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
         ) {
-            for case let url as URL in enumerator {
+            while let next = enumerator.nextObject() {
+                guard let url = next as? URL else { continue }
                 let isRegular = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
                 if isRegular { files.append(url) }
             }
