@@ -16,7 +16,7 @@ import UniformTypeIdentifiers
 /// A folder in the breadcrumb hierarchy, used by the toolbar title menu.
 struct AncestorFolder: Identifiable {
     let id = UUID()
-    let name: String   // Display name ("january", "2024", "Library")
+    let name: String   // Display name ("january", "2024", "Data")
     let path: String   // Full relative path ("photos/2024", "photos", "")
     let depth: Int     // Depth in the navigation stack (0 = root)
 }
@@ -34,8 +34,13 @@ struct LibraryFolderView: View {
     @State private var isLoading = false
     @State private var error: Error?
 
+    // Search state
+    @State private var searchText = ""
+    @State private var isSearchPresented = false
+
     // Upload state
     @State private var showFilePicker = false
+    @State private var showFolderPicker = false
     @State private var isUploading = false
     @State private var uploadProgress: (current: Int, total: Int)?
     @State private var uploadError: String?
@@ -45,18 +50,27 @@ struct LibraryFolderView: View {
     @State private var showNewFolderDialog = false
     @State private var newFolderName = ""
 
+    // MARK: - Filtered Children
+
+    private var filteredChildren: [FileTreeNode] {
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return children }
+        return children.filter { $0.name.localizedCaseInsensitiveContains(query) }
+    }
+
     var body: some View {
         Group {
             if isLoading && children.isEmpty {
                 loadingView
             } else if let error = error, children.isEmpty {
                 errorView(error)
-            } else if children.isEmpty && !isLoading {
+            } else if filteredChildren.isEmpty && !isLoading {
                 emptyView
             } else {
                 contentView
             }
         }
+        .searchable(text: $searchText, isPresented: $isSearchPresented, prompt: "Search files...")
         .overlay {
             if isUploading {
                 uploadOverlay
@@ -72,7 +86,7 @@ struct LibraryFolderView: View {
                     Button {
                         navigateToAncestor(ancestor)
                     } label: {
-                        Label(ancestor.name, systemImage: ancestor.depth == 0 ? "books.vertical" : "folder")
+                        Label(ancestor.name, systemImage: ancestor.depth == 0 ? "tray.full" : "folder")
                     }
                 }
             }
@@ -81,9 +95,22 @@ struct LibraryFolderView: View {
             ToolbarItem(placement: .automatic) {
                 Menu {
                     Button {
+                        isSearchPresented = true
+                    } label: {
+                        Label("Search", systemImage: "magnifyingglass")
+                    }
+
+                    Button {
                         showFilePicker = true
                     } label: {
-                        Label("Upload Files", systemImage: "arrow.up.doc")
+                        Label("Upload File", systemImage: "arrow.up.doc")
+                    }
+                    .disabled(isUploading)
+
+                    Button {
+                        showFolderPicker = true
+                    } label: {
+                        Label("Upload Folder", systemImage: "arrow.up.doc.on.clipboard")
                     }
                     .disabled(isUploading)
 
@@ -92,6 +119,12 @@ struct LibraryFolderView: View {
                         showNewFolderDialog = true
                     } label: {
                         Label("New Folder", systemImage: "folder.badge.plus")
+                    }
+
+                    Button {
+                        Task { await loadChildren(ignoreCache: true) }
+                    } label: {
+                        Label("Refresh", systemImage: "arrow.clockwise")
                     }
 
                     Divider()
@@ -113,6 +146,13 @@ struct LibraryFolderView: View {
             allowsMultipleSelection: true
         ) { result in
             handleFileImport(result)
+        }
+        .fileImporter(
+            isPresented: $showFolderPicker,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            handleFolderImport(result)
         }
         .alert("New Folder", isPresented: $showNewFolderDialog) {
             TextField("Folder name", text: $newFolderName)
@@ -142,11 +182,11 @@ struct LibraryFolderView: View {
     private var contentView: some View {
         switch viewMode {
         case .grid:
-            LibraryGridView(children: children, folderPath: folderPath, onRefresh: {
+            LibraryGridView(children: filteredChildren, folderPath: folderPath, onRefresh: {
                 await loadChildren(ignoreCache: true)
             })
         case .list:
-            LibraryListView(children: children, folderPath: folderPath, onRefresh: {
+            LibraryListView(children: filteredChildren, folderPath: folderPath, onRefresh: {
                 await loadChildren(ignoreCache: true)
             })
         }
@@ -255,6 +295,87 @@ struct LibraryFolderView: View {
         }
     }
 
+    private func handleFolderImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let folderURL = urls.first else { return }
+            Task { await uploadFolder(folderURL) }
+        case .failure(let error):
+            uploadError = error.localizedDescription
+            showUploadError = true
+        }
+    }
+
+    private func uploadFolder(_ folderURL: URL) async {
+        let accessing = folderURL.startAccessingSecurityScopedResource()
+        defer { if accessing { folderURL.stopAccessingSecurityScopedResource() } }
+
+        // Recursively enumerate regular files inside the picked folder.
+        var files: [URL] = []
+        if let enumerator = FileManager.default.enumerator(
+            at: folderURL,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) {
+            for case let url as URL in enumerator {
+                let isRegular = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
+                if isRegular { files.append(url) }
+            }
+        }
+
+        guard !files.isEmpty else { return }
+
+        isUploading = true
+        uploadProgress = (current: 0, total: files.count)
+
+        var errors: [String] = []
+        let rootName = folderURL.lastPathComponent
+        let rootPath = folderURL.standardizedFileURL.path
+
+        for (index, fileURL) in files.enumerated() {
+            uploadProgress = (current: index + 1, total: files.count)
+
+            do {
+                let data = try Data(contentsOf: fileURL)
+                let filename = fileURL.lastPathComponent
+
+                // Relative directory inside the picked folder, e.g. "sub/a" for "<root>/sub/a/file.txt".
+                let fileDirPath = fileURL.deletingLastPathComponent().standardizedFileURL.path
+                var relativeDir = fileDirPath
+                if relativeDir.hasPrefix(rootPath) {
+                    relativeDir.removeFirst(rootPath.count)
+                }
+                relativeDir = relativeDir.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+                // Include the picked folder itself as the top-level destination dir.
+                let subPath = relativeDir.isEmpty ? rootName : "\(rootName)/\(relativeDir)"
+                let destination = folderPath.isEmpty ? subPath : "\(folderPath)/\(subPath)"
+
+                let utType = UTType(filenameExtension: fileURL.pathExtension)
+                let mimeType = utType?.preferredMIMEType ?? "application/octet-stream"
+
+                let _: SimpleUploadResponse = try await APIClient.shared.library.simpleUpload(
+                    data: data,
+                    filename: filename,
+                    destination: destination,
+                    mimeType: mimeType
+                )
+            } catch {
+                errors.append("\(fileURL.lastPathComponent): \(error.localizedDescription)")
+            }
+        }
+
+        isUploading = false
+        uploadProgress = nil
+
+        await loadChildren()
+
+        if !errors.isEmpty {
+            uploadError = errors.joined(separator: "\n")
+            showUploadError = true
+        }
+    }
+
     private func uploadFiles(_ urls: [URL]) async {
         isUploading = true
         uploadProgress = (current: 0, total: urls.count)
@@ -322,7 +443,7 @@ struct LibraryFolderView: View {
 
     /// Builds the ancestor chain from the immediate parent up to the root.
     /// Example: "photos/2024/january" →
-    ///   [("2024", "photos/2024", 2), ("photos", "photos", 1), ("Library", "", 0)]
+    ///   [("2024", "photos/2024", 2), ("photos", "photos", 1), ("Data", "", 0)]
     private var ancestorFolders: [AncestorFolder] {
         guard !folderPath.isEmpty else { return [] }
 
@@ -335,8 +456,8 @@ struct LibraryFolderView: View {
             ancestors.append(AncestorFolder(name: components[depth - 1], path: path, depth: depth))
         }
 
-        // Root ("Library")
-        ancestors.append(AncestorFolder(name: "Library", path: "", depth: 0))
+        // Root ("Data")
+        ancestors.append(AncestorFolder(name: "Data", path: "", depth: 0))
 
         return ancestors
     }

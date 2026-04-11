@@ -46,7 +46,6 @@ struct NativeLibraryBrowserView: View {
 
     @State private var navigationPath = NavigationPath()
     @AppStorage("libraryViewMode") private var viewMode: LibraryViewMode = .grid
-    @State private var searchText = ""
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -71,7 +70,6 @@ struct NativeLibraryBrowserView: View {
                 }
             }
         }
-        .searchable(text: $searchText, prompt: "Search files...")
     }
 }
 

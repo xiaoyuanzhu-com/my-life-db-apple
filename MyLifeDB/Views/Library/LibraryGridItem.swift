@@ -3,7 +3,7 @@
 //  MyLifeDB
 //
 //  A single grid cell in the library browser.
-//  Shows a file type icon, filename, and file size.
+//  Shows a file type icon (or preview) and filename.
 //
 
 import SwiftUI
@@ -30,19 +30,6 @@ struct LibraryGridItem: View {
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.primary)
-
-            if let size = node.formattedSize {
-                Text(size)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            } else if node.isFolder {
-                // Show child count hint for folders
-                if let children = node.children {
-                    Text("\(children.count) items")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)

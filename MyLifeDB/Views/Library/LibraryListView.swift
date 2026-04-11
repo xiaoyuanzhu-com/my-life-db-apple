@@ -3,7 +3,7 @@
 //  MyLifeDB
 //
 //  List layout for library folder contents.
-//  Shows icon, filename, size, and modification date per row.
+//  Shows icon and filename per row.
 //
 
 import SwiftUI
@@ -69,25 +69,9 @@ struct LibraryListRow: View {
                 .foregroundStyle(iconColor)
                 .frame(width: 32)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(node.name)
-                    .font(.body)
-                    .lineLimit(1)
-
-                HStack(spacing: 6) {
-                    if let size = node.formattedSize {
-                        Text(size)
-                    }
-
-                    if let date = node.modifiedDate {
-                        Text("·")
-                            .foregroundStyle(.quaternary)
-                        Text(date, style: .date)
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
+            Text(node.name)
+                .font(.body)
+                .lineLimit(1)
 
             Spacer()
         }
