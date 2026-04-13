@@ -17,7 +17,7 @@ struct ExplorePostCard: View {
             // Cover media
             if let coverPath = post.coverImagePath {
                 ZStack(alignment: .topTrailing) {
-                    AuthenticatedImage(path: coverPath)
+                    ExploreCardImage(path: coverPath)
                         .clipShape(UnevenRoundedRectangle(
                             topLeadingRadius: 12,
                             topTrailingRadius: 12
@@ -63,6 +63,108 @@ struct ExplorePostCard: View {
         }
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+// MARK: - Bucketed Card Image
+
+/// Loads an image and renders it cropped to one of 3 aspect ratio buckets
+/// (3:4 portrait, 1:1 square, 4:3 landscape) for a consistent masonry grid.
+private struct ExploreCardImage: View {
+
+    let path: String
+
+    @State private var image: FileCache.Image?
+    @State private var loadState: LoadState = .loading
+    @State private var aspectRatio: CGFloat = 3.0 / 4.0 // default: portrait
+
+    private enum LoadState {
+        case loading, loaded, failed
+    }
+
+    var body: some View {
+        Group {
+            switch loadState {
+            case .loading:
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.secondary.opacity(0.1))
+                    ProgressView()
+                }
+                .aspectRatio(aspectRatio, contentMode: .fit)
+
+            case .loaded:
+                if let image {
+                    GeometryReader { geo in
+                        #if os(iOS) || os(visionOS)
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geo.size.width, height: geo.size.height)
+                            .clipped()
+                        #elseif os(macOS)
+                        Image(nsImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geo.size.width, height: geo.size.height)
+                            .clipped()
+                        #endif
+                    }
+                    .aspectRatio(aspectRatio, contentMode: .fit)
+                } else {
+                    failedView
+                }
+
+            case .failed:
+                failedView
+            }
+        }
+        .task(id: path) {
+            await loadImage()
+        }
+    }
+
+    private var failedView: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.secondary.opacity(0.1))
+            Image(systemName: "photo")
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
+        }
+        .aspectRatio(aspectRatio, contentMode: .fit)
+    }
+
+    private func loadImage() async {
+        loadState = .loading
+        let url = APIClient.shared.rawFileURL(path: path)
+
+        do {
+            let loaded = try await FileCache.shared.image(for: url)
+            image = loaded
+            aspectRatio = bucketAspectRatio(for: loaded)
+            loadState = .loaded
+        } catch {
+            loadState = .failed
+        }
+    }
+
+    /// Bucket the image's natural aspect ratio into 3:4, 1:1, or 4:3.
+    private func bucketAspectRatio(for img: FileCache.Image) -> CGFloat {
+        #if os(iOS) || os(visionOS)
+        let w = img.size.width
+        let h = img.size.height
+        #elseif os(macOS)
+        let w = img.size.width
+        let h = img.size.height
+        #endif
+
+        guard h > 0 else { return 3.0 / 4.0 }
+        let ratio = w / h
+
+        if ratio > 1.1 { return 4.0 / 3.0 }    // landscape
+        if ratio > 0.85 { return 1.0 }           // square
+        return 3.0 / 4.0                          // portrait
     }
 }
 
