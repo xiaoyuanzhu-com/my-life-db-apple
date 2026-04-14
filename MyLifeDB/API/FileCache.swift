@@ -16,6 +16,7 @@
 
 import Foundation
 import CryptoKit
+import ImageIO
 #if os(iOS) || os(visionOS)
 import UIKit
 #elseif os(macOS)
@@ -52,6 +53,10 @@ final class FileCache: @unchecked Sendable {
 
     private let session: URLSession
 
+    /// Limits concurrent network fetches to avoid saturating the connection
+    /// when many images load at once (e.g. initial feed of 30 cards).
+    private let fetchThrottle = FetchThrottle(limit: 6)
+
     // MARK: - Init
 
     private init() {
@@ -66,10 +71,10 @@ final class FileCache: @unchecked Sendable {
         dataCache.countLimit = 80
         dataCache.totalCostLimit = 50 * 1024 * 1024
 
-        // Decoded image cache: 30 items, 120MB
-        // Cost is the actual decoded bitmap size (width × height × 4 bytes),
-        // NOT the compressed file size. 120MB ≈ 2–3 full-resolution photos.
-        imageCache.countLimit = 30
+        // Decoded image cache: 150 items, 120MB
+        // Count raised from 30 to accommodate many small thumbnails alongside
+        // full-res images. Cost is the actual decoded bitmap size (w × h × 4).
+        imageCache.countLimit = 150
         imageCache.totalCostLimit = 120 * 1024 * 1024
 
         // Metadata cache: lightweight Int64 values, generous limit
@@ -189,6 +194,61 @@ final class FileCache: @unchecked Sendable {
         return image
     }
 
+    // MARK: - Public: Thumbnail (downsampled decode)
+
+    /// Fetches and decodes an image as a thumbnail, downsampling during decode
+    /// to reduce memory. A 3000×4000 photo decoded at maxPixelSize=600 uses
+    /// ~480 KB instead of ~48 MB — a 100× reduction ideal for card/grid contexts.
+    func thumbnail(for url: URL, maxPixelSize: CGFloat = 400, expectedModifiedAt: Int64? = nil) async throws -> Image {
+        let key = "thumb_\(Int(maxPixelSize))_\(url.absoluteString)" as NSString
+
+        // 1. Check decoded image cache (thumbnails cached under separate key)
+        if let cached = imageCache.object(forKey: key) {
+            let cachedMod = modifiedAtCache.object(forKey: key)?.int64Value
+            if isFresh(cachedModifiedAt: cachedMod, expectedModifiedAt: expectedModifiedAt) {
+                return cached
+            }
+            imageCache.removeObject(forKey: key)
+        }
+
+        // 2. Get raw data (may hit data cache, disk cache, or network)
+        let data = try await self.data(for: url, expectedModifiedAt: expectedModifiedAt)
+
+        // 3. Downsample during decode using ImageIO — avoids ever holding
+        //    the full-resolution bitmap in memory.
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+            invalidate(for: url)
+            throw FileCacheError.decodingFailed
+        }
+
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+        ]
+
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+            invalidate(for: url)
+            throw FileCacheError.decodingFailed
+        }
+
+        #if os(iOS) || os(visionOS)
+        let image = UIImage(cgImage: cgImage)
+        #elseif os(macOS)
+        let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+        #endif
+
+        let bitmapCost = cgImage.width * cgImage.height * 4
+        imageCache.setObject(image, forKey: key, cost: bitmapCost)
+
+        // Evict compressed data — thumbnail is cached, raw bytes stay on disk
+        let dataKey = url.absoluteString as NSString
+        dataCache.removeObject(forKey: dataKey)
+
+        return image
+    }
+
     // MARK: - Public: Invalidation
 
     /// Explicitly invalidate all cached data for a URL.
@@ -249,7 +309,16 @@ final class FileCache: @unchecked Sendable {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
-        let (data, response) = try await session.data(for: request)
+        // Throttle concurrent network requests (max 6 in-flight)
+        await fetchThrottle.wait()
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            await fetchThrottle.signal()
+            throw error
+        }
+        await fetchThrottle.signal()
 
         guard let http = response as? HTTPURLResponse else {
             throw FileCacheError.networkError(0)
@@ -321,5 +390,37 @@ final class FileCache: @unchecked Sendable {
         case decodingFailed
         case unauthorized
         case networkError(Int)
+    }
+}
+
+// MARK: - Fetch Throttle
+
+/// Actor-based semaphore that limits concurrent network fetches to avoid
+/// saturating the connection on initial page loads (30+ images at once).
+private actor FetchThrottle {
+    private let limit: Int
+    private var active = 0
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(limit: Int) {
+        self.limit = limit
+    }
+
+    func wait() async {
+        if active < limit {
+            active += 1
+            return
+        }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    func signal() {
+        if !waiters.isEmpty {
+            waiters.removeFirst().resume()
+        } else {
+            active -= 1
+        }
     }
 }

@@ -75,21 +75,24 @@ private struct ExploreCardImage: View {
     let path: String
 
     @State private var image: FileCache.Image?
-    @State private var loadState: LoadState = .loading
+    @State private var loadState: LoadState = .idle
     @State private var aspectRatio: CGFloat = 3.0 / 4.0 // default: portrait
+    @State private var loadTask: Task<Void, Never>?
 
     private enum LoadState {
-        case loading, loaded, failed
+        case idle, loading, loaded, failed
     }
 
     var body: some View {
         Group {
             switch loadState {
-            case .loading:
+            case .idle, .loading:
                 ZStack {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color.secondary.opacity(0.1))
-                    ProgressView()
+                    if loadState == .loading {
+                        ProgressView()
+                    }
                 }
                 .aspectRatio(aspectRatio, contentMode: .fit)
 
@@ -119,9 +122,26 @@ private struct ExploreCardImage: View {
                 failedView
             }
         }
-        .task(id: path) {
-            await loadImage()
+        .onAppear { startLoad() }
+        .onDisappear { cancelAndRelease() }
+        .onChange(of: path) { _, _ in
+            cancelAndRelease()
+            startLoad()
         }
+    }
+
+    private func startLoad() {
+        guard image == nil else { return }
+        loadTask = Task { await loadImage() }
+    }
+
+    /// Release decoded image when scrolled off-screen to reclaim memory.
+    /// FileCache still holds the thumbnail on disk/memory — reload is instant.
+    private func cancelAndRelease() {
+        loadTask?.cancel()
+        loadTask = nil
+        image = nil
+        loadState = .idle
     }
 
     private var failedView: some View {
@@ -140,11 +160,15 @@ private struct ExploreCardImage: View {
         let url = APIClient.shared.rawFileURL(path: path)
 
         do {
-            let loaded = try await FileCache.shared.image(for: url)
+            // Use thumbnail decode (max 600px) instead of full-resolution
+            // to reduce memory ~100x for typical photos in card context.
+            let loaded = try await FileCache.shared.thumbnail(for: url, maxPixelSize: 600)
+            guard !Task.isCancelled else { return }
             image = loaded
             aspectRatio = bucketAspectRatio(for: loaded)
             loadState = .loaded
         } catch {
+            guard !Task.isCancelled else { return }
             loadState = .failed
         }
     }

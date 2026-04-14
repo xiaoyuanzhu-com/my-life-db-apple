@@ -22,9 +22,17 @@ struct ExploreMasonryGrid: View {
     }
     #endif
 
-    var body: some View {
-        let columns = distributeIntoColumns(posts, count: columnCount)
+    // Memoized column distribution — only recomputed when posts or column count changes.
+    @State private var columns: [[ExplorePost]] = []
+    @State private var cachedFingerprint = ""
 
+    /// Cheap proxy for change detection: catches pagination (count), refresh (ids),
+    /// and rotation (column count) without comparing the full array.
+    private var postsFingerprint: String {
+        "\(columnCount)|\(posts.count)|\(posts.first?.id ?? "")|\(posts.last?.id ?? "")"
+    }
+
+    var body: some View {
         HStack(alignment: .top, spacing: 10) {
             ForEach(0..<columns.count, id: \.self) { colIndex in
                 LazyVStack(spacing: 10) {
@@ -36,13 +44,21 @@ struct ExploreMasonryGrid: View {
             }
         }
         .padding(.vertical, 8)
+        .onAppear { recomputeIfNeeded() }
+        .onChange(of: postsFingerprint) { _, _ in recomputeIfNeeded() }
     }
 
     // MARK: - Column Distribution
 
+    private func recomputeIfNeeded() {
+        let fp = postsFingerprint
+        guard fp != cachedFingerprint else { return }
+        cachedFingerprint = fp
+        columns = Self.distributeIntoColumns(posts, count: columnCount)
+    }
+
     /// Distribute posts across columns, balancing estimated heights.
-    /// Images get more height than text-only posts.
-    private func distributeIntoColumns(_ posts: [ExplorePost], count: Int) -> [[ExplorePost]] {
+    static func distributeIntoColumns(_ posts: [ExplorePost], count: Int) -> [[ExplorePost]] {
         var columns = Array(repeating: [ExplorePost](), count: count)
         var heights = Array(repeating: CGFloat(0), count: count)
 
@@ -57,7 +73,7 @@ struct ExploreMasonryGrid: View {
         return columns
     }
 
-    private func estimatedHeight(for post: ExplorePost) -> CGFloat {
+    private static func estimatedHeight(for post: ExplorePost) -> CGFloat {
         var height: CGFloat = 50 // base (title + author + padding)
 
         if post.hasMedia {
