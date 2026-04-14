@@ -123,16 +123,12 @@ final class FileCache: @unchecked Sendable {
         }
 
         // 3. Fetch from network
-        var request = URLRequest(url: url)
-        if let token = AuthManager.shared.accessToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        let (data, response) = try await session.data(for: request)
+        let result = try await fetchFromNetwork(url: url, allowRetryOn401: true)
 
         // Determine modifiedAt: prefer server's Last-Modified header,
         // fall back to the caller's expected value
-        let modifiedAt = parseLastModified(from: response) ?? expectedModifiedAt
+        let data = result.data
+        let modifiedAt = result.modifiedAt ?? expectedModifiedAt
 
         // Store in memory caches
         dataCache.setObject(data as NSData, forKey: key, cost: data.count)
@@ -173,6 +169,9 @@ final class FileCache: @unchecked Sendable {
         let data = try await self.data(for: url, expectedModifiedAt: expectedModifiedAt)
 
         guard let image = Image(data: data) else {
+            // Possibly cached error response from before HTTP status checks
+            // were added — purge the poisoned entry so the next attempt re-fetches.
+            invalidate(for: url)
             throw FileCacheError.decodingFailed
         }
 
@@ -235,6 +234,43 @@ final class FileCache: @unchecked Sendable {
         return estimated > 0 ? estimated : max(compressedSize * 4, 1)
     }
 
+    // MARK: - Private: Network Fetch with Auth
+
+    private struct FetchResult {
+        let data: Data
+        let modifiedAt: Int64?
+    }
+
+    /// Fetches data from the network with auth headers and HTTP status validation.
+    /// On 401, refreshes the token and retries once.
+    private func fetchFromNetwork(url: URL, allowRetryOn401: Bool) async throws -> FetchResult {
+        var request = URLRequest(url: url)
+        if let token = AuthManager.shared.accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let http = response as? HTTPURLResponse else {
+            throw FileCacheError.networkError(0)
+        }
+
+        switch http.statusCode {
+        case 200...299:
+            return FetchResult(data: data, modifiedAt: parseLastModified(from: response))
+        case 401:
+            if allowRetryOn401 {
+                let refreshed = await AuthManager.shared.handleUnauthorized()
+                if refreshed {
+                    return try await fetchFromNetwork(url: url, allowRetryOn401: false)
+                }
+            }
+            throw FileCacheError.unauthorized
+        default:
+            throw FileCacheError.networkError(http.statusCode)
+        }
+    }
+
     // MARK: - Private: Last-Modified Parsing
 
     private func parseLastModified(from response: URLResponse) -> Int64? {
@@ -283,5 +319,7 @@ final class FileCache: @unchecked Sendable {
 
     enum FileCacheError: Error {
         case decodingFailed
+        case unauthorized
+        case networkError(Int)
     }
 }
