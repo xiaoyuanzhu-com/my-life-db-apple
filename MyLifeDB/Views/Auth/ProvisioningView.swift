@@ -23,7 +23,7 @@ struct ProvisioningView: View {
                 .padding(.bottom, 8)
 
             VStack(spacing: 8) {
-                Text("Setting up your space\(dots)")
+                Text(String(localized: "Setting up your space") + dots)
                     .font(.title2.bold())
 
                 Text("This usually takes about 15 seconds")

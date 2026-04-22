@@ -12,9 +12,9 @@ import SwiftUI
 
 struct DataSource: Identifiable {
     let id: String
-    let name: String
+    let name: LocalizedStringResource
     let icon: String
-    let description: String
+    let description: LocalizedStringResource
     let platform: Platform
     let status: SourceStatus
 
@@ -25,6 +25,17 @@ struct DataSource: Identifiable {
         case iOSWatch = "iPhone, Watch"
         case iOSMac = "iPhone, Mac"
         case all = "All"
+
+        var displayName: LocalizedStringResource {
+            switch self {
+            case .iOS: "iPhone"
+            case .mac: "Mac"
+            case .watch: "Watch"
+            case .iOSWatch: "iPhone, Watch"
+            case .iOSMac: "iPhone, Mac"
+            case .all: "All"
+            }
+        }
     }
 
     enum SourceStatus: String {
@@ -32,6 +43,15 @@ struct DataSource: Identifiable {
         case limited = "Limited"
         case manual = "Manual"
         case future = "Future"
+
+        var displayName: LocalizedStringResource {
+            switch self {
+            case .available: "Available"
+            case .limited: "Limited"
+            case .manual: "Manual"
+            case .future: "Future"
+            }
+        }
     }
 }
 
@@ -39,7 +59,7 @@ struct DataSource: Identifiable {
 
 struct DataCategory: Identifiable {
     let id: String
-    let name: String
+    let name: LocalizedStringResource
     let icon: String
     let sources: [DataSource]
 }
@@ -422,9 +442,10 @@ extension DataCollectView {
         let timeAgo = lastSync.formatted(.relative(presentation: .named))
         switch syncManager.lastSyncResult {
         case .success(let fileCount):
-            let files = fileCount == 1 ? "1 file" : "\(fileCount) files"
+            let files = String(localized: "\(fileCount) file(s) uploaded")
             if let detail = syncManager.lastSyncDetail, detail.samplesCollected > 0 {
-                return "Synced \(files) (\(detail.samplesCollected) samples) \u{00B7} \(timeAgo)"
+                let samples = String(localized: "\(detail.samplesCollected) sample(s)")
+                return "Synced \(files) (\(samples)) \u{00B7} \(timeAgo)"
             }
             return "Synced \(files) \u{00B7} \(timeAgo)"
         case .noNewData:
@@ -432,12 +453,13 @@ extension DataCollectView {
                 if detail.typesQueried == 0 {
                     return "No data types to query \u{00B7} \(timeAgo)"
                 }
-                return "No new data \u{00B7} queried \(detail.typesQueried) types \u{00B7} \(timeAgo)"
+                let types = String(localized: "\(detail.typesQueried) type(s)")
+                return "No new data \u{00B7} queried \(types) \u{00B7} \(timeAgo)"
             }
             return "Up to date \u{00B7} \(timeAgo)"
         case .partial(let uploaded, let failed):
-            let files = uploaded == 1 ? "1 file" : "\(uploaded) files"
-            let errors = failed == 1 ? "1 error" : "\(failed) errors"
+            let files = String(localized: "\(uploaded) file(s) uploaded")
+            let errors = String(localized: "\(failed) error(s)")
             return "Synced \(files), \(errors) \u{00B7} \(timeAgo)"
         case .failed:
             return "Sync failed \u{00B7} \(timeAgo)"
@@ -462,9 +484,9 @@ extension DataCollectView {
 
             // Data collection summary
             HStack(spacing: 12) {
-                Label("\(detail.typesQueried) types", systemImage: "list.bullet")
-                Label("\(detail.samplesCollected) samples", systemImage: "waveform.path")
-                Label("\(detail.filesUploaded) files", systemImage: "arrow.up.doc")
+                Label(String(localized: "\(detail.typesQueried) type(s)"), systemImage: "list.bullet")
+                Label(String(localized: "\(detail.samplesCollected) sample(s)"), systemImage: "waveform.path")
+                Label(String(localized: "\(detail.filesUploaded) file(s) uploaded"), systemImage: "arrow.up.doc")
                 if detail.filesSkipped > 0 {
                     Label("\(detail.filesSkipped) skipped", systemImage: "checkmark.circle")
                 }
@@ -477,7 +499,7 @@ extension DataCollectView {
                 HStack(spacing: 4) {
                     Image(systemName: "info.circle.fill")
                         .foregroundStyle(.orange)
-                    Text("Queried \(detail.typesQueried) data types but found 0 samples. Check that Health permissions are granted in Settings → Privacy → Health.")
+                    Text(String(localized: "Queried \(detail.typesQueried) data types but found 0 samples. Check that Health permissions are granted in Settings → Privacy → Health."))
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -510,9 +532,9 @@ private struct DataSourceRow: View {
                         .font(.body)
 
                     HStack(spacing: 4) {
-                        Text(source.platform.rawValue)
+                        Text(source.platform.displayName)
                         Text("·")
-                        Text(source.status.rawValue)
+                        Text(source.status.displayName)
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)

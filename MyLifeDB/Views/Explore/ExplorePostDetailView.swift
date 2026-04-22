@@ -130,7 +130,7 @@ struct ExplorePostDetailView: View {
             if !data.comments.isEmpty {
                 Divider()
 
-                Text("Comments (\(data.comments.count))")
+                Text(String(localized: "Comments (\(data.comments.count))"))
                     .font(.headline)
 
                 ForEach(data.comments) { comment in

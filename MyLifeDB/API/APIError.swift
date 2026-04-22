@@ -68,21 +68,21 @@ enum APIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "Invalid URL"
+            return String(localized: "Invalid URL")
         case .invalidResponse:
-            return "Invalid server response"
+            return String(localized: "Invalid server response")
         case .badRequest(let message):
-            return message ?? "Bad request"
+            return message ?? String(localized: "Bad request")
         case .unauthorized:
-            return "Authentication required"
+            return String(localized: "Authentication required")
         case .forbidden:
-            return "Access denied"
+            return String(localized: "Access denied")
         case .notFound:
-            return "Resource not found"
+            return String(localized: "Resource not found")
         case .conflict(let message):
-            return message ?? "Resource conflict"
+            return message ?? String(localized: "Resource conflict")
         case .provisioning:
-            return "Setting up your space"
+            return String(localized: "Setting up your space")
         case .serverError(let code, let message):
             return message ?? "Server error (\(code))"
         case .unexpectedStatusCode(let code):
@@ -94,9 +94,9 @@ enum APIError: LocalizedError {
         case .networkError(let error):
             return "Network error: \(error.localizedDescription)"
         case .timeout:
-            return "Request timed out"
+            return String(localized: "Request timed out")
         case .noConnection:
-            return "No network connection"
+            return String(localized: "No network connection")
         }
     }
 
@@ -116,19 +116,19 @@ enum APIError: LocalizedError {
     var userMessage: String {
         switch self {
         case .unauthorized:
-            return "Please log in to continue."
+            return String(localized: "Please log in to continue.")
         case .forbidden:
-            return "You don't have permission to access this."
+            return String(localized: "You don't have permission to access this.")
         case .notFound:
-            return "The requested item was not found."
+            return String(localized: "The requested item was not found.")
         case .noConnection:
-            return "No internet connection. Please check your network."
+            return String(localized: "No internet connection. Please check your network.")
         case .timeout:
-            return "The request timed out. Please try again."
+            return String(localized: "The request timed out. Please try again.")
         case .provisioning:
-            return "Setting up your space. This may take a moment."
+            return String(localized: "Setting up your space. This may take a moment.")
         case .serverError:
-            return "Server error. Please try again later."
+            return String(localized: "Server error. Please try again later.")
         default:
             return errorDescription ?? "An error occurred."
         }

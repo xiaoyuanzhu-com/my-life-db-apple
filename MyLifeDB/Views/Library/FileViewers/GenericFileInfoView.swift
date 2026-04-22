@@ -48,6 +48,7 @@ struct GenericFileInfoView: View {
 
                     infoRow(label: "Modified", value: file.modifiedDate.formatted(date: .long, time: .shortened))
                     infoRow(label: "Created", value: file.createdDate.formatted(date: .long, time: .shortened))
+
                 }
                 .background(Color.platformGray6)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -70,7 +71,7 @@ struct GenericFileInfoView: View {
         return "doc"
     }
 
-    private func infoRow(label: String, value: String) -> some View {
+    private func infoRow(label: LocalizedStringResource, value: String) -> some View {
         HStack {
             Text(label)
                 .foregroundStyle(.secondary)

@@ -106,7 +106,8 @@ struct SyncDataView: View {
             // Summary line
             if let firstYear = progress.years.first, let lastYear = progress.years.last {
                 let typeCount = enabledTypeCount
-                Text("\(typeCount) type\(typeCount == 1 ? "" : "s") \u{00B7} \(String(firstYear))\u{2013}\(String(lastYear))")
+                let typeStr = String(localized: "\(typeCount) type(s)")
+                Text("\(typeStr) \u{00B7} \(String(firstYear))\u{2013}\(String(lastYear))")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

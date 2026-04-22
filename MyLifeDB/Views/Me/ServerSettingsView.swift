@@ -21,9 +21,9 @@ struct ServerSettingsView: View {
 
         var text: String {
             switch self {
-            case .unknown: return "Not checked"
-            case .connected: return "Connected"
-            case .unreachable: return "Not reachable"
+            case .unknown: return String(localized: "Not checked")
+            case .connected: return String(localized: "Connected")
+            case .unreachable: return String(localized: "Not reachable")
             }
         }
 
@@ -118,7 +118,7 @@ struct ServerSettingsView: View {
               let scheme = url.scheme,
               ["http", "https"].contains(scheme),
               url.host != nil else {
-            validationError = "Invalid URL format. Must start with http:// or https://"
+            validationError = String(localized: "Invalid URL format. Must start with http:// or https://")
             return
         }
 
