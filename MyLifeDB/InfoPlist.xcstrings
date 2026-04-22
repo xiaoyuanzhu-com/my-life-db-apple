@@ -1,5 +1,74 @@
 {
   "sourceLanguage" : "en",
-  "strings" : {},
+  "strings" : {
+    "NSPhotoLibraryUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MyLifeDB needs access to your photo library to share photos and videos to your inbox."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MyLifeDB 需要访问你的照片图库，以便将照片和视频分享到收件箱。"
+          }
+        }
+      }
+    },
+    "NSPhotoLibraryAddUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MyLifeDB needs permission to save photos and videos to your photo library."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MyLifeDB 需要权限将照片和视频保存到你的照片图库。"
+          }
+        }
+      }
+    },
+    "NSHealthShareUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MyLifeDB reads your health data to sync it to your personal knowledge base."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MyLifeDB 需要读取你的健康数据，以将其同步到个人知识库。"
+          }
+        }
+      }
+    },
+    "NSHealthUpdateUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MyLifeDB may write health data back when correcting or enriching records."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MyLifeDB 在更正或丰富记录时可能会写入健康数据。"
+          }
+        }
+      }
+    }
+  },
   "version" : "1.0"
 }
