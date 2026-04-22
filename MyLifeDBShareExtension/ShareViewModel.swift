@@ -71,7 +71,7 @@ final class ShareViewModel {
         if hasContent {
             state = .ready
         } else {
-            state = .error("No shareable content found.")
+            state = .error(String(localized: "No shareable content found."))
         }
     }
 
