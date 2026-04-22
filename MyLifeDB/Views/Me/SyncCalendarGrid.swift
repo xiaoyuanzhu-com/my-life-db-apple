@@ -67,9 +67,13 @@ private struct StatusDot: View {
 struct MonthCalendarGrid: View {
     let month: MonthProgress
 
-    private static let weekdays: [(id: Int, label: String)] = [
-        (0, "M"), (1, "T"), (2, "W"), (3, "T"), (4, "F"), (5, "S"), (6, "S"),
-    ]
+    private static var weekdays: [(id: Int, label: String)] {
+        // Use locale-aware standalone weekday symbols (Mon-first order).
+        let symbols = Calendar.current.veryShortStandaloneWeekdaySymbols
+        // symbols[0] is Sunday; rotate to Monday-first: [1...6] + [0]
+        let rotated = Array(symbols[1...]) + [symbols[0]]
+        return rotated.enumerated().map { ($0.offset, $0.element) }
+    }
     private static let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
 
     var body: some View {
@@ -119,7 +123,8 @@ struct MonthCalendarGrid: View {
     }
 
     private var monthName: String {
-        let symbols = Calendar(identifier: .gregorian).shortMonthSymbols
+        // Use Calendar.current so symbols respect the user's locale.
+        let symbols = Calendar.current.shortMonthSymbols
         guard month.month >= 1 && month.month <= symbols.count else { return "?" }
         return symbols[month.month - 1]
     }

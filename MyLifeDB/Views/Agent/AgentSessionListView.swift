@@ -129,9 +129,9 @@ struct AgentSessionListView: View {
 
     private var filterNavigationTitle: String {
         switch statusFilter {
-        case "all": return "Sessions (All)"
-        case "archived": return "Sessions (Archived)"
-        default: return "Sessions (Active)"
+        case "all": return String(localized: "Sessions (All)")
+        case "archived": return String(localized: "Sessions (Archived)")
+        default: return String(localized: "Sessions (Active)")
         }
     }
 
@@ -169,11 +169,11 @@ struct AgentSessionListView: View {
         }
 
         var result: [(String, [AgentSession])] = []
-        if !today.isEmpty { result.append(("Today", today)) }
-        if !yesterday.isEmpty { result.append(("Yesterday", yesterday)) }
-        if !pastWeek.isEmpty { result.append(("Past Week", pastWeek)) }
-        if !pastMonth.isEmpty { result.append(("Past Month", pastMonth)) }
-        if !earlier.isEmpty { result.append(("Earlier", earlier)) }
+        if !today.isEmpty { result.append((String(localized: "Today"), today)) }
+        if !yesterday.isEmpty { result.append((String(localized: "Yesterday"), yesterday)) }
+        if !pastWeek.isEmpty { result.append((String(localized: "Past Week"), pastWeek)) }
+        if !pastMonth.isEmpty { result.append((String(localized: "Past Month"), pastMonth)) }
+        if !earlier.isEmpty { result.append((String(localized: "Earlier"), earlier)) }
         return result
     }
 
@@ -549,6 +549,8 @@ private struct SessionRow: View {
     }
 
     private func shortRelativeTime(_ date: Date, now: Date) -> String {
+        // Note: compact numeric abbreviations (5s, 3m, 2h, 4d) are intentionally
+        // kept locale-independent for readability in a cramped list cell.
         let seconds = Int(now.timeIntervalSince(date))
         if seconds < 60 { return "\(seconds)s" }
         let minutes = seconds / 60
@@ -573,7 +575,7 @@ private struct UnreadDot: View {
         Circle()
             .fill(state == .working ? Color.orange : Color.green)
             .frame(width: 8, height: 8)
-            .accessibilityLabel(state == .working ? "Agent is working" : "Unread results")
+            .accessibilityLabel(state == .working ? String(localized: "Agent is working") : String(localized: "Unread results"))
     }
 }
 

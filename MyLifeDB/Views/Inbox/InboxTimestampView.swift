@@ -3,7 +3,7 @@
 //  MyLifeDB
 //
 //  Displays relative timestamps for inbox items.
-//  Shows "Just now", "5 min ago", "2 hours ago", "Yesterday", or date.
+//  Uses RelativeDateTimeFormatter for locale-aware output.
 //
 
 import SwiftUI
@@ -17,34 +17,19 @@ struct InboxTimestampView: View {
             .foregroundStyle(.secondary)
     }
 
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .full
+        f.dateTimeStyle = .named  // gives "yesterday", "today" etc.
+        return f
+    }()
+
     private var formattedTime: String {
         let date = epochMs.asDate
-
-        let now = Date()
-        let interval = now.timeIntervalSince(date)
-
-        if interval < 60 {
-            return "Just now"
+        let elapsed = Date().timeIntervalSince(date)
+        if elapsed < 60 {
+            return String(localized: "Just now")
         }
-        if interval < 3600 {
-            let minutes = Int(interval / 60)
-            return "\(minutes) min ago"
-        }
-        if interval < 86400 {
-            let hours = Int(interval / 3600)
-            return hours == 1 ? "1 hour ago" : "\(hours) hours ago"
-        }
-        if interval < 172800 {
-            return "Yesterday"
-        }
-        if interval < 604800 {
-            let days = Int(interval / 86400)
-            return "\(days) days ago"
-        }
-
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
+        return Self.relativeFormatter.localizedString(for: date, relativeTo: Date())
     }
 }

@@ -29,6 +29,15 @@ enum AppTab: String, CaseIterable {
         case .me: return "person.circle"
         }
     }
+
+    var label: LocalizedStringResource {
+        switch self {
+        case .data: "Data"
+        case .agent: "Agent"
+        case .explore: "Explore"
+        case .me: "Me"
+        }
+    }
 }
 
 // MARK: - MainTabView
@@ -78,16 +87,16 @@ struct MainTabView: View {
     private var iOSLayout: some View {
         withFilePreview(
             TabView(selection: $selectedTab) {
-                Tab(AppTab.data.rawValue, systemImage: AppTab.data.icon, value: .data) {
+                Tab(AppTab.data.label, systemImage: AppTab.data.icon, value: .data) {
                     NativeLibraryBrowserView()
                 }
-                Tab(AppTab.agent.rawValue, systemImage: AppTab.agent.icon, value: .agent) {
+                Tab(AppTab.agent.label, systemImage: AppTab.agent.icon, value: .agent) {
                     AgentSessionListView(deepLink: $agentDeepLink)
                 }
-                Tab(AppTab.explore.rawValue, systemImage: AppTab.explore.icon, value: .explore) {
+                Tab(AppTab.explore.label, systemImage: AppTab.explore.icon, value: .explore) {
                     ExploreView()
                 }
-                Tab(AppTab.me.rawValue, systemImage: AppTab.me.icon, value: .me) {
+                Tab(AppTab.me.label, systemImage: AppTab.me.icon, value: .me) {
                     MeView()
                 }
             }
@@ -107,7 +116,7 @@ struct MainTabView: View {
         withFilePreview(
             NavigationSplitView {
                 List(AppTab.allCases, id: \.self, selection: $selectedTab) { tab in
-                    Label(tab.rawValue, systemImage: tab.icon)
+                    Label(tab.label, systemImage: tab.icon)
                         .tag(tab)
                 }
                 .navigationSplitViewColumnWidth(min: 180, ideal: 200)
