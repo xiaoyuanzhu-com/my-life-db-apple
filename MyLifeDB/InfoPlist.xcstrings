@@ -1,36 +1,14 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "NSPhotoLibraryUsageDescription" : {
-      "extractionState" : "manual",
+    "CFBundleName" : {
+      "comment" : "Bundle name",
+      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "MyLifeDB needs access to your photo library to share photos and videos to your inbox."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "MyLifeDB 需要访问你的照片图库，以便将照片和视频分享到收件箱。"
-          }
-        }
-      }
-    },
-    "NSPhotoLibraryAddUsageDescription" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "MyLifeDB needs permission to save photos and videos to your photo library."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "MyLifeDB 需要权限将照片和视频保存到你的照片图库。"
+            "state" : "new",
+            "value" : "MyLifeDB"
           }
         }
       }
@@ -65,6 +43,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "MyLifeDB 在更正或丰富记录时可能会写入健康数据。"
+          }
+        }
+      }
+    },
+    "NSPhotoLibraryAddUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MyLifeDB needs permission to save photos and videos to your photo library."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MyLifeDB 需要权限将照片和视频保存到你的照片图库。"
+          }
+        }
+      }
+    },
+    "NSPhotoLibraryUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MyLifeDB needs access to your photo library to share photos and videos to your inbox."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MyLifeDB 需要访问你的照片图库，以便将照片和视频分享到收件箱。"
           }
         }
       }

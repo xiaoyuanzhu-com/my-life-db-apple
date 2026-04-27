@@ -1,6 +1,43 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "" : {
+
+    },
+    " · %@" : {
+
+    },
+    " (%lld%% similar)" : {
+
+    },
+    "—" : {
+
+    },
+    ".claude Sessions" : {
+
+    },
+    "·" : {
+
+    },
+    "#%@" : {
+
+    },
+    "% of time in atrial fibrillation" : {
+
+    },
+    "%@ · %@–%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@–%3$@"
+          }
+        }
+      }
+    },
+    "%lld" : {
+
+    },
     "%lld error(s)" : {
       "comment" : "Plural count of sync errors",
       "localizations" : {
@@ -73,6 +110,7 @@
     },
     "%lld result(s)" : {
       "comment" : "Plural count of search results",
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -105,6 +143,9 @@
           }
         }
       }
+    },
+    "%lld results" : {
+
     },
     "%lld sample(s)" : {
       "comment" : "Plural count of health samples",
@@ -141,6 +182,9 @@
         }
       }
     },
+    "%lld skipped" : {
+
+    },
     "%lld type(s)" : {
       "comment" : "Plural count of data types",
       "localizations" : {
@@ -176,6 +220,29 @@
         }
       }
     },
+    "%lld/%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld/%2$lld"
+          }
+        }
+      }
+    },
+    "+%lld" : {
+
+    },
+    "A native iOS and macOS client for the MyLifeDB personal knowledge management system." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MyLifeDB 个人知识管理系统的原生 iOS 和 macOS 客户端。"
+          }
+        }
+      }
+    },
     "About" : {
       "localizations" : {
         "zh-Hans" : {
@@ -206,6 +273,21 @@
         }
       }
     },
+    "Active App Time" : {
+
+    },
+    "Active Energy" : {
+
+    },
+    "Active focus mode and schedule" : {
+
+    },
+    "Active subscriptions and costs" : {
+
+    },
+    "AFib Burden" : {
+
+    },
     "Agent" : {
       "localizations" : {
         "zh-Hans" : {
@@ -226,6 +308,12 @@
         }
       }
     },
+    "Air Quality" : {
+
+    },
+    "Alcohol" : {
+
+    },
     "All" : {
       "localizations" : {
         "zh-Hans" : {
@@ -236,15 +324,14 @@
         }
       }
     },
-    "A native iOS and macOS client for the MyLifeDB personal knowledge management system." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "MyLifeDB 个人知识管理系统的原生 iOS 和 macOS 客户端。"
-          }
-        }
-      }
+    "All workout types with duration and calories" : {
+
+    },
+    "Ambient Noise" : {
+
+    },
+    "Anki/flashcard session stats" : {
+
     },
     "API Base URL" : {
       "localizations" : {
@@ -266,15 +353,11 @@
         }
       }
     },
-    "Are you sure you want to delete \"%@\"? This cannot be undone." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "确定要删除\"%@\"吗？此操作无法撤销。"
-          }
-        }
-      }
+    "App Category Usage" : {
+
+    },
+    "AQI at your location" : {
+
     },
     "Archive" : {
       "localizations" : {
@@ -296,6 +379,25 @@
         }
       }
     },
+    "Are you sure you want to delete \"%@\"? This cannot be undone." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确定要删除\"%@\"吗？此操作无法撤销。"
+          }
+        }
+      }
+    },
+    "Art created, time spent" : {
+
+    },
+    "Articles Read" : {
+
+    },
+    "Assets minus liabilities" : {
+
+    },
     "Authentication required" : {
       "localizations" : {
         "zh-Hans" : {
@@ -305,6 +407,9 @@
           }
         }
       }
+    },
+    "Auto" : {
+
     },
     "Available" : {
       "localizations" : {
@@ -316,6 +421,12 @@
         }
       }
     },
+    "Average step length while walking" : {
+
+    },
+    "Average walking speed" : {
+
+    },
     "Bad request" : {
       "localizations" : {
         "zh-Hans" : {
@@ -325,6 +436,69 @@
           }
         }
       }
+    },
+    "Basal Energy" : {
+
+    },
+    "Battery Level" : {
+
+    },
+    "Battery percentage over time" : {
+
+    },
+    "Bedtime & Wake Time" : {
+
+    },
+    "Birthdays" : {
+
+    },
+    "Blood Glucose" : {
+
+    },
+    "Blood Oxygen" : {
+
+    },
+    "Blood Pressure" : {
+
+    },
+    "Blood sugar level (manual entry or CGM)" : {
+
+    },
+    "Bluetooth Devices" : {
+
+    },
+    "BMI" : {
+
+    },
+    "Body Fat %" : {
+
+    },
+    "Body fat percentage" : {
+
+    },
+    "Body height" : {
+
+    },
+    "Body mass index" : {
+
+    },
+    "Body Weight" : {
+
+    },
+    "Books & Reading" : {
+
+    },
+    "Books Finished" : {
+
+    },
+    "Branches, PRs, code review" : {
+
+    },
+    "Breaths per minute during sleep" : {
+
+    },
+    "Browser Tabs" : {
+
     },
     "Build" : {
       "localizations" : {
@@ -336,6 +510,24 @@
         }
       }
     },
+    "Caffeine" : {
+
+    },
+    "Calendar Events" : {
+
+    },
+    "Call frequency and duration" : {
+
+    },
+    "Calories burned at rest" : {
+
+    },
+    "Calories burned through activity" : {
+
+    },
+    "Calories Consumed" : {
+
+    },
     "Cancel" : {
       "localizations" : {
         "zh-Hans" : {
@@ -346,6 +538,12 @@
         }
       }
     },
+    "Cardio fitness level" : {
+
+    },
+    "Chat Logs" : {
+
+    },
     "Check Connection" : {
       "localizations" : {
         "zh-Hans" : {
@@ -355,6 +553,15 @@
           }
         }
       }
+    },
+    "Claude Code session history" : {
+
+    },
+    "Code Written" : {
+
+    },
+    "Coffee and tea consumption" : {
+
     },
     "Comments (%lld)" : {
       "comment" : "Comment count in Explore post detail",
@@ -385,6 +592,9 @@
         }
       }
     },
+    "Commit frequency, repos, LOC changed" : {
+
+    },
     "Communication" : {
       "localizations" : {
         "zh-Hans" : {
@@ -395,6 +605,12 @@
         }
       }
     },
+    "Commute" : {
+
+    },
+    "Completed books list" : {
+
+    },
     "Connected" : {
       "localizations" : {
         "zh-Hans" : {
@@ -404,6 +620,12 @@
           }
         }
       }
+    },
+    "Connected network (location proxy)" : {
+
+    },
+    "Connected peripherals" : {
+
     },
     "Connecting..." : {
       "localizations" : {
@@ -425,12 +647,34 @@
         }
       }
     },
+    "Consecutive days of completion" : {
+
+    },
+    "Contact Frequency" : {
+
+    },
+    "Countries Visited" : {
+
+    },
+    "Courses" : {
+
+    },
     "Create" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "创建"
+          }
+        }
+      }
+    },
+    "Created" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建时间"
           }
         }
       }
@@ -455,6 +699,24 @@
         }
       }
     },
+    "Curated photo projects" : {
+
+    },
+    "Custom Habits" : {
+
+    },
+    "Cycling" : {
+
+    },
+    "Daily screen usage duration" : {
+
+    },
+    "Daily step count" : {
+
+    },
+    "Daily water consumption" : {
+
+    },
     "Data" : {
       "localizations" : {
         "zh-Hans" : {
@@ -474,6 +736,12 @@
           }
         }
       }
+    },
+    "Daylight hours at your location" : {
+
+    },
+    "Deep Work Sessions" : {
+
     },
     "Delete" : {
       "localizations" : {
@@ -525,6 +793,15 @@
         }
       }
     },
+    "Device Unlocks" : {
+
+    },
+    "Diary and free writing" : {
+
+    },
+    "Dietary energy intake" : {
+
+    },
     "Discovering data range..." : {
       "localizations" : {
         "zh-Hans" : {
@@ -534,6 +811,15 @@
           }
         }
       }
+    },
+    "Disk space used and available" : {
+
+    },
+    "Distance" : {
+
+    },
+    "Distance, speed, power" : {
+
     },
     "Done" : {
       "localizations" : {
@@ -545,6 +831,9 @@
         }
       }
     },
+    "Double Support Time" : {
+
+    },
     "Download" : {
       "localizations" : {
         "zh-Hans" : {
@@ -555,6 +844,15 @@
         }
       }
     },
+    "Drawing & Art" : {
+
+    },
+    "Drinks consumed" : {
+
+    },
+    "Duolingo etc. streaks and progress" : {
+
+    },
     "Earlier" : {
       "localizations" : {
         "zh-Hans" : {
@@ -564,6 +862,18 @@
           }
         }
       }
+    },
+    "Earnings tracking" : {
+
+    },
+    "Email Volume" : {
+
+    },
+    "Emails sent and received per day" : {
+
+    },
+    "Emotional state logging" : {
+
     },
     "Empty Folder" : {
       "localizations" : {
@@ -615,6 +925,18 @@
         }
       }
     },
+    "Environmental noise level in dBASPL (Apple Watch)" : {
+
+    },
+    "Episodes listened, duration, shows" : {
+
+    },
+    "Evening Routine" : {
+
+    },
+    "Exercise Minutes" : {
+
+    },
     "Explore" : {
       "localizations" : {
         "zh-Hans" : {
@@ -635,7 +957,32 @@
         }
       }
     },
+    "FaceTime, Zoom, Meet duration" : {
+
+    },
     "Failed to Load" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加载失败"
+          }
+        }
+      }
+    },
+    "Failed to Load Agents" : {
+
+    },
+    "Failed to Load File" : {
+
+    },
+    "Failed to Load Image" : {
+
+    },
+    "Failed to Load PDF" : {
+
+    },
+    "Failed to load posts" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -655,15 +1002,11 @@
         }
       }
     },
-    "Failed to load posts" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "加载失败"
-          }
-        }
-      }
+    "Fall risk assessment" : {
+
+    },
+    "Family Time" : {
+
     },
     "Files" : {
       "localizations" : {
@@ -705,6 +1048,21 @@
         }
       }
     },
+    "Flashcard Reviews" : {
+
+    },
+    "Flights Climbed" : {
+
+    },
+    "Floors ascended" : {
+
+    },
+    "Focus Mode" : {
+
+    },
+    "Focused uninterrupted work blocks" : {
+
+    },
     "Folder name" : {
       "localizations" : {
         "zh-Hans" : {
@@ -715,6 +1073,9 @@
         }
       }
     },
+    "Free-text mood entries" : {
+
+    },
     "Future" : {
       "localizations" : {
         "zh-Hans" : {
@@ -724,6 +1085,9 @@
           }
         }
       }
+    },
+    "Gatherings, parties, dinners" : {
+
     },
     "General" : {
       "localizations" : {
@@ -745,6 +1109,18 @@
         }
       }
     },
+    "Git Activity" : {
+
+    },
+    "Git Commits" : {
+
+    },
+    "GPS tracks for outdoor workouts — stored inside each workout file" : {
+
+    },
+    "Gratitude Log" : {
+
+    },
     "Grid" : {
       "localizations" : {
         "zh-Hans" : {
@@ -755,6 +1131,9 @@
         }
       }
     },
+    "Habit Streaks" : {
+
+    },
     "Habits & Routines" : {
       "localizations" : {
         "zh-Hans" : {
@@ -764,6 +1143,12 @@
           }
         }
       }
+    },
+    "Headphone Audio" : {
+
+    },
+    "Headphone audio exposure level in dBASPL" : {
+
     },
     "Health & Body" : {
       "localizations" : {
@@ -795,6 +1180,107 @@
         }
       }
     },
+    "Heart Rate" : {
+
+    },
+    "Heart Rate Variability" : {
+
+    },
+    "Height" : {
+
+    },
+    "High Heart Rate Events" : {
+
+    },
+    "Home / Work Time" : {
+
+    },
+    "Hours in meetings per day/week" : {
+
+    },
+    "Hours with standing activity" : {
+
+    },
+    "How often you pick up your phone" : {
+
+    },
+    "How often you reach each person" : {
+
+    },
+    "HRV — stress and recovery indicator" : {
+
+    },
+    "https://my.xiaoyuanzhu.com" : {
+
+    },
+    "IDE Usage" : {
+
+    },
+    "iMessage" : {
+
+    },
+    "Inbox Items" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收件箱条目"
+          }
+        }
+      }
+    },
+    "Income" : {
+
+    },
+    "Information" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "信息"
+          }
+        }
+      }
+    },
+    "International travel log" : {
+
+    },
+    "Invalid Image" : {
+
+    },
+    "Invalid server response" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器响应无效"
+          }
+        }
+      }
+    },
+    "Invalid URL" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网址无效"
+          }
+        }
+      }
+    },
+    "Invalid URL format. Must start with http:// or https://" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "URL 格式无效，必须以 http:// 或 https:// 开头"
+          }
+        }
+      }
+    },
+    "Investments" : {
+
+    },
     "iPhone" : {
       "localizations" : {
         "zh-Hans" : {
@@ -825,55 +1311,14 @@
         }
       }
     },
-    "Information" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "信息"
-          }
-        }
-      }
+    "Irregular heartbeat detections" : {
+
     },
-    "Inbox Items" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "收件箱条目"
-          }
-        }
-      }
+    "Irregular Rhythm" : {
+
     },
-    "Invalid URL" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "网址无效"
-          }
-        }
-      }
-    },
-    "Invalid URL format. Must start with http:// or https://" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "URL 格式无效，必须以 http:// 或 https:// 开头"
-          }
-        }
-      }
-    },
-    "Invalid server response" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "服务器响应无效"
-          }
-        }
-      }
+    "Journal Entries" : {
+
     },
     "Just now" : {
       "localizations" : {
@@ -885,6 +1330,15 @@
         }
       }
     },
+    "Language Learning" : {
+
+    },
+    "Laps, strokes, distance, SWOLF" : {
+
+    },
+    "Lean Body Mass" : {
+
+    },
     "Learning & Growth" : {
       "localizations" : {
         "zh-Hans" : {
@@ -894,6 +1348,9 @@
           }
         }
       }
+    },
+    "Left/right step time difference" : {
+
     },
     "Legal" : {
       "localizations" : {
@@ -915,6 +1372,9 @@
         }
       }
     },
+    "Lines of code by language" : {
+
+    },
     "List" : {
       "localizations" : {
         "zh-Hans" : {
@@ -925,6 +1385,15 @@
         }
       }
     },
+    "Loading agents…" : {
+
+    },
+    "Loading file..." : {
+
+    },
+    "Loading image..." : {
+
+    },
     "Loading inbox..." : {
       "localizations" : {
         "zh-Hans" : {
@@ -934,6 +1403,12 @@
           }
         }
       }
+    },
+    "Loading PDF..." : {
+
+    },
+    "Loading post..." : {
+
     },
     "Loading posts..." : {
       "localizations" : {
@@ -955,6 +1430,9 @@
         }
       }
     },
+    "Loading video..." : {
+
+    },
     "Loading..." : {
       "localizations" : {
         "zh-Hans" : {
@@ -965,6 +1443,9 @@
         }
       }
     },
+    "Loading…" : {
+
+    },
     "Location & Travel" : {
       "localizations" : {
         "zh-Hans" : {
@@ -974,6 +1455,9 @@
           }
         }
       }
+    },
+    "Low Heart Rate Events" : {
+
     },
     "Mac" : {
       "localizations" : {
@@ -995,6 +1479,9 @@
         }
       }
     },
+    "Matched in %@" : {
+
+    },
     "Me" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1005,6 +1492,9 @@
         }
       }
     },
+    "Meals" : {
+
+    },
     "Media & Culture" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1014,6 +1504,21 @@
           }
         }
       }
+    },
+    "Meditation session duration" : {
+
+    },
+    "Meeting Time" : {
+
+    },
+    "Meetings, appointments, time blocks" : {
+
+    },
+    "Message count and conversations" : {
+
+    },
+    "Mindful Minutes" : {
+
     },
     "Mindfulness & Mental Health" : {
       "localizations" : {
@@ -1035,6 +1540,33 @@
         }
       }
     },
+    "Mood" : {
+
+    },
+    "Mood Journal" : {
+
+    },
+    "Morning Routine" : {
+
+    },
+    "Movies & TV" : {
+
+    },
+    "Multi-day trips, destinations" : {
+
+    },
+    "Muscle + bone mass" : {
+
+    },
+    "Music Listening" : {
+
+    },
+    "Music Production" : {
+
+    },
+    "Music, art, sports practice time" : {
+
+    },
     "MyLifeDB" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1055,6 +1587,12 @@
         }
       }
     },
+    "Net Worth" : {
+
+    },
+    "New" : {
+
+    },
     "New Folder" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1064,6 +1602,9 @@
           }
         }
       }
+    },
+    "No content" : {
+
     },
     "No Health Data Sources" : {
       "localizations" : {
@@ -1075,22 +1616,22 @@
         }
       }
     },
-    "No Items" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "暂无条目"
-          }
-        }
-      }
-    },
     "No internet connection. Please check your network." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "没有网络连接，请检查你的网络。"
+          }
+        }
+      }
+    },
+    "No Items" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂无条目"
           }
         }
       }
@@ -1125,6 +1666,17 @@
         }
       }
     },
+    "No shareable content found." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到可分享的内容。"
+          }
+        }
+      }
+    },
     "Not checked" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1155,15 +1707,17 @@
         }
       }
     },
-    "No shareable content found." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未找到可分享的内容。"
-          }
-        }
-      }
+    "Notification count by app" : {
+
+    },
+    "Notifications" : {
+
+    },
+    "Notifications when HR drops below threshold" : {
+
+    },
+    "Notifications when HR exceeds threshold" : {
+
     },
     "Nutrition & Intake" : {
       "localizations" : {
@@ -1175,6 +1729,9 @@
         }
       }
     },
+    "OFF" : {
+
+    },
     "OK" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1185,6 +1742,9 @@
         }
       }
     },
+    "Online courses, progress" : {
+
+    },
     "Open Source Licenses" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1194,6 +1754,15 @@
           }
         }
       }
+    },
+    "Open tab count over time" : {
+
+    },
+    "Overnight skin temperature from Apple Watch" : {
+
+    },
+    "Pace, stride length, vertical oscillation, power, ground contact time" : {
+
     },
     "Past Month" : {
       "localizations" : {
@@ -1225,6 +1794,12 @@
         }
       }
     },
+    "People Interactions" : {
+
+    },
+    "Per-App Usage" : {
+
+    },
     "Personal Knowledge Management" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1234,6 +1809,15 @@
           }
         }
       }
+    },
+    "Phone Calls" : {
+
+    },
+    "Phone Pickups" : {
+
+    },
+    "Photo count per day" : {
+
     },
     "Photo Library" : {
       "localizations" : {
@@ -1245,6 +1829,12 @@
         }
       }
     },
+    "Photography Projects" : {
+
+    },
+    "Photos Taken" : {
+
+    },
     "Pin" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1255,6 +1845,12 @@
         }
       }
     },
+    "Places Visited" : {
+
+    },
+    "Places visited with time spent" : {
+
+    },
     "Please log in to continue." : {
       "localizations" : {
         "zh-Hans" : {
@@ -1264,6 +1860,12 @@
           }
         }
       }
+    },
+    "Podcasts" : {
+
+    },
+    "Portfolio value over time" : {
+
     },
     "Post" : {
       "localizations" : {
@@ -1284,6 +1886,9 @@
           }
         }
       }
+    },
+    "Posts, comments, likes" : {
+
     },
     "Productivity" : {
       "localizations" : {
@@ -1335,6 +1940,12 @@
         }
       }
     },
+    "REM, deep, core, awake breakdown" : {
+
+    },
+    "Reminders Completed" : {
+
+    },
     "Request timed out" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1375,6 +1986,15 @@
         }
       }
     },
+    "Respiratory Rate" : {
+
+    },
+    "Restaurants, shops, venues" : {
+
+    },
+    "Resting, walking, and workout HR" : {
+
+    },
     "Resume" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1405,6 +2025,9 @@
         }
       }
     },
+    "Running Metrics" : {
+
+    },
     "Save Failed" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1415,6 +2038,9 @@
         }
       }
     },
+    "Schedule regularity score" : {
+
+    },
     "Screen Time & Digital" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1424,6 +2050,12 @@
           }
         }
       }
+    },
+    "Screenshot frequency" : {
+
+    },
+    "Screenshots" : {
+
     },
     "Search" : {
       "localizations" : {
@@ -1445,6 +2077,9 @@
         }
       }
     },
+    "Search files..." : {
+
+    },
     "Searching..." : {
       "localizations" : {
         "zh-Hans" : {
@@ -1454,6 +2089,9 @@
           }
         }
       }
+    },
+    "Semantic match" : {
+
     },
     "Send" : {
       "localizations" : {
@@ -1515,7 +2153,11 @@
         }
       }
     },
+    "Sessions" : {
+
+    },
     "Sessions (Active)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1526,6 +2168,7 @@
       }
     },
     "Sessions (All)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1536,6 +2179,7 @@
       }
     },
     "Sessions (Archived)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1575,6 +2219,9 @@
         }
       }
     },
+    "Shell commands executed" : {
+
+    },
     "Sign In" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1595,6 +2242,12 @@
         }
       }
     },
+    "Significant Locations" : {
+
+    },
+    "Signing in..." : {
+
+    },
     "Size" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1604,6 +2257,9 @@
           }
         }
       }
+    },
+    "Skills Practiced" : {
+
     },
     "Sleep" : {
       "localizations" : {
@@ -1615,6 +2271,18 @@
         }
       }
     },
+    "Sleep Consistency" : {
+
+    },
+    "Sleep Duration" : {
+
+    },
+    "Sleep schedule tracking" : {
+
+    },
+    "Sleep Stages" : {
+
+    },
     "Social & Relationships" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1624,6 +2292,39 @@
           }
         }
       }
+    },
+    "Social Events" : {
+
+    },
+    "Social Media" : {
+
+    },
+    "Songs produced, DAW time" : {
+
+    },
+    "Songs, artists, genres, duration" : {
+
+    },
+    "Speed going down stairs" : {
+
+    },
+    "Speed going up stairs" : {
+
+    },
+    "Spending" : {
+
+    },
+    "SpO2 saturation level" : {
+
+    },
+    "Stair Ascent Speed" : {
+
+    },
+    "Stair Descent Speed" : {
+
+    },
+    "Stand Hours" : {
+
     },
     "Start" : {
       "localizations" : {
@@ -1655,6 +2356,30 @@
         }
       }
     },
+    "Step Length" : {
+
+    },
+    "Steps" : {
+
+    },
+    "Storage Usage" : {
+
+    },
+    "Subscriptions" : {
+
+    },
+    "Sun exposure risk level" : {
+
+    },
+    "Sunrise & Sunset" : {
+
+    },
+    "Supplements" : {
+
+    },
+    "Swimming" : {
+
+    },
     "Sync" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1685,6 +2410,16 @@
         }
       }
     },
+    "Syncing all history..." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在同步全部历史…"
+          }
+        }
+      }
+    },
     "Syncing..." : {
       "localizations" : {
         "zh-Hans" : {
@@ -1695,15 +2430,17 @@
         }
       }
     },
-    "Syncing all history..." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在同步全部历史…"
-          }
-        }
-      }
+    "Systolic & diastolic (manual entry or cuff)" : {
+
+    },
+    "Tasks checked off" : {
+
+    },
+    "Temperature and conditions at your location" : {
+
+    },
+    "Terminal History" : {
+
     },
     "The request timed out. Please try again." : {
       "localizations" : {
@@ -1725,6 +2462,9 @@
         }
       }
     },
+    "Things you're grateful for" : {
+
+    },
     "This folder has no files or subfolders." : {
       "localizations" : {
         "zh-Hans" : {
@@ -1745,6 +2485,33 @@
         }
       }
     },
+    "Time at home vs office vs other" : {
+
+    },
+    "Time both feet are on the ground" : {
+
+    },
+    "Time by category (social, productivity…)" : {
+
+    },
+    "Time in Xcode, VS Code, etc." : {
+
+    },
+    "Time per application on Mac" : {
+
+    },
+    "Time spent exercising" : {
+
+    },
+    "Time spent in each app" : {
+
+    },
+    "Time with family members" : {
+
+    },
+    "Titles, reading time, progress" : {
+
+    },
     "Today" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1754,6 +2521,21 @@
           }
         }
       }
+    },
+    "Total Screen Time" : {
+
+    },
+    "Total time asleep" : {
+
+    },
+    "Transactions and amounts" : {
+
+    },
+    "Travel time and route to work" : {
+
+    },
+    "Trips & Travel" : {
+
     },
     "Try Again" : {
       "localizations" : {
@@ -1785,6 +2567,9 @@
         }
       }
     },
+    "Unlock frequency" : {
+
+    },
     "Unpin" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1804,6 +2589,9 @@
           }
         }
       }
+    },
+    "Upcoming and past birthdays" : {
+
     },
     "Upload Failed" : {
       "localizations" : {
@@ -1835,6 +2623,16 @@
         }
       }
     },
+    "Uploading %lld/%lld..." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Uploading %1$lld/%2$lld..."
+          }
+        }
+      }
+    },
     "Uploading..." : {
       "localizations" : {
         "zh-Hans" : {
@@ -1844,6 +2642,18 @@
           }
         }
       }
+    },
+    "User-defined habits to track" : {
+
+    },
+    "UV Exposure" : {
+
+    },
+    "UV Index" : {
+
+    },
+    "UV radiation exposure (manual entry or compatible device)" : {
+
     },
     "Version" : {
       "localizations" : {
@@ -1855,6 +2665,15 @@
         }
       }
     },
+    "Version %@" : {
+
+    },
+    "Video Calls" : {
+
+    },
+    "Videos watched, channels, time" : {
+
+    },
     "View Mode" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1864,6 +2683,33 @@
           }
         }
       }
+    },
+    "Vitamins and medications" : {
+
+    },
+    "VO2 Max" : {
+
+    },
+    "Waist Circumference" : {
+
+    },
+    "Waist measurement" : {
+
+    },
+    "Wake up activities and timing" : {
+
+    },
+    "Walking + running distance" : {
+
+    },
+    "Walking Asymmetry" : {
+
+    },
+    "Walking Speed" : {
+
+    },
+    "Walking Steadiness" : {
+
     },
     "Watch" : {
       "localizations" : {
@@ -1875,6 +2721,24 @@
         }
       }
     },
+    "Water Intake" : {
+
+    },
+    "Weather" : {
+
+    },
+    "Web articles and blog posts" : {
+
+    },
+    "Weight measurements" : {
+
+    },
+    "What you ate, when, photos" : {
+
+    },
+    "What you watched, ratings" : {
+
+    },
     "What's up?" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1884,6 +2748,33 @@
           }
         }
       }
+    },
+    "WhatsApp, Telegram, Discord, Slack" : {
+
+    },
+    "Who you spent time with" : {
+
+    },
+    "Wi-Fi Network" : {
+
+    },
+    "Wind-down activities and timing" : {
+
+    },
+    "Word count and writing sessions" : {
+
+    },
+    "Workout Routes" : {
+
+    },
+    "Workouts" : {
+
+    },
+    "Wrist Temperature" : {
+
+    },
+    "Writing" : {
+
     },
     "Yesterday" : {
       "localizations" : {
@@ -1915,15 +2806,8 @@
         }
       }
     },
-    "Created" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "创建时间"
-          }
-        }
-      }
+    "YouTube History" : {
+
     }
   },
   "version" : "1.0"
