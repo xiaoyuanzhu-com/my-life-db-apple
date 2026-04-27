@@ -15,6 +15,14 @@ enum AgentDestination: Hashable {
     case session(AgentSession)
     case sessionById(String)
     case newSession
+    case createAgent
+}
+
+/// Top-level segment selection for the Agent tab.
+/// Mirrors the web's two-tab segmented control: "Sessions ▾ | Auto".
+enum AgentSection: Hashable {
+    case sessions
+    case auto
 }
 
 struct AgentSessionListView: View {
@@ -31,11 +39,14 @@ struct AgentSessionListView: View {
     @State private var path = NavigationPath()
     @State private var sseManager = AgentSessionSSEManager()
     @State private var statusFilter = "active"
+    @State private var section: AgentSection = .sessions
 
     var body: some View {
         NavigationStack(path: $path) {
             Group {
-                if isLoading && sessions.isEmpty {
+                if section == .auto {
+                    AutoAgentListView(path: $path)
+                } else if isLoading && sessions.isEmpty {
                     loadingView
                 } else if let error = error, sessions.isEmpty {
                     errorView(error)
@@ -43,20 +54,9 @@ struct AgentSessionListView: View {
                     sessionList
                 }
             }
-            .navigationTitle(filterNavigationTitle)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .toolbarTitleMenu {
-                Picker("Filter", selection: $statusFilter) {
-                    Label("All", systemImage: "list.bullet")
-                        .tag("all")
-                    Label("Active", systemImage: "circle.fill")
-                        .tag("active")
-                    Label("Archived", systemImage: "archivebox")
-                        .tag("archived")
-                }
-            }
             .navigationDestination(for: AgentDestination.self) { dest in
                 switch dest {
                 case .session(let session):
@@ -65,14 +65,29 @@ struct AgentSessionListView: View {
                     AgentSessionDetailView(sessionId: id)
                 case .newSession:
                     NewAgentSessionView()
+                case .createAgent:
+                    NewAgentSessionView(seed: "/create-agent")
+                }
+            }
+            .navigationDestination(for: AutoAgentDestination.self) { dest in
+                switch dest {
+                case .editor(let name):
+                    AutoAgentEditorView(name: name)
+                case .create:
+                    NewAgentSessionView(seed: "/create-agent")
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        path.append(AgentDestination.newSession)
-                    } label: {
-                        Image(systemName: "plus")
+                ToolbarItem(placement: .principal) {
+                    SectionToggle(section: $section, statusFilter: $statusFilter)
+                }
+                if section == .sessions {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            path.append(AgentDestination.newSession)
+                        } label: {
+                            Image(systemName: "plus")
+                        }
                     }
                 }
             }
@@ -122,16 +137,6 @@ struct AgentSessionListView: View {
             } else if link == "/agent" {
                 path.append(AgentDestination.newSession)
             }
-        }
-    }
-
-    // MARK: - Helpers
-
-    private var filterNavigationTitle: String {
-        switch statusFilter {
-        case "all": return String(localized: "Sessions (All)")
-        case "archived": return String(localized: "Sessions (Archived)")
-        default: return String(localized: "Sessions (Active)")
         }
     }
 
@@ -452,15 +457,32 @@ struct AgentSessionListView: View {
 
 private struct NewAgentSessionView: View {
 
-    @State private var webVM = TabWebViewModel(
-        route: "/agent",
-        featureFlags: [
-            "sessionSidebar": false,
-            "sessionCreateNew": false,
-        ]
-    )
+    /// Optional seed appended as `?seed=<value>` so the web composer pre-fills.
+    /// e.g. `/create-agent` opens the new-session view with the create-agent
+    /// skill already staged in the input.
+    let seed: String?
+
+    @State private var webVM: TabWebViewModel
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
+
+    init(seed: String? = nil) {
+        self.seed = seed
+        let route: String
+        if let seed, !seed.isEmpty {
+            let encoded = seed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? seed
+            route = "/agent?seed=\(encoded)"
+        } else {
+            route = "/agent"
+        }
+        self._webVM = State(initialValue: TabWebViewModel(
+            route: route,
+            featureFlags: [
+                "sessionSidebar": false,
+                "sessionCreateNew": false,
+            ]
+        ))
+    }
 
     var body: some View {
         ZStack {
@@ -576,6 +598,97 @@ private struct UnreadDot: View {
             .fill(state == .working ? Color.orange : Color.green)
             .frame(width: 8, height: 8)
             .accessibilityLabel(state == .working ? String(localized: "Agent is working") : String(localized: "Unread results"))
+    }
+}
+
+// MARK: - Section Toggle
+
+/// Segmented "Sessions ▾ | Auto" pill placed in the navigation bar's
+/// principal slot. Mirrors the web's two-tab header (bg-muted/50 p-0.5
+/// pill with two button-style tabs).
+///
+/// On the active "Sessions" tab a Menu surfaces the status filter
+/// (All / Active / Archived) — replacing the previous toolbarTitleMenu.
+private struct SectionToggle: View {
+
+    @Binding var section: AgentSection
+    @Binding var statusFilter: String
+
+    var body: some View {
+        HStack(spacing: 2) {
+            sessionsTab
+            autoTab
+        }
+        .padding(2)
+        .background(
+            Capsule().fill(Color.secondary.opacity(0.12))
+        )
+    }
+
+    @ViewBuilder
+    private var sessionsTab: some View {
+        if section == .sessions {
+            // Active — tap to open status-filter menu.
+            Menu {
+                Picker("Filter", selection: $statusFilter) {
+                    Label("All", systemImage: "list.bullet")
+                        .tag("all")
+                    Label("Active", systemImage: "circle.fill")
+                        .tag("active")
+                    Label("Archived", systemImage: "archivebox")
+                        .tag("archived")
+                }
+            } label: {
+                tabLabel(text: sessionsTitle, isActive: true, showChevron: true)
+            }
+        } else {
+            // Inactive — tap to switch to sessions.
+            Button {
+                section = .sessions
+            } label: {
+                tabLabel(text: sessionsTitle, isActive: false, showChevron: false)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder
+    private var autoTab: some View {
+        Button {
+            section = .auto
+        } label: {
+            tabLabel(text: String(localized: "Auto"), isActive: section == .auto, showChevron: false)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var sessionsTitle: String {
+        switch statusFilter {
+        case "all": return String(localized: "All")
+        case "archived": return String(localized: "Archived")
+        default: return String(localized: "Sessions")
+        }
+    }
+
+    private func tabLabel(text: String, isActive: Bool, showChevron: Bool) -> some View {
+        HStack(spacing: 2) {
+            Text(text)
+                .font(.subheadline)
+                .fontWeight(.medium)
+            if showChevron {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+        }
+        .foregroundStyle(isActive ? Color.primary : Color.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(
+            Capsule()
+                .fill(isActive ? Color.platformBackground : Color.clear)
+                .shadow(color: isActive ? Color.black.opacity(0.06) : .clear, radius: 1, y: 1)
+        )
+        .contentShape(Capsule())
     }
 }
 

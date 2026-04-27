@@ -120,7 +120,7 @@ final class TabWebViewModel {
         // Also set cookies in WebKit store (belt-and-suspenders).
         await injectAuthCookiesViaWebKitStore(for: baseURL)
 
-        let loadURL = route == "/" ? baseURL : baseURL.appendingPathComponent(route)
+        let loadURL = resolveRoute(route, against: baseURL)
         webPage.load(URLRequest(url: loadURL))
         observeNavigationEvents()
     }
@@ -259,7 +259,7 @@ final class TabWebViewModel {
     @MainActor
     func loadPath(_ path: String) {
         guard let baseURL else { return }
-        let url = path == "/" ? baseURL : baseURL.appendingPathComponent(path)
+        let url = resolveRoute(path, against: baseURL)
         pendingNavigation = nil
 
         // Refresh user script with latest token before loading new page
@@ -465,10 +465,24 @@ final class TabWebViewModel {
 
         await injectAuthCookiesViaWebKitStore(for: baseURL)
 
-        let loadURL = route == "/" ? baseURL : baseURL.appendingPathComponent(route)
+        let loadURL = resolveRoute(route, against: baseURL)
         webPage.load(URLRequest(url: loadURL))
         observeNavigationEvents()
     }
+}
+
+// MARK: - URL Helpers
+
+/// Resolve a frontend route (e.g. "/", "/agent", "/agent/auto?edit=foo")
+/// against the base URL. Uses URL(string:relativeTo:) so that routes
+/// containing query strings or fragments are parsed correctly —
+/// `appendingPathComponent` would percent-encode "?" and "#".
+private func resolveRoute(_ route: String, against baseURL: URL) -> URL {
+    if route == "/" { return baseURL }
+    if let resolved = URL(string: route, relativeTo: baseURL)?.absoluteURL {
+        return resolved
+    }
+    return baseURL.appendingPathComponent(route)
 }
 
 // MARK: - String Extension for JS Escaping
