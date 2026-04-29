@@ -427,6 +427,9 @@
     "Average walking speed" : {
 
     },
+    "Back" : {
+
+    },
     "Bad request" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1544,6 +1547,9 @@
 
     },
     "Mood Journal" : {
+
+    },
+    "More options" : {
 
     },
     "Morning Routine" : {
