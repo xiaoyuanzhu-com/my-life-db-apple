@@ -13,14 +13,23 @@ struct AgentSessionDetailView: View {
 
     let sessionId: String
     let title: String?
+    let isArchived: Bool
 
     @State private var webVM: TabWebViewModel
+    @State private var archiveState: ArchiveState
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
 
-    init(sessionId: String, title: String? = nil) {
+    private enum ArchiveState {
+        case active
+        case archived
+    }
+
+    init(sessionId: String, title: String? = nil, isArchived: Bool = false) {
         self.sessionId = sessionId
         self.title = title
+        self.isArchived = isArchived
+        self._archiveState = State(initialValue: isArchived ? .archived : .active)
         self._webVM = State(initialValue: TabWebViewModel(
             route: "/agent/\(sessionId)",
             featureFlags: [
@@ -46,20 +55,42 @@ struct AgentSessionDetailView: View {
                 .background(Color.platformBackground)
             }
         }
+        .navigationTitle(title ?? String(localized: "Session"))
         #if os(iOS)
-        // Hide the system navigation bar entirely to prevent the iOS 26
-        // Liquid Glass material from rendering a translucent overlay on
-        // top of the web content. Use a custom GlassCircleButton instead
-        // (same pattern as FileViewerView). The interactive pop gesture
-        // still works — InteractivePopGestureController manages it below.
-        .overlay(alignment: .topLeading) {
-            GlassCircleButton(systemName: "chevron.left") {
-                dismiss()
+        // Show a real navigation bar with an opaque app-background tint so
+        // the WebView no longer extends into the status-bar area and the
+        // iOS 26 Liquid Glass material has a solid surface to sit on top of.
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbarBackground(Color.platformBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .fontWeight(.semibold)
+                }
+                .accessibilityLabel(Text("Back"))
             }
-            .padding(.leading, 16)
-            .padding(.top, 8)
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        Task { await toggleArchive() }
+                    } label: {
+                        if archiveState == .archived {
+                            Label("Unarchive", systemImage: "tray.and.arrow.up")
+                        } else {
+                            Label("Archive", systemImage: "archivebox")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                }
+                .accessibilityLabel(Text("More options"))
+            }
         }
-        .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         // Disable the NavigationStack's interactive pop gesture while the web
         // frontend is showing a fullscreen preview (e.g. Estima slides).
@@ -70,8 +101,6 @@ struct AgentSessionDetailView: View {
                 disabled: webVM.bridgeHandler.isFullscreenPreview
             )
         )
-        #else
-        .navigationTitle(title ?? "Session")
         #endif
         .task {
             await webVM.setup(baseURL: AuthManager.shared.baseURL)
@@ -90,6 +119,28 @@ struct AgentSessionDetailView: View {
         }
         .onDisappear {
             webVM.cancelObservation()
+        }
+    }
+
+    // MARK: - Archive / Unarchive
+
+    /// Toggle the session's archive state and dismiss back to the list,
+    /// which will refresh on path change to reflect the new state.
+    private func toggleArchive() async {
+        let wasArchived = archiveState == .archived
+        // Optimistic flip so the menu label updates if the dismiss is animated.
+        archiveState = wasArchived ? .active : .archived
+        do {
+            if wasArchived {
+                try await APIClient.shared.agent.unarchive(sessionId: sessionId)
+            } else {
+                try await APIClient.shared.agent.archive(sessionId: sessionId)
+            }
+            dismiss()
+        } catch {
+            // Revert on failure
+            archiveState = wasArchived ? .archived : .active
+            print("[AgentSessionDetailView] Archive toggle failed: \(error)")
         }
     }
 }

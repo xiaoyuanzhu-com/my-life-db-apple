@@ -60,7 +60,11 @@ struct AgentSessionListView: View {
             .navigationDestination(for: AgentDestination.self) { dest in
                 switch dest {
                 case .session(let session):
-                    AgentSessionDetailView(sessionId: session.id, title: session.title)
+                    AgentSessionDetailView(
+                        sessionId: session.id,
+                        title: session.title,
+                        isArchived: session.isArchived
+                    )
                 case .sessionById(let id):
                     AgentSessionDetailView(sessionId: id)
                 case .newSession:
