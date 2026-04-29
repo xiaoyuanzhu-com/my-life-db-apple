@@ -52,17 +52,19 @@ struct AgentSessionDetailView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.platformBackground)
+                .background(Color.webBackground)
             }
         }
         .navigationTitle(title ?? String(localized: "Session"))
         #if os(iOS)
-        // Show a real navigation bar with an opaque app-background tint so
-        // the WebView no longer extends into the status-bar area and the
-        // iOS 26 Liquid Glass material has a solid surface to sit on top of.
+        // Show a real navigation bar tinted to match the WebView's
+        // `--background` design token so the status-bar / nav-bar area
+        // blends seamlessly with the embedded page in both light and
+        // dark mode (UIColor.systemBackground is pure black in dark mode
+        // and would leave a visible seam against oklch(0.145) ≈ #0A0A0A).
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
-        .toolbarBackground(Color.platformBackground, for: .navigationBar)
+        .toolbarBackground(Color.webBackground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
