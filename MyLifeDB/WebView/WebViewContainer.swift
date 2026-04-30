@@ -16,6 +16,11 @@ struct WebViewContainer: View {
     var body: some View {
         WebView(viewModel.webPage)
             .ignoresSafeArea()
+            // Paint `webBackground` behind the WebView so the brief moment
+            // before page content renders matches the page's `--background`
+            // token in both light and dark mode (the WKWebView's backing
+            // layer is otherwise dark on first appearance).
+            .background(Color.webBackground.ignoresSafeArea())
             #if os(iOS)
             // Re-inject safe area insets when the device rotates.
             // `.ignoresSafeArea()` zeroes out the CSS env() variables,

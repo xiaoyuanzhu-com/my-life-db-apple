@@ -57,26 +57,57 @@ struct AgentSessionDetailView: View {
         }
         .navigationTitle(title ?? String(localized: "Session"))
         #if os(iOS)
-        // Show a real navigation bar tinted to match the WebView's
-        // `--background` design token so the status-bar / nav-bar area
-        // blends seamlessly with the embedded page in both light and
-        // dark mode (UIColor.systemBackground is pure black in dark mode
-        // and would leave a visible seam against oklch(0.145) ≈ #0A0A0A).
+        // Hide the system nav bar entirely; we use the same floating-glass-
+        // button pattern as Claude / ChatGPT iOS so the WebView can scroll
+        // edge-to-edge while the status-bar and action buttons stay legible
+        // over an `webBackground` → clear gradient. On iOS 26 Liquid Glass
+        // is enforced system-wide and there's no per-view API to make a
+        // toolbar opaque, so this avoids the bar entirely instead of
+        // fighting it.
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbarBackground(Color.webBackground, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
+        .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
+        // Top fade: a translucent material rectangle masked by a gradient so
+        // it's blurred-opaque at the very top (status bar / button row) and
+        // fades to clear below. Page content scrolls all the way under,
+        // staying visible through the blur near the bottom of the fade.
+        .overlay(alignment: .top) {
+            Color.clear
+                .frame(height: 130)
+                .background(.regularMaterial)
+                .mask(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black, location: 0),
+                            .init(color: .black, location: 0.55),
+                            .init(color: .clear, location: 1),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .ignoresSafeArea(edges: .top)
+                .allowsHitTesting(false)
+        }
+        // Top action row: back · title · ellipsis menu.  Same floating glass
+        // pattern as Claude / ChatGPT iOS, sitting on top of the material
+        // fade above.
+        .overlay(alignment: .top) {
+            HStack(spacing: 12) {
+                GlassCircleButton(systemName: "chevron.left") {
                     dismiss()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .fontWeight(.semibold)
                 }
                 .accessibilityLabel(Text("Back"))
-            }
-            ToolbarItem(placement: .topBarTrailing) {
+
+                Spacer(minLength: 8)
+
+                Text(title ?? String(localized: "Session"))
+                    .font(.headline)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Spacer(minLength: 8)
+
                 Menu {
                     Button {
                         Task { await toggleArchive() }
@@ -89,11 +120,16 @@ struct AgentSessionDetailView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis")
+                        .font(.system(size: 17, weight: .medium))
+                        .padding(10)
+                        .contentShape(Circle())
+                        .glassEffect(.regular.interactive(), in: .circle)
                 }
                 .accessibilityLabel(Text("More options"))
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
         }
-        .toolbar(.hidden, for: .tabBar)
         // Disable the NavigationStack's interactive pop gesture while the web
         // frontend is showing a fullscreen preview (e.g. Estima slides).
         // This lets swipe gestures reach the iframe content instead of
@@ -259,4 +295,5 @@ final class GestureSetupController: UIViewController {
         return found
     }
 }
+
 #endif

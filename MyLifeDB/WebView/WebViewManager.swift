@@ -138,6 +138,24 @@ final class TabWebViewModel {
 
         var script = NativeBridgeHandler.bridgePolyfillScript
 
+        // Apply the system theme to <html> at documentStart so the page paints
+        // with the correct background from the first frame. Without this the
+        // CSS `:root` light defaults render a white flash before
+        // `__nativeBridge.setTheme()` (set up after React mounts) toggles the
+        // `.dark` class.
+        let isDark = currentIsDarkMode()
+        script += """
+            \n(function() {
+                var d = '\(isDark ? "dark" : "light")';
+                if (d === 'dark') {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+                document.documentElement.style.colorScheme = d;
+            })();
+            """
+
         if !featureFlags.isEmpty {
             let pairs = featureFlags
                 .map { "\($0.key): \($0.value)" }
@@ -155,6 +173,18 @@ final class TabWebViewModel {
             forMainFrameOnly: true
         )
         ucc.addUserScript(userScript)
+    }
+
+    /// Current system dark-mode state. Used both to seed the documentStart
+    /// script and to keep the running page in sync via `syncTheme()`.
+    private static func currentIsDarkMode() -> Bool {
+        #if os(iOS)
+        return UITraitCollection.current.userInterfaceStyle == .dark
+        #elseif os(macOS)
+        return NSApp?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        #else
+        return false
+        #endif
     }
 
     // MARK: - Navigation Event Observation
@@ -297,16 +327,7 @@ final class TabWebViewModel {
 
     @MainActor
     func syncTheme() {
-        let isDark: Bool
-        #if os(iOS)
-        isDark = UITraitCollection.current.userInterfaceStyle == .dark
-        #elseif os(macOS)
-        isDark = NSApp?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        #else
-        isDark = false
-        #endif
-
-        let theme = isDark ? "dark" : "light"
+        let theme = Self.currentIsDarkMode() ? "dark" : "light"
         let js = "window.__nativeBridge?.setTheme('\(theme)')"
         Task {
             _ = try? await webPage.callJavaScript(js)
