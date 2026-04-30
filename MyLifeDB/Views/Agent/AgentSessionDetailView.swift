@@ -26,6 +26,10 @@ struct AgentSessionDetailView: View {
             featureFlags: [
                 "sessionSidebar": false,
                 "sessionCreateNew": false,
+                // Push the message list below the SwiftUI navigation bar
+                // (the WebView ignores safe area and would otherwise be
+                // occluded by the inline title bar at the top).
+                "hybridTopInset": true,
             ]
         ))
     }
