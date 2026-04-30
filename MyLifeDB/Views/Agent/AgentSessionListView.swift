@@ -56,6 +56,18 @@ struct AgentSessionListView: View {
             }
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            // Hide the system nav bar and float the section toggle / + button
+            // inside the view's safe-area inset.  Toolbar items live in the
+            // navigation chrome, which is positioned absolutely and snaps to
+            // its final on-screen position the instant an interactive pop
+            // begins — that's why they would appear over the still-visible
+            // detail view during a slow edge-swipe.  Putting them in
+            // `safeAreaInset` makes them part of the view geometry so they
+            // slide in with the list during the pop.
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                topBar
+            }
             #endif
             .navigationDestination(for: AgentDestination.self) { dest in
                 switch dest {
@@ -80,6 +92,7 @@ struct AgentSessionListView: View {
                     NewAgentSessionView(seed: "/create-agent")
                 }
             }
+            #if !os(iOS)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     SectionToggle(section: $section, statusFilter: $statusFilter)
@@ -94,6 +107,7 @@ struct AgentSessionListView: View {
                     }
                 }
             }
+            #endif
         }
         .task {
             if sessions.isEmpty {
@@ -142,6 +156,40 @@ struct AgentSessionListView: View {
             }
         }
     }
+
+    // MARK: - Top Bar (iOS)
+
+    #if os(iOS)
+    /// Floating top bar rendered via `safeAreaInset` instead of the system
+    /// nav bar so the section toggle and + button slide with the list during
+    /// an interactive pop (see comment at the call site).
+    private var topBar: some View {
+        HStack(spacing: 12) {
+            // Leading placeholder matching the trailing slot so the
+            // SectionToggle stays visually centered between screen edges.
+            Color.clear.frame(width: 32, height: 32)
+            Spacer(minLength: 8)
+            SectionToggle(section: $section, statusFilter: $statusFilter)
+            Spacer(minLength: 8)
+            if section == .sessions {
+                Button {
+                    path.append(AgentDestination.newSession)
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 17, weight: .medium))
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            } else {
+                Color.clear.frame(width: 32, height: 32)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(.bar)
+    }
+    #endif
 
     // MARK: - Session List
 
