@@ -2,27 +2,35 @@
 //  AutoAgentListView.swift
 //  MyLifeDB
 //
-//  Native grid of auto-run agent definitions. Mirrors the web's
-//  AutoAgentList: avatar tile per agent (persona color from name hash),
-//  initials, "off" badge for disabled defs, and a trailing "+" tile to
-//  create a new agent (which seeds the new-session composer with the
-//  /create-agent skill, exactly like the web).
+//  Native auto-agent tree for the Agent tab's "Auto" section.
+//  Mirrors the web's AutoAgentTree: each agent definition is a collapsible
+//  header row whose nested rows are the auto-run sessions belonging to that
+//  agent.  Sessions whose agent definition has been deleted appear in a
+//  trailing "(unknown agent)" group.
 //
-//  Tapping a tile opens AutoAgentEditorView (a WebView pinned to the
-//  /agent/auto?edit=<name> route).
+//  - Tap a session row → push AgentSessionDetailView (same destination as
+//    the Sessions tab).
+//  - Tap the agent header / pencil → push AutoAgentEditorView for that name.
+//  - Tap the "+ New auto agent" row → push the create-agent composer.
 //
 
 import SwiftUI
 
 struct AutoAgentListView: View {
 
-    /// Pushed by the parent NavigationStack when a tile is selected.
+    /// Pushed by the parent NavigationStack when a row is selected.
     @Binding var path: NavigationPath
+
+    /// Auto-run sessions, already filtered to `source == "auto"` by the
+    /// parent.  Mirrors how the web passes its filtered `visibleSessions`
+    /// down to AutoAgentTree.
+    let sessions: [AgentSession]
 
     @State private var defs: [AgentDef] = []
     @State private var isLoading = false
     @State private var error: Error?
     @State private var refreshTick: Int = 0
+    @State private var collapsed: Set<String> = []
 
     var body: some View {
         Group {
@@ -30,8 +38,10 @@ struct AutoAgentListView: View {
                 loadingView
             } else if let error = error, defs.isEmpty {
                 errorView(error)
+            } else if defs.isEmpty && sessions.isEmpty {
+                emptyView
             } else {
-                grid
+                tree
             }
         }
         .task(id: refreshTick) {
@@ -47,35 +57,231 @@ struct AutoAgentListView: View {
         }
     }
 
-    // MARK: - Subviews
+    // MARK: - Grouping
 
-    private var grid: some View {
-        // Avatar tiles ~ 96pt wide, mirroring the web's auto-fill 8rem grid.
-        ScrollView {
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 96), spacing: 16)],
-                alignment: .center,
-                spacing: 20
-            ) {
-                ForEach(defs) { def in
+    private struct AgentGroup: Identifiable {
+        let key: String
+        let def: AgentDef?
+        let sessions: [AgentSession]
+        let latestActivity: Int64
+        var id: String { key }
+        var displayName: String { def?.name ?? "(unknown agent)" }
+        var isOrphan: Bool { def == nil }
+    }
+
+    private static let unknownAgentGroupKey = "__unknown__"
+
+    /// Group sessions by `agentName`, mirroring the web's `groups` memo.
+    private var groups: [AgentGroup] {
+        var byAgent: [String: [AgentSession]] = [:]
+        let knownNames = Set(defs.map(\.name))
+
+        for s in sessions {
+            let key: String
+            if let name = s.agentName, knownNames.contains(name) {
+                key = name
+            } else {
+                key = Self.unknownAgentGroupKey
+            }
+            byAgent[key, default: []].append(s)
+        }
+
+        // Sort sessions within each group, latest first.
+        for k in byAgent.keys {
+            byAgent[k]?.sort { a, b in
+                (a.lastUserActivity ?? a.lastActivity) > (b.lastUserActivity ?? b.lastActivity)
+            }
+        }
+
+        var result: [AgentGroup] = defs.map { def in
+            let list = byAgent[def.name] ?? []
+            return AgentGroup(
+                key: def.name,
+                def: def,
+                sessions: list,
+                latestActivity: list.first.map { $0.lastUserActivity ?? $0.lastActivity } ?? 0
+            )
+        }
+
+        // Orphan group for sessions whose def has been deleted.
+        if let orphans = byAgent[Self.unknownAgentGroupKey], !orphans.isEmpty {
+            result.append(AgentGroup(
+                key: Self.unknownAgentGroupKey,
+                def: nil,
+                sessions: orphans,
+                latestActivity: orphans[0].lastUserActivity ?? orphans[0].lastActivity
+            ))
+        }
+
+        // Sort: groups with sessions by latest activity desc; groups without
+        // sessions to the bottom, alphabetically among themselves.
+        result.sort { a, b in
+            let aHas = !a.sessions.isEmpty
+            let bHas = !b.sessions.isEmpty
+            if aHas != bHas { return aHas }
+            if aHas { return a.latestActivity > b.latestActivity }
+            return a.displayName.localizedCompare(b.displayName) == .orderedAscending
+        }
+
+        return result
+    }
+
+    // MARK: - Tree
+
+    private var tree: some View {
+        List {
+            // "+ New auto agent" row
+            Button {
+                path.append(AutoAgentDestination.create)
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.circle")
+                        .foregroundStyle(.secondary)
+                    Text("New Auto Agent")
+                        .foregroundStyle(.primary)
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .listRowSeparator(.hidden)
+
+            ForEach(groups) { group in
+                groupSection(group)
+            }
+        }
+        .listStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func groupSection(_ group: AgentGroup) -> some View {
+        let isCollapsed = collapsed.contains(group.key)
+
+        // Header row: chevron + name + (off) badge + pencil
+        Button {
+            toggle(group.key)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 12)
+
+                if !group.isOrphan {
+                    Circle()
+                        .fill(personaColor(for: group.displayName))
+                        .frame(width: 8, height: 8)
+                }
+
+                Text(group.displayName)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(group.isOrphan ? .secondary : .primary)
+                    .italic(group.isOrphan)
+                    .lineLimit(1)
+
+                if let def = group.def, !def.enabled {
+                    Text("OFF")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color.secondary.opacity(0.15))
+                        )
+                }
+
+                Spacer()
+
+                if let def = group.def {
                     Button {
                         path.append(AutoAgentDestination.editor(name: def.name))
                     } label: {
-                        AgentTile(name: def.name, enabled: def.enabled)
+                        Image(systemName: "pencil")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 28, height: 28)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
-
-                Button {
-                    path.append(AutoAgentDestination.create)
-                } label: {
-                    NewAgentTile()
-                }
-                .buttonStyle(.plain)
             }
-            .padding(16)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .listRowSeparator(.hidden)
+
+        if !isCollapsed {
+            if group.sessions.isEmpty && !group.isOrphan {
+                Text("No sessions yet")
+                    .font(.callout)
+                    .foregroundStyle(.tertiary)
+                    .padding(.leading, 30)
+                    .listRowSeparator(.hidden)
+            } else {
+                ForEach(group.sessions) { session in
+                    autoSessionRow(session)
+                        .listRowSeparator(.hidden)
+                }
+            }
         }
     }
+
+    private func autoSessionRow(_ session: AgentSession) -> some View {
+        Button {
+            path.append(AgentDestination.session(session))
+        } label: {
+            HStack(spacing: 8) {
+                // Indent under the chevron
+                Color.clear.frame(width: 22, height: 1)
+
+                Text(session.title.replacing(/\s*\n\s*/, with: " "))
+                    .font(.callout)
+                    .lineLimit(1)
+                    .foregroundStyle(session.isArchived ? .tertiary : .primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if session.sessionState == .working || session.sessionState == .unread {
+                    Circle()
+                        .fill(session.sessionState == .working ? Color.orange : Color.green)
+                        .frame(width: 7, height: 7)
+                }
+
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    Text(shortRelativeTime((session.lastUserActivity ?? session.lastActivity).asDate, now: context.date))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                        .frame(minWidth: 28, alignment: .trailing)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func toggle(_ key: String) {
+        if collapsed.contains(key) {
+            collapsed.remove(key)
+        } else {
+            collapsed.insert(key)
+        }
+    }
+
+    private func shortRelativeTime(_ date: Date, now: Date) -> String {
+        // Compact numeric abbreviations (locale-independent for tight cells).
+        let seconds = Int(now.timeIntervalSince(date))
+        if seconds < 60 { return "\(seconds)s" }
+        let minutes = seconds / 60
+        if minutes < 60 { return "\(minutes)m" }
+        let hours = minutes / 60
+        if hours < 24 { return "\(hours)h" }
+        let days = hours / 24
+        return "\(days)d"
+    }
+
+    // MARK: - States
 
     private var loadingView: some View {
         VStack(spacing: 12) {
@@ -108,6 +314,28 @@ struct AutoAgentListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private var emptyView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "wand.and.stars")
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
+            Text("No auto agents yet")
+                .font(.headline)
+            Text("Create an auto-run agent that responds to triggers.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            Button {
+                path.append(AutoAgentDestination.create)
+            } label: {
+                Label("New Auto Agent", systemImage: "plus")
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     // MARK: - Data
 
     private func fetch() async {
@@ -130,81 +358,7 @@ enum AutoAgentDestination: Hashable {
     case create
 }
 
-// MARK: - Tiles
-
-private struct AgentTile: View {
-
-    let name: String
-    let enabled: Bool
-
-    var body: some View {
-        VStack(spacing: 8) {
-            Circle()
-                .fill(personaColor(for: name))
-                .frame(width: 56, height: 56)
-                .overlay(
-                    Text(personaInitials(for: name))
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.white)
-                )
-
-            HStack(spacing: 4) {
-                Text(name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                if !enabled {
-                    Text("OFF")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                        .background(
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(Color.secondary.opacity(0.15))
-                        )
-                }
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .contentShape(Rectangle())
-    }
-}
-
-private struct NewAgentTile: View {
-    var body: some View {
-        VStack(spacing: 8) {
-            Circle()
-                .fill(Color.secondary.opacity(0.1))
-                .frame(width: 56, height: 56)
-                .overlay(
-                    Circle()
-                        .strokeBorder(
-                            Color.secondary.opacity(0.4),
-                            style: StrokeStyle(lineWidth: 1, dash: [4, 3])
-                        )
-                )
-                .overlay(
-                    Image(systemName: "plus")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(.secondary)
-                )
-
-            Text("New")
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .contentShape(Rectangle())
-    }
-}
-
-// MARK: - Persona Color / Initials
+// MARK: - Persona Color
 
 /// Palette mirroring the web's PERSONA_COLORS (rose/amber/emerald/sky/...
 /// at /90 opacity). Order kept identical so the same agent gets the same
@@ -232,26 +386,12 @@ private func personaColor(for name: String) -> Color {
     return personaPalette[Int(hash % UInt32(personaPalette.count))]
 }
 
-private func personaInitials(for name: String) -> String {
-    let cleaned = name
-        .replacingOccurrences(of: "[^a-zA-Z0-9]", with: " ", options: .regularExpression)
-        .trimmingCharacters(in: .whitespaces)
-    if cleaned.isEmpty { return "?" }
-    let parts = cleaned.split(separator: " ", omittingEmptySubsequences: true)
-    if parts.count >= 2 {
-        let a = parts[0].first.map(String.init) ?? ""
-        let b = parts[1].first.map(String.init) ?? ""
-        return (a + b).uppercased()
-    }
-    return String(cleaned.prefix(2)).uppercased()
-}
-
 // MARK: - Preview
 
 #Preview {
     @Previewable @State var path = NavigationPath()
     return NavigationStack(path: $path) {
-        AutoAgentListView(path: $path)
+        AutoAgentListView(path: $path, sessions: [])
             .navigationTitle("Auto Agents")
     }
 }

@@ -45,10 +45,13 @@ struct AgentSessionListView: View {
         NavigationStack(path: $path) {
             Group {
                 if section == .auto {
-                    AutoAgentListView(path: $path)
-                } else if isLoading && sessions.isEmpty {
+                    AutoAgentListView(
+                        path: $path,
+                        sessions: autoSessions
+                    )
+                } else if isLoading && userSessions.isEmpty {
                     loadingView
-                } else if let error = error, sessions.isEmpty {
+                } else if let error = error, userSessions.isEmpty {
                     errorView(error)
                 } else {
                     sessionList
@@ -193,15 +196,28 @@ struct AgentSessionListView: View {
 
     // MARK: - Session List
 
+    /// User-initiated sessions — shown in the Sessions tab.
+    /// Mirrors the web's `sessions.filter((s) => s.source !== 'auto')`.
+    private var userSessions: [AgentSession] {
+        sessions.filter { !$0.isAuto }
+    }
+
+    /// Auto-run agent sessions — shown in the Auto tab.
+    /// Mirrors the web's `sessions.filter((s) => s.source === 'auto')`.
+    private var autoSessions: [AgentSession] {
+        sessions.filter { $0.isAuto }
+    }
+
     private var groupedSessions: [(title: String, sessions: [AgentSession])] {
         let calendar = Calendar.current
         let now = Date()
         let startOfToday = calendar.startOfDay(for: now)
+        let scoped = userSessions
 
         guard let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday),
               let startOfWeek = calendar.date(byAdding: .day, value: -7, to: startOfToday),
               let startOfMonth = calendar.date(byAdding: .month, value: -1, to: startOfToday)
-        else { return [("All", sessions)] }
+        else { return [("All", scoped)] }
 
         var today: [AgentSession] = []
         var yesterday: [AgentSession] = []
@@ -209,7 +225,7 @@ struct AgentSessionListView: View {
         var pastMonth: [AgentSession] = []
         var earlier: [AgentSession] = []
 
-        for session in sessions {
+        for session in scoped {
             let date = (session.lastUserActivity ?? session.lastActivity).asDate
             if date >= startOfToday {
                 today.append(session)

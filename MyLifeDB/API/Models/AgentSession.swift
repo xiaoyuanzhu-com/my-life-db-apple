@@ -33,8 +33,14 @@ struct AgentSession: Codable, Identifiable, Hashable {
     let isSidechain: Bool
     var sessionState: SessionState
     let git: AgentSessionGitInfo?
+    /// "user" (user-initiated chat) or "auto" (auto-run agent session).
+    /// Used by the Agent tab to split sessions between the Sessions and Auto tabs.
+    let source: String?
+    /// Auto-agent definition name this session belongs to (only set when source == "auto").
+    let agentName: String?
 
     var isArchived: Bool { sessionState == .archived }
+    var isAuto: Bool { source == "auto" }
 
     /// Returns a copy with the given session state
     func withSessionState(_ state: SessionState) -> AgentSession {
@@ -56,6 +62,8 @@ struct AgentSession: Codable, Identifiable, Hashable {
         isSidechain = try container.decodeIfPresent(Bool.self, forKey: .isSidechain) ?? false
         sessionState = try container.decode(SessionState.self, forKey: .sessionState)
         git = try container.decodeIfPresent(AgentSessionGitInfo.self, forKey: .git)
+        source = try container.decodeIfPresent(String.self, forKey: .source)
+        agentName = try container.decodeIfPresent(String.self, forKey: .agentName)
     }
 }
 

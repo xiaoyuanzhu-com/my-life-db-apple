@@ -405,7 +405,14 @@
       }
     },
     "Auto" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动"
+          }
+        }
+      }
     },
     "Available" : {
       "localizations" : {
@@ -2266,7 +2273,14 @@
       }
     },
     "Sessions" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会话"
+          }
+        }
+      }
     },
     "Sessions (Active)" : {
       "extractionState" : "stale",
