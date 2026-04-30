@@ -13,23 +13,14 @@ struct AgentSessionDetailView: View {
 
     let sessionId: String
     let title: String?
-    let isArchived: Bool
 
     @State private var webVM: TabWebViewModel
-    @State private var archiveState: ArchiveState
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
 
-    private enum ArchiveState {
-        case active
-        case archived
-    }
-
-    init(sessionId: String, title: String? = nil, isArchived: Bool = false) {
+    init(sessionId: String, title: String? = nil) {
         self.sessionId = sessionId
         self.title = title
-        self.isArchived = isArchived
-        self._archiveState = State(initialValue: isArchived ? .archived : .active)
         self._webVM = State(initialValue: TabWebViewModel(
             route: "/agent/\(sessionId)",
             featureFlags: [
@@ -76,11 +67,21 @@ struct AgentSessionDetailView: View {
                 .frame(height: 130)
                 .background(.regularMaterial)
                 .mask(
+                    // Material has its own intrinsic translucency (~60–70%),
+                    // so mask alpha N renders as ~N × intrinsic — i.e. mask
+                    // 0.9 ≈ 0.55–0.6 perceived. The stops below are tuned
+                    // high to compensate: full alpha across the status bar /
+                    // title row, then a smooth falloff to clear.
                     LinearGradient(
                         stops: [
-                            .init(color: .black, location: 0),
-                            .init(color: .black, location: 0.55),
-                            .init(color: .clear, location: 1),
+                            .init(color: .black.opacity(1.00), location: 0.0),
+                            .init(color: .black.opacity(0.97), location: 0.3),
+                            .init(color: .black.opacity(0.92), location: 0.5),
+                            .init(color: .black.opacity(0.82), location: 0.7),
+                            .init(color: .black.opacity(0.65), location: 0.8),
+                            .init(color: .black.opacity(0.40), location: 0.9),
+                            .init(color: .black.opacity(0.18), location: 0.96),
+                            .init(color: .clear, location: 1.0),
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -89,9 +90,9 @@ struct AgentSessionDetailView: View {
                 .ignoresSafeArea(edges: .top)
                 .allowsHitTesting(false)
         }
-        // Top action row: back · title · ellipsis menu.  Same floating glass
-        // pattern as Claude / ChatGPT iOS, sitting on top of the material
-        // fade above.
+        // Top action row: back · title.  Floating glass pattern over the
+        // material fade above. A trailing spacer the same size as the back
+        // button keeps the title visually centred between screen edges.
         .overlay(alignment: .top) {
             HStack(spacing: 12) {
                 GlassCircleButton(systemName: "chevron.left") {
@@ -108,24 +109,10 @@ struct AgentSessionDetailView: View {
 
                 Spacer(minLength: 8)
 
-                Menu {
-                    Button {
-                        Task { await toggleArchive() }
-                    } label: {
-                        if archiveState == .archived {
-                            Label("Unarchive", systemImage: "tray.and.arrow.up")
-                        } else {
-                            Label("Archive", systemImage: "archivebox")
-                        }
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 17, weight: .medium))
-                        .padding(10)
-                        .contentShape(Circle())
-                        .glassEffect(.regular.interactive(), in: .circle)
-                }
-                .accessibilityLabel(Text("More options"))
+                // Invisible placeholder matching the back button's footprint
+                // so the title stays centred.
+                Color.clear
+                    .frame(width: 37, height: 37)
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -157,28 +144,6 @@ struct AgentSessionDetailView: View {
         }
         .onDisappear {
             webVM.cancelObservation()
-        }
-    }
-
-    // MARK: - Archive / Unarchive
-
-    /// Toggle the session's archive state and dismiss back to the list,
-    /// which will refresh on path change to reflect the new state.
-    private func toggleArchive() async {
-        let wasArchived = archiveState == .archived
-        // Optimistic flip so the menu label updates if the dismiss is animated.
-        archiveState = wasArchived ? .active : .archived
-        do {
-            if wasArchived {
-                try await APIClient.shared.agent.unarchive(sessionId: sessionId)
-            } else {
-                try await APIClient.shared.agent.archive(sessionId: sessionId)
-            }
-            dismiss()
-        } catch {
-            // Revert on failure
-            archiveState = wasArchived ? .archived : .active
-            print("[AgentSessionDetailView] Archive toggle failed: \(error)")
         }
     }
 }

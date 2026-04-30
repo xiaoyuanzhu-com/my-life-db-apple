@@ -62,8 +62,7 @@ struct AgentSessionListView: View {
                 case .session(let session):
                     AgentSessionDetailView(
                         sessionId: session.id,
-                        title: session.title,
-                        isArchived: session.isArchived
+                        title: session.title
                     )
                 case .sessionById(let id):
                     AgentSessionDetailView(sessionId: id)
