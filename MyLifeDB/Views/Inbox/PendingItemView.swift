@@ -96,11 +96,11 @@ struct PendingItemView: View {
     private var statusText: String {
         switch item.status {
         case .uploading: return String(localized: "Sending...")
-        case .failed: return item.error ?? "Failed"
+        case .failed: return item.error ?? String(localized: "Failed")
         case .queued:
             if let retryAt = item.retryAt {
                 let seconds = max(0, Int(retryAt.timeIntervalSinceNow))
-                return "retry in \(seconds)s"
+                return String(localized: "retry in \(seconds)s")
             }
             return String(localized: "Queued")
         }

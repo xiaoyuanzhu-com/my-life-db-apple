@@ -141,7 +141,7 @@ struct InboxInputBar: View {
                     .foregroundStyle(.secondary)
             }
         } else if searchStatus.resultCount > 0 {
-            Text("\(searchStatus.resultCount) results")
+            Text("\(searchStatus.resultCount) result(s)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } else if searchStatus.hasError {

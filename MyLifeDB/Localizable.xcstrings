@@ -110,7 +110,6 @@
     },
     "%lld result(s)" : {
       "comment" : "Plural count of search results",
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -143,9 +142,6 @@
           }
         }
       }
-    },
-    "%lld results" : {
-
     },
     "%lld sample(s)" : {
       "comment" : "Plural count of health samples",
@@ -2115,6 +2111,22 @@
     "Running Metrics" : {
 
     },
+    "retry in %llds" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "retry in %llds"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 秒后重试"
+          }
+        }
+      }
+    },
     "Save Failed" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2743,8 +2755,14 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
             "value" : "Uploading %1$lld/%2$lld..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上传中 %1$lld/%2$lld…"
           }
         }
       }
