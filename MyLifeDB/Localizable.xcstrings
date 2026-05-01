@@ -1374,19 +1374,6 @@
         }
       }
     },
-    "Limited" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "有限"
-          }
-        }
-      }
-    },
-    "Lines of code by language" : {
-
-    },
     "Library folders will appear here" : {
       "localizations" : {
         "en" : {
@@ -1402,6 +1389,19 @@
           }
         }
       }
+    },
+    "Limited" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有限"
+          }
+        }
+      }
+    },
+    "Lines of code by language" : {
+
     },
     "List" : {
       "localizations" : {
@@ -1574,7 +1574,11 @@
     "Mood" : {
 
     },
+    "Mood Journal" : {
+
+    },
     "More options" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1589,9 +1593,6 @@
           }
         }
       }
-    },
-    "Mood Journal" : {
-
     },
     "Morning Routine" : {
 
@@ -2095,9 +2096,6 @@
         }
       }
     },
-    "Running Metrics" : {
-
-    },
     "retry in %llds" : {
       "localizations" : {
         "en" : {
@@ -2113,6 +2111,9 @@
           }
         }
       }
+    },
+    "Running Metrics" : {
+
     },
     "Save Failed" : {
       "localizations" : {
