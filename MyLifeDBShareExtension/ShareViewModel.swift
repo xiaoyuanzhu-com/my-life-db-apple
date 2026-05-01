@@ -112,7 +112,7 @@ final class ShareViewModel {
         let combinedText = textParts.isEmpty ? nil : textParts.joined(separator: "\n\n")
 
         do {
-            try await apiClient.uploadToInbox(
+            try await apiClient.upload(
                 text: combinedText,
                 files: files
             )

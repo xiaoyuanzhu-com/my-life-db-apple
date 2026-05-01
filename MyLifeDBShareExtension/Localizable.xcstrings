@@ -101,35 +101,14 @@
         }
       }
     },
-    "Send to Inbox" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "发送到收件箱"
-          }
-        }
-      }
+    "Send to MyLifeDB" : {
+
     },
-    "Sending to Inbox..." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在发送到收件箱…"
-          }
-        }
-      }
+    "Sending..." : {
+
     },
-    "Sent to Inbox" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已发送到收件箱"
-          }
-        }
-      }
+    "Sent" : {
+
     }
   },
   "version" : "1.0"

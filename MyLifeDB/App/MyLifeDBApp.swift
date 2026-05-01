@@ -95,7 +95,7 @@ struct MyLifeDBApp: App {
 
     // MARK: - Deep Linking
 
-    /// Handle deep links (e.g., mylifedb://oauth/callback?access_token=..., mylifedb://inbox/12345).
+    /// Handle deep links (e.g., mylifedb://oauth/callback?access_token=..., mylifedb://library/foo).
     @MainActor
     private func handleDeepLink(_ url: URL) {
         // Only handle our custom scheme
@@ -108,8 +108,8 @@ struct MyLifeDBApp: App {
         }
 
         // The host + path form the web route
-        // e.g., mylifedb://inbox/123 → /inbox/123
-        //        mylifedb://library → /library
+        // e.g., mylifedb://library → /library
+        //        mylifedb://library/foo → /library/foo
         let path: String
         if let host = url.host {
             path = "/\(host)\(url.path)"

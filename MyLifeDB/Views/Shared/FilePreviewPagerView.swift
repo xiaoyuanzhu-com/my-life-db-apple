@@ -3,9 +3,9 @@
 //  MyLifeDB
 //
 //  Horizontal pager for swiping between media files (images and videos)
-//  in the inbox file preview. Uses a simple ScrollView with paging so
-//  each item sits side by side at full width. Non-media files are
-//  excluded from the pager.
+//  in the file preview. Uses a simple ScrollView with paging so each
+//  item sits side by side at full width. Non-media files are excluded
+//  from the pager.
 //
 //  Items are displayed in chronological order (oldest on the left,
 //  newest on the right) so swiping left goes toward newer items

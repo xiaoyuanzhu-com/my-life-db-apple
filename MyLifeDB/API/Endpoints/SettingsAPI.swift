@@ -66,7 +66,6 @@ struct StatsResponse: Codable {
     // Add stats properties based on your backend
     let totalFiles: Int?
     let totalFolders: Int?
-    let inboxCount: Int?
 }
 
 /// Response from GET /api/directories

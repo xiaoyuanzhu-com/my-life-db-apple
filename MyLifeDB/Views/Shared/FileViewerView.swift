@@ -2,17 +2,16 @@
 //  FileViewerView.swift
 //  MyLifeDB
 //
-//  Reusable native file viewer that can be presented from anywhere
-//  (Library, Inbox, etc.). Dispatches to the appropriate type-specific
-//  viewer based on the file's MIME type, with a fallback for
-//  unsupported formats.
+//  Reusable native file viewer that can be presented from anywhere.
+//  Dispatches to the appropriate type-specific viewer based on the
+//  file's MIME type, with a fallback for unsupported formats.
 //
 //  Usage:
 //    // When you already have a FileRecord:
 //    FileViewerView(file: someFileRecord)
 //
 //    // When you only have a path (metadata will be fetched):
-//    FileViewerView(filePath: "inbox/photo.jpg", fileName: "photo.jpg")
+//    FileViewerView(filePath: "library/photo.jpg", fileName: "photo.jpg")
 //
 
 import SwiftUI

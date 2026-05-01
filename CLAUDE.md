@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 MyLifeDB Apple is a **native iOS/macOS client** for the MyLifeDB personal knowledge management system. It consumes the MyLifeDB backend API (Go server) and provides a native Apple experience.
 
-**Documentation:** All project docs live in [`../my-life-db-docs/`](../my-life-db-docs/) (Astro Starlight site). See the **Apple Client** section for architecture, hybrid UI approach, data collection, and inbox PRD.
+**Documentation:** All project docs live in [`../my-life-db-docs/`](../my-life-db-docs/) (Astro Starlight site). See the **Apple Client** section for architecture, hybrid UI approach, and data collection.
 
 ## Design Principles
 
@@ -62,7 +62,6 @@ MyLifeDB/
 │   ├── Endpoints/               # Per-resource API calls
 │   └── Models/                  # Codable structs for API responses
 ├── Views/                       # SwiftUI views
-│   ├── Inbox/
 │   ├── Library/
 │   ├── Search/
 │   └── Shared/
@@ -76,11 +75,11 @@ MyLifeDB/
 The app consumes the MyLifeDB backend API (default: `http://localhost:12345`).
 
 Key endpoints:
-- `GET /api/inbox` — List inbox items
 - `GET /api/library/tree` — Folder structure
 - `GET /api/search?q=...` — Full-text search
 - `GET /api/people` — People list
 - `GET /raw/*path` — Serve file content
+- `PUT /api/upload/simple/*path` — Single-request file upload
 - `GET /api/notifications/stream` — SSE real-time updates
 
 See the Apple Client section in [`../my-life-db-docs/`](../my-life-db-docs/) for full API reference.
@@ -105,9 +104,9 @@ See the Apple Client section in [`../my-life-db-docs/`](../my-life-db-docs/) for
 
 ### API Client Usage
 ```swift
-// Fetch inbox items
-let response = try await APIClient.shared.inbox.list()
-self.items = response.items
+// Fetch the library tree
+let response = try await APIClient.shared.library.getTree(path: "", depth: 1)
+self.children = response.children
 ```
 
 ### SwiftUI Data Flow
@@ -190,7 +189,7 @@ A worktree may accumulate multiple commits before pushing. After every push, cle
 
 | Category | Convention | Example |
 |----------|-----------|---------|
-| Swift files | PascalCase | `InboxView.swift` |
-| API models | PascalCase | `InboxItem`, `FileRecord` |
-| API endpoints | camelCase methods | `inbox.list()` |
-| Views | PascalCase + View suffix | `InboxListView` |
+| Swift files | PascalCase | `LibraryBrowseView.swift` |
+| API models | PascalCase | `FileRecord`, `LibraryTreeResponse` |
+| API endpoints | camelCase methods | `library.getTree()` |
+| Views | PascalCase + View suffix | `LibraryBrowseView` |

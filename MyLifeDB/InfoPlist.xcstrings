@@ -70,13 +70,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "MyLifeDB needs access to your photo library to share photos and videos to your inbox."
+            "value" : "MyLifeDB needs access to your photo library to share photos and videos to your library."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "MyLifeDB 需要访问你的照片图库，以便将照片和视频分享到收件箱。"
+            "value" : "MyLifeDB 需要访问你的照片图库，以便将照片和视频分享到你的资料库。"
           }
         }
       }

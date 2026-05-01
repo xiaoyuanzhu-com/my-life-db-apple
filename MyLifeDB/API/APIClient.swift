@@ -31,7 +31,6 @@ final class APIClient {
 
     // MARK: - Endpoint Namespaces
 
-    lazy var inbox = InboxAPI(client: self)
     lazy var library = LibraryAPI(client: self)
     lazy var search = SearchAPI(client: self)
     lazy var people = PeopleAPI(client: self)

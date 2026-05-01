@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>MyLifeDB needs access to your photo library to attach photos and videos to inbox items.</string>
+	<string>MyLifeDB needs access to your photo library to attach photos and videos to your library.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>MyLifeDB needs permission to save photos and videos to your photo library.</string>
 	<key>NSHealthShareUsageDescription</key>

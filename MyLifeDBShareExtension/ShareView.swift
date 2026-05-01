@@ -4,7 +4,7 @@
 //
 //  SwiftUI compose view for the Share Extension.
 //  Displays a compose sheet where users can add a note
-//  and preview what they're sharing before sending to Inbox.
+//  and preview what they're sharing before sending to MyLifeDB.
 //
 
 import LinkPresentation
@@ -38,7 +38,7 @@ struct ShareView: View {
                     errorView(message: message)
                 }
             }
-            .navigationTitle("Send to Inbox")
+            .navigationTitle("Send to MyLifeDB")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -238,7 +238,7 @@ struct ShareView: View {
         VStack(spacing: 16) {
             ProgressView()
                 .scaleEffect(1.2)
-            Text("Sending to Inbox...")
+            Text("Sending...")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -252,7 +252,7 @@ struct ShareView: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 48))
                 .foregroundStyle(.green)
-            Text("Sent to Inbox")
+            Text("Sent")
                 .font(.headline)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
