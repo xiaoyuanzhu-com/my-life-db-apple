@@ -334,8 +334,11 @@ final class FileCache: @unchecked Sendable {
                     return try await fetchFromNetwork(url: url, allowRetryOn401: false)
                 }
             }
+            print("[FileCache] 401 unauthorized for \(url.absoluteString)")
             throw FileCacheError.unauthorized
         default:
+            let bodyPreview = String(data: data.prefix(200), encoding: .utf8) ?? "<non-utf8 \(data.count) bytes>"
+            print("[FileCache] HTTP \(http.statusCode) for \(url.absoluteString) — body: \(bodyPreview)")
             throw FileCacheError.networkError(http.statusCode)
         }
     }
@@ -386,10 +389,24 @@ final class FileCache: @unchecked Sendable {
 
     // MARK: - Error
 
-    enum FileCacheError: Error {
+    enum FileCacheError: LocalizedError {
         case decodingFailed
         case unauthorized
         case networkError(Int)
+
+        var errorDescription: String? {
+            switch self {
+            case .decodingFailed:
+                return "Failed to decode file content"
+            case .unauthorized:
+                return "Unauthorized (401) — please sign in again"
+            case .networkError(let status):
+                if status == 0 {
+                    return "Network error — no HTTP response"
+                }
+                return "Server returned HTTP \(status)"
+            }
+        }
     }
 }
 
