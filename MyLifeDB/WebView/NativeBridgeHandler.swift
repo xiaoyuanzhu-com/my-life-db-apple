@@ -42,6 +42,16 @@ final class NativeBridgeHandler: URLSchemeHandler {
     /// The hosting SwiftUI view should observe this and call dismiss().
     private(set) var isRequestingGoBack = false
 
+    #if os(iOS)
+    /// Retains the active document picker delegate while a `pickAndUploadFiles`
+    /// session is in flight. UIDocumentPickerViewController.delegate is `weak`,
+    /// so the coordinator must be held by us until it fires its callback.
+    /// Cleared in the coordinator's completion. Only one picker is presentable
+    /// at a time on iOS, so a single slot is sufficient.
+    @ObservationIgnored
+    var activeFilePickerCoordinator: FilePickerCoordinator?
+    #endif
+
     // MARK: - URLSchemeHandler
 
     // CORS headers required because the WebView's page origin (e.g. http://192.168.x.x:12346)
@@ -77,7 +87,40 @@ final class NativeBridgeHandler: URLSchemeHandler {
                 return
             }
 
-            if action == "requestTokenRefresh" {
+            if action == "pickAndUploadFiles" {
+                // Async action: present native file picker, upload picked
+                // files via APIClient, return resulting Attachment records
+                // as JSON. Empty array on cancel or any failure.
+                #if os(iOS)
+                Task { @MainActor [weak self] in
+                    guard let self else {
+                        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: Self.corsHeaders)!
+                        continuation.yield(.response(response))
+                        continuation.yield(.data(Data(#"{"attachments":[]}"#.utf8)))
+                        continuation.finish()
+                        return
+                    }
+                    let storageId = json["storageId"] as? String
+                    let result = await self.handlePickAndUploadFiles(storageId: storageId)
+                    let bodyData = (try? JSONSerialization.data(withJSONObject: result)) ?? Data(#"{"attachments":[]}"#.utf8)
+                    var headers = Self.corsHeaders
+                    headers["Content-Type"] = "application/json"
+                    let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: headers)!
+                    continuation.yield(.response(response))
+                    continuation.yield(.data(bodyData))
+                    continuation.finish()
+                }
+                #else
+                // Not implemented on macOS yet — return empty so JS falls back
+                // gracefully (or shows nothing, depending on caller).
+                var headers = Self.corsHeaders
+                headers["Content-Type"] = "application/json"
+                let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: headers)!
+                continuation.yield(.response(response))
+                continuation.yield(.data(Data(#"{"attachments":[]}"#.utf8)))
+                continuation.finish()
+                #endif
+            } else if action == "requestTokenRefresh" {
                 // Async action: await native token refresh before responding.
                 // Include the new access token so the web side can update its
                 // Authorization header immediately (before the async notification).
