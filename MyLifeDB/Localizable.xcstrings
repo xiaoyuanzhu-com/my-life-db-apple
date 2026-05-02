@@ -4,15 +4,6 @@
     "" : {
 
     },
-    " · %@" : {
-
-    },
-    " (%lld%% similar)" : {
-
-    },
-    "—" : {
-
-    },
     ".claude Sessions" : {
 
     },
@@ -110,6 +101,7 @@
     },
     "%lld result(s)" : {
       "comment" : "Plural count of search results",
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -225,9 +217,6 @@
           }
         }
       }
-    },
-    "+%lld" : {
-
     },
     "A native iOS and macOS client for the MyLifeDB personal knowledge management system." : {
       "localizations" : {
@@ -970,6 +959,7 @@
 
     },
     "Failed" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1034,6 +1024,7 @@
 
     },
     "Files" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1336,6 +1327,7 @@
 
     },
     "Just now" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1501,6 +1493,7 @@
       }
     },
     "Matched in %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1673,9 +1666,6 @@
     "No auto agents yet" : {
 
     },
-    "No content" : {
-
-    },
     "No Health Data Sources" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1697,6 +1687,7 @@
       }
     },
     "No Items" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1900,6 +1891,7 @@
 
     },
     "Photo Library" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1916,6 +1908,7 @@
 
     },
     "Pin" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1991,6 +1984,7 @@
       }
     },
     "Queued" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2106,6 +2100,7 @@
       }
     },
     "retry in %llds" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2164,6 +2159,7 @@
       }
     },
     "Search failed" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2177,6 +2173,7 @@
 
     },
     "Searching..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2187,6 +2184,7 @@
       }
     },
     "Semantic match" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2203,6 +2201,7 @@
       }
     },
     "Send" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2213,6 +2212,7 @@
       }
     },
     "Sending..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2703,6 +2703,7 @@
 
     },
     "Unpin" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2894,6 +2895,7 @@
 
     },
     "What's up?" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
