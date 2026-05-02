@@ -34,7 +34,6 @@ final class APIClient {
     lazy var library = LibraryAPI(client: self)
     lazy var search = SearchAPI(client: self)
     lazy var people = PeopleAPI(client: self)
-    lazy var digest = DigestAPI(client: self)
     lazy var settings = SettingsAPI(client: self)
     lazy var agent = AgentAPI(client: self)
     lazy var explore = ExploreAPI(client: self)

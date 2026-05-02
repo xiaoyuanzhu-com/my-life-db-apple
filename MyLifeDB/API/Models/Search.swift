@@ -23,7 +23,6 @@ struct SearchResultItem: Codable, Identifiable {
     let mimeType: String?
     let modifiedAt: Int64
     let createdAt: Int64
-    let digests: [Digest]
     let score: Double
     let snippet: String
     let textPreview: String?

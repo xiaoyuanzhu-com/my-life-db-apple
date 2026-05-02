@@ -74,15 +74,13 @@ struct LibraryTreeResponse: Codable {
 }
 
 /// Response from GET /api/library/file-info
-/// Note: The backend uses Go struct embedding for FileWithDigests, which flattens
-/// FileRecord fields to the top level in JSON (no nested "file" key).
+/// Note: The backend flattens FileRecord fields to the top level in JSON
+/// (Go struct embedding — no nested "file" key).
 struct FileInfoResponse: Codable {
     let file: FileRecord
-    let digests: [Digest]?
     let isPinned: Bool
 
     private enum CodingKeys: String, CodingKey {
-        case digests
         case isPinned
     }
 
@@ -90,7 +88,6 @@ struct FileInfoResponse: Codable {
         // FileRecord fields are at the top level (Go struct embedding flattens them)
         file = try FileRecord(from: decoder)
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        digests = try container.decodeIfPresent([Digest].self, forKey: .digests)
         isPinned = try container.decode(Bool.self, forKey: .isPinned)
     }
 }

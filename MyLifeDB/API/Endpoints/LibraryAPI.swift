@@ -53,7 +53,7 @@ struct LibraryAPI {
         )
     }
 
-    /// Get file information with digests
+    /// Get file information
     func getFileInfo(path: String) async throws -> FileInfoResponse {
         try await client.request(
             path: "/api/library/file-info",
