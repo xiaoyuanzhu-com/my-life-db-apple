@@ -68,12 +68,12 @@ struct LibraryNode: Codable, Identifiable, Hashable {
     }
 }
 
-/// Response from GET /api/library/tree
+/// Response from GET /api/data/tree (legacy shape — newer callers use FileTreeResponse)
 struct LibraryTreeResponse: Codable {
     let tree: [LibraryNode]
 }
 
-/// Response from GET /api/library/file-info
+/// Response from GET /api/data/files/*path
 /// Note: The backend flattens FileRecord fields to the top level in JSON
 /// (Go struct embedding — no nested "file" key).
 struct FileInfoResponse: Codable {
@@ -92,26 +92,20 @@ struct FileInfoResponse: Codable {
     }
 }
 
-/// Request body for POST /api/library/folder
+/// Request body for POST /api/data/folders
 struct CreateFolderRequest: Codable {
-    let path: String
+    let parent: String
+    let name: String
 }
 
-/// Request body for POST /api/library/rename
-struct RenameRequest: Codable {
-    let path: String
-    let newName: String
+/// Request body for PATCH /api/data/files/*path — rename variant
+struct PatchFileRenameRequest: Codable {
+    let name: String
 }
 
-/// Request body for POST /api/library/move
-struct MoveRequest: Codable {
-    let sourcePath: String
-    let destinationPath: String
-}
-
-/// Request body for POST /api/library/pin and DELETE /api/library/pin
-struct PinRequest: Codable {
-    let path: String
+/// Request body for PATCH /api/data/files/*path — move variant
+struct PatchFileMoveRequest: Codable {
+    let parent: String
 }
 
 /// Generic success response
@@ -129,7 +123,7 @@ struct SimpleUploadResponse: Codable {
 
 // MARK: - Tree API Response Models
 
-/// A node in the tree response from GET /api/library/tree.
+/// A node in the tree response from GET /api/data/tree.
 /// Note: `path` is just the filename/folder name, NOT the full path.
 /// The parent directory is implicit from the API request context.
 struct FileTreeNode: Codable, Identifiable, Hashable {
@@ -206,7 +200,7 @@ struct FileTreeNode: Codable, Identifiable, Hashable {
     }
 }
 
-/// Response from GET /api/library/tree?path=&depth=
+/// Response from GET /api/data/tree?path=&depth=
 struct FileTreeResponse: Codable {
     let basePath: String?
     let path: String?

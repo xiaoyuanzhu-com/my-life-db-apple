@@ -75,7 +75,7 @@ MyLifeDB/
 The app consumes the MyLifeDB backend API (default: `http://localhost:12345`).
 
 Key endpoints:
-- `GET /api/library/tree` — Folder structure
+- `GET /api/data/tree` — Folder structure
 - `GET /api/search?q=...` — Full-text search
 - `GET /api/people` — People list
 - `GET /raw/*path` — Serve file content

@@ -6,7 +6,7 @@
 //  Displays the organized file tree from the backend.
 //  Users can browse folders and view files.
 //
-//  API: GET /api/library/tree
+//  API: GET /api/data/tree
 //
 
 import SwiftUI

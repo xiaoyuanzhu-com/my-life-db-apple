@@ -4,16 +4,15 @@
 //
 //  Library API endpoints for file management.
 //
-//  Endpoints:
-//  - GET    /api/library/tree       - Get folder tree structure
-//  - GET    /api/library/file-info  - Get file details
-//  - POST   /api/library/folder     - Create new folder
-//  - POST   /api/library/rename     - Rename file/folder
-//  - POST   /api/library/move       - Move file/folder
-//  - DELETE /api/library/file       - Delete file/folder
-//  - POST   /api/library/pin        - Pin a file
-//  - DELETE /api/library/pin        - Unpin a file
-//  - PUT    /api/upload/simple/*path - Simple file upload
+//  Endpoints (post Phase B refactor — see my-life-db-docs internal/api/api-structure.md):
+//  - GET    /api/data/tree            - Get folder tree structure
+//  - GET    /api/data/files/*path     - Get file details
+//  - POST   /api/data/folders         - Create new folder ({parent, name})
+//  - PATCH  /api/data/files/*path     - Rename ({name}) or move ({parent})
+//  - DELETE /api/data/files/*path     - Delete file/folder
+//  - PUT    /api/data/pins/*path      - Pin a file (idempotent)
+//  - DELETE /api/data/pins/*path      - Unpin a file (idempotent)
+//  - PUT    /api/upload/simple/*path  - Simple file upload
 //
 
 import Foundation
@@ -27,11 +26,38 @@ struct LibraryAPI {
         self.client = client
     }
 
+    // MARK: - Path Encoding
+
+    /// Encode a relative path for use as a URL path segment.
+    /// Splits on "/" and percent-encodes each segment so that names containing
+    /// "/", "?", "#", spaces, etc. are preserved.
+    private static func encodePath(_ path: String) -> String {
+        let trimmed = path.drop(while: { $0 == "/" })
+        let segments = trimmed.split(separator: "/", omittingEmptySubsequences: false)
+        return segments.map { segment in
+            segment.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(.init(charactersIn: "/")))
+                ?? String(segment)
+        }.joined(separator: "/")
+    }
+
+    /// Split a full path into (parent, name).
+    /// e.g. "notes/2024/foo.md" -> ("notes/2024", "foo.md")
+    /// e.g. "foo.md" -> ("", "foo.md")
+    private static func splitParentAndName(_ path: String) -> (parent: String, name: String) {
+        let trimmed = path.drop(while: { $0 == "/" })
+        if let lastSlash = trimmed.lastIndex(of: "/") {
+            let parent = String(trimmed[trimmed.startIndex..<lastSlash])
+            let name = String(trimmed[trimmed.index(after: lastSlash)...])
+            return (parent, name)
+        }
+        return ("", String(trimmed))
+    }
+
     // MARK: - Tree Operations
 
     /// Get the folder tree structure (legacy — returns LibraryTreeResponse)
     func getTree() async throws -> LibraryTreeResponse {
-        try await client.request(path: "/api/library/tree")
+        try await client.request(path: "/api/data/tree")
     }
 
     /// Get the folder tree structure for a specific path and depth.
@@ -47,7 +73,7 @@ struct LibraryAPI {
             queryItems.append(URLQueryItem(name: "path", value: path))
         }
         return try await client.request(
-            path: "/api/library/tree",
+            path: "/api/data/tree",
             queryItems: queryItems,
             ignoreCache: ignoreCache
         )
@@ -56,46 +82,48 @@ struct LibraryAPI {
     /// Get file information
     func getFileInfo(path: String) async throws -> FileInfoResponse {
         try await client.request(
-            path: "/api/library/file-info",
-            queryItems: [URLQueryItem(name: "path", value: path)]
+            path: "/api/data/files/\(Self.encodePath(path))"
         )
     }
 
     // MARK: - File Operations
 
-    /// Create a new folder
+    /// Create a new folder. The `path` is the full folder path; the API splits
+    /// it into (parent, name) before sending to the backend.
     func createFolder(path: String) async throws -> SuccessResponse {
-        try await client.request(
-            path: "/api/library/folder",
+        let (parent, name) = Self.splitParentAndName(path)
+        return try await client.request(
+            path: "/api/data/folders",
             method: .post,
-            body: CreateFolderRequest(path: path)
+            body: CreateFolderRequest(parent: parent, name: name)
         )
     }
 
     /// Rename a file or folder
     func rename(path: String, newName: String) async throws -> SuccessResponse {
         try await client.request(
-            path: "/api/library/rename",
-            method: .post,
-            body: RenameRequest(path: path, newName: newName)
+            path: "/api/data/files/\(Self.encodePath(path))",
+            method: .patch,
+            body: PatchFileRenameRequest(name: newName)
         )
     }
 
-    /// Move a file or folder
+    /// Move a file or folder. `destinationPath` is the full new path; the
+    /// parent directory is extracted and sent as the new parent.
     func move(from sourcePath: String, to destinationPath: String) async throws -> SuccessResponse {
-        try await client.request(
-            path: "/api/library/move",
-            method: .post,
-            body: MoveRequest(sourcePath: sourcePath, destinationPath: destinationPath)
+        let (parent, _) = Self.splitParentAndName(destinationPath)
+        return try await client.request(
+            path: "/api/data/files/\(Self.encodePath(sourcePath))",
+            method: .patch,
+            body: PatchFileMoveRequest(parent: parent)
         )
     }
 
     /// Delete a file or folder
     func delete(path: String) async throws {
         try await client.requestVoid(
-            path: "/api/library/file",
-            method: .delete,
-            queryItems: [URLQueryItem(name: "path", value: path)]
+            path: "/api/data/files/\(Self.encodePath(path))",
+            method: .delete
         )
     }
 
@@ -125,21 +153,19 @@ struct LibraryAPI {
 
     // MARK: - Pin Operations
 
-    /// Pin a file
+    /// Pin a file (idempotent — PUT)
     func pin(path: String) async throws -> SuccessResponse {
         try await client.request(
-            path: "/api/library/pin",
-            method: .post,
-            body: PinRequest(path: path)
+            path: "/api/data/pins/\(Self.encodePath(path))",
+            method: .put
         )
     }
 
-    /// Unpin a file
+    /// Unpin a file (idempotent — DELETE)
     func unpin(path: String) async throws {
         try await client.requestVoid(
-            path: "/api/library/pin",
-            method: .delete,
-            queryItems: [URLQueryItem(name: "path", value: path)]
+            path: "/api/data/pins/\(Self.encodePath(path))",
+            method: .delete
         )
     }
 }
