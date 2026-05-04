@@ -3,7 +3,7 @@
 //  MyLifeDB
 //
 //  Server-Sent Events manager for agent session real-time updates.
-//  Connects to GET /api/notifications/stream and listens for
+//  Connects to GET /api/data/events and listens for
 //  claude-session-updated events to trigger session list refreshes.
 //
 
@@ -61,7 +61,7 @@ final class AgentSessionSSEManager {
         session = nil
 
         let baseURL = AuthManager.shared.baseURL
-        guard let url = URL(string: "\(baseURL)/api/notifications/stream") else {
+        guard let url = URL(string: "\(baseURL)/api/data/events") else {
             print("[AgentSSE] Invalid URL")
             return
         }

@@ -17,7 +17,7 @@ Native App (Swift)                    Web Frontend (React)
 
 **Why native owns auth:**
 - **Single source of truth** — tokens live in Keychain, not in cookies or JS variables
-- **No dual-writer races** — only native refreshes tokens; web never calls `/api/oauth/refresh` directly
+- **No dual-writer races** — only native refreshes tokens; web never calls `/api/system/oauth/refresh` directly
 - **Cross-view consistency** — all WebPage instances read from the same AuthManager
 - **Survives WebView crashes** — native re-injects token after process termination
 - **Works offline** — native can check token validity without network
@@ -56,7 +56,7 @@ WebKit guarantees `atDocumentStart` runs before ANY `<script>` tags. This is cri
 2. Calls refreshViaNativeBridge()
    → fetch('nativebridge://message', { action: 'requestTokenRefresh' })
 3. Native: AuthManager.refreshAccessToken()
-   → POST /api/oauth/refresh (refresh_token from Keychain)
+   → POST /api/system/oauth/refresh (refresh_token from Keychain)
    → stores new tokens in Keychain
 4. Native responds: { success: true, accessToken: '<new_jwt>' }
 5. Web: window.__nativeAccessToken = '<new_jwt>'
@@ -151,7 +151,7 @@ The native-owns-auth architecture is **not a workaround for cookies** — it's t
 │  AuthManager (singleton)                        │
 │  ├── accessToken  (Keychain)                    │
 │  ├── refreshToken (Keychain)                    │
-│  └── refreshAccessToken() → POST /api/oauth/refresh
+│  └── refreshAccessToken() → POST /api/system/oauth/refresh
 │                                                 │
 │  TabWebViewModel                                │
 │  ├── creates WebPage(configuration)             │
@@ -179,7 +179,7 @@ The native-owns-auth architecture is **not a workaround for cookies** — it's t
 │  │   ├── native: fetch('nativebridge://...')    │
 │  │   │   → receives { success, accessToken }    │
 │  │   │   → updates window.__nativeAccessToken   │
-│  │   └── web: POST /api/oauth/refresh (cookie)  │
+│  │   └── web: POST /api/system/oauth/refresh (cookie)  │
 │  └── retries with new token                     │
 │                                                 │
 │  useSessionWebSocket()                          │
@@ -188,7 +188,7 @@ The native-owns-auth architecture is **not a workaround for cookies** — it's t
 │  └── desktop: cookies sent automatically        │
 │                                                 │
 │  AuthProvider                                   │
-│  ├── checkAuth() → api.get('/api/settings')     │
+│  ├── checkAuth() → api.get('/api/system/settings') │
 │  └── listens for 'native-recheck-auth' event    │
 └─────────────────────────────────────────────────┘
 ```

@@ -5,7 +5,7 @@
 //  Search API endpoints.
 //
 //  Endpoints:
-//  - GET /api/search - Full-text and semantic search
+//  - GET /api/data/search - Full-text and semantic search
 //
 
 import Foundation
@@ -36,7 +36,7 @@ struct SearchAPI {
         }
 
         return try await client.request(
-            path: "/api/search",
+            path: "/api/data/search",
             queryItems: [
                 URLQueryItem(name: "q", value: query),
                 URLQueryItem(name: "limit", value: String(limit)),

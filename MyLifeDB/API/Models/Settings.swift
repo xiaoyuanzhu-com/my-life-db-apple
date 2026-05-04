@@ -18,13 +18,13 @@ struct AppSettings: Codable {
     // Add more settings as defined in your backend
 }
 
-/// Response from GET /api/settings
+/// Response from GET /api/system/settings
 struct SettingsResponse: Codable {
     // Match your backend settings response
     // Placeholder - customize based on your actual schema
 }
 
-/// Request body for PUT /api/settings
+/// Request body for PUT /api/system/settings
 struct UpdateSettingsRequest: Codable {
     // Match your backend settings request
     // Placeholder - customize based on your actual schema

@@ -7,7 +7,7 @@
 //  singletons, so it can run safely in the Share Extension's process.
 //
 //  Uses the backend's simple upload endpoint:
-//    PUT /api/upload/simple/<destination>/<filename>
+//    PUT /api/data/uploads/simple/<destination>/<filename>
 //  with the raw file bytes as the request body and the MIME type
 //  in the Content-Type header. Each file is uploaded as a separate
 //  request; a user note (if any) is uploaded as an extra .md file.
@@ -45,7 +45,7 @@ struct ShareUploadFileResult: Codable {
     let status: String  // "created" or "skipped"
 }
 
-/// Response from PUT /api/upload/simple/*path
+/// Response from PUT /api/data/uploads/simple/*path
 struct ShareSimpleUploadResponse: Codable {
     let success: Bool?
     let path: String
@@ -64,7 +64,7 @@ struct SharedAPIClient {
     /// Upload text and/or files into the user's library.
     ///
     /// Each file (and the text note, if non-empty) is uploaded via a
-    /// separate `PUT /api/upload/simple/<destination>/<filename>` call.
+    /// separate `PUT /api/data/uploads/simple/<destination>/<filename>` call.
     ///
     /// - Parameters:
     ///   - text: Optional markdown text content. Uploaded as a `.md` file.
@@ -118,11 +118,12 @@ struct SharedAPIClient {
         mimeType: String
     ) async throws -> [ShareUploadFileResult] {
         let baseURL = SharedConstants.apiBaseURL
-        // Path: /api/upload/simple/<destination>/<filename>
+        // Path: /api/data/uploads/simple/<destination>/<filename>
         // Note: appendingPathComponent percent-encodes each segment.
         let url = baseURL
             .appendingPathComponent("api")
-            .appendingPathComponent("upload")
+            .appendingPathComponent("data")
+            .appendingPathComponent("uploads")
             .appendingPathComponent("simple")
             .appendingPathComponent(Self.destination)
             .appendingPathComponent(filename)

@@ -436,7 +436,7 @@ final class TabWebViewModel {
                 .name: "refresh_token",
                 .value: refreshToken,
                 .domain: host,
-                .path: "/api/oauth",
+                .path: "/api/system/oauth",
                 .expires: Date().addingTimeInterval(60 * 60 * 24 * 30),
                 .sameSitePolicy: HTTPCookieStringPolicy.sameSiteLax,
             ]

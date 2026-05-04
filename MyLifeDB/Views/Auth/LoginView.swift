@@ -94,7 +94,7 @@ struct LoginView: View {
         let callbackScheme = "mylifedb"
         let nativeRedirect = "\(callbackScheme)://oauth/callback"
         var components = URLComponents(string: apiBaseURL)
-        components?.path = "/api/oauth/authorize"
+        components?.path = "/api/system/oauth/authorize"
         components?.queryItems = [
             URLQueryItem(name: "native_redirect", value: nativeRedirect)
         ]

@@ -207,7 +207,7 @@ final class AuthManager {
             guard let self else { return .failed }
 
             do {
-                let url = self.baseURL.appendingPathComponent("api/oauth/refresh")
+                let url = self.baseURL.appendingPathComponent("api/system/oauth/refresh")
                 var request = URLRequest(url: url)
                 request.httpMethod = "POST"
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -273,7 +273,7 @@ final class AuthManager {
     func logout() async {
         // Call backend logout (best-effort)
         do {
-            let url = baseURL.appendingPathComponent("api/oauth/logout")
+            let url = baseURL.appendingPathComponent("api/system/oauth/logout")
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             if let token = accessToken {
@@ -351,7 +351,7 @@ final class AuthManager {
 
     private func validateToken(_ token: String) async -> TokenValidationResult {
         do {
-            let url = baseURL.appendingPathComponent("api/oauth/token")
+            let url = baseURL.appendingPathComponent("api/system/oauth/token")
             var request = URLRequest(url: url)
             request.httpMethod = "GET"
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

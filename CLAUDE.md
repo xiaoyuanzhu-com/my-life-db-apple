@@ -74,13 +74,15 @@ MyLifeDB/
 
 The app consumes the MyLifeDB backend API (default: `http://localhost:12345`).
 
-Key endpoints:
+Key endpoints (post Phase D namespace refactor):
 - `GET /api/data/tree` — Folder structure
-- `GET /api/search?q=...` — Full-text search
-- `GET /api/people` — People list
+- `GET /api/data/search?q=...` — Full-text search
 - `GET /raw/*path` — Serve file content
-- `PUT /api/upload/simple/*path` — Single-request file upload
-- `GET /api/notifications/stream` — SSE real-time updates
+- `PUT /api/data/uploads/simple/*path` — Single-request file upload
+- `GET /api/data/events` — SSE real-time filesystem events
+- `GET /api/system/settings` — User settings
+- `GET /api/system/stats` — Application statistics
+- OAuth flow: `GET /api/system/oauth/{authorize,callback,token}`, `POST /api/system/oauth/{refresh,logout}`
 
 See the Apple Client section in [`../my-life-db-docs/`](../my-life-db-docs/) for full API reference.
 

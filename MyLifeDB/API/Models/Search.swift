@@ -84,7 +84,7 @@ struct RleMask: Codable {
 
 // MARK: - Search Response
 
-/// Response from GET /api/search
+/// Response from GET /api/data/search
 struct SearchResponse: Codable {
     let results: [SearchResultItem]
     let pagination: SearchPagination

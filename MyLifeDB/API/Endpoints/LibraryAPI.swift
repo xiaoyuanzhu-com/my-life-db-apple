@@ -12,7 +12,7 @@
 //  - DELETE /api/data/files/*path     - Delete file/folder
 //  - PUT    /api/data/pins/*path      - Pin a file (idempotent)
 //  - DELETE /api/data/pins/*path      - Unpin a file (idempotent)
-//  - PUT    /api/upload/simple/*path  - Simple file upload
+//  - PUT    /api/data/uploads/simple/*path  - Simple file upload
 //
 
 import Foundation
@@ -140,9 +140,9 @@ struct LibraryAPI {
     func simpleUpload(data: Data, filename: String, destination: String, mimeType: String) async throws -> SimpleUploadResponse {
         let uploadPath: String
         if destination.isEmpty {
-            uploadPath = "/api/upload/simple/\(filename)"
+            uploadPath = "/api/data/uploads/simple/\(filename)"
         } else {
-            uploadPath = "/api/upload/simple/\(destination)/\(filename)"
+            uploadPath = "/api/data/uploads/simple/\(destination)/\(filename)"
         }
         return try await client.uploadRaw(
             path: uploadPath,

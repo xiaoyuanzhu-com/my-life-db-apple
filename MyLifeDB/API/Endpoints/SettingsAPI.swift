@@ -5,9 +5,11 @@
 //  Settings API endpoints.
 //
 //  Endpoints:
-//  - GET  /api/settings - Get current settings
-//  - PUT  /api/settings - Update settings
-//  - POST /api/settings - Reset settings
+//  - GET  /api/system/settings    - Get current settings
+//  - PUT  /api/system/settings    - Update settings
+//  - POST /api/system/settings    - Reset settings
+//  - GET  /api/system/stats       - Application statistics
+//  - GET  /api/data/directories   - Available directories
 //
 
 import Foundation
@@ -25,13 +27,13 @@ struct SettingsAPI {
 
     /// Get current settings
     func get() async throws -> SettingsResponse {
-        try await client.request(path: "/api/settings")
+        try await client.request(path: "/api/system/settings")
     }
 
     /// Update settings
     func update(_ settings: UpdateSettingsRequest) async throws {
         try await client.requestVoid(
-            path: "/api/settings",
+            path: "/api/system/settings",
             method: .put,
             body: settings
         )
@@ -40,7 +42,7 @@ struct SettingsAPI {
     /// Reset settings to defaults
     func reset() async throws {
         try await client.requestVoid(
-            path: "/api/settings",
+            path: "/api/system/settings",
             method: .post
         )
     }
@@ -52,23 +54,23 @@ extension APIClient {
 
     /// Get application statistics
     func getStats() async throws -> StatsResponse {
-        try await request(path: "/api/stats")
+        try await request(path: "/api/system/stats")
     }
 
     /// Get available directories
     func getDirectories() async throws -> DirectoriesResponse {
-        try await request(path: "/api/directories")
+        try await request(path: "/api/data/directories")
     }
 }
 
-/// Response from GET /api/stats
+/// Response from GET /api/system/stats
 struct StatsResponse: Codable {
     // Add stats properties based on your backend
     let totalFiles: Int?
     let totalFolders: Int?
 }
 
-/// Response from GET /api/directories
+/// Response from GET /api/data/directories
 struct DirectoriesResponse: Codable {
     let directories: [String]
 }
