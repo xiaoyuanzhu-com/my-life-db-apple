@@ -3,7 +3,6 @@
 //  MyLifeDB
 //
 //  Factory for WebPage.Configuration used by the hybrid WebView layer.
-//  Registers the native bridge URL scheme handler.
 //
 
 import WebKit
@@ -12,10 +11,14 @@ enum WebViewConfiguration {
 
     /// Create a configured WebPage.Configuration for the hybrid shell.
     ///
-    /// - Parameter bridgeHandler: The native bridge URL scheme handler for Web-to-Native communication.
+    /// The native bridge is registered as a WKScriptMessageHandlerWithReply on
+    /// the user content controller (see TabWebViewModel.init), not here.
+    ///
+    /// - Parameter userContentController: The user content controller holding
+    ///   the WKUserScript for the bridge polyfill and the script message
+    ///   handler that backs window.webkit.messageHandlers.native.
     /// - Returns: A fully configured `WebPage.Configuration`.
     static func create(
-        bridgeHandler: NativeBridgeHandler,
         userContentController: WKUserContentController
     ) -> WebPage.Configuration {
         var config = WebPage.Configuration()
@@ -24,13 +27,9 @@ enum WebViewConfiguration {
         // instances share the same cookie jar.
         config.websiteDataStore = .default()
 
-        // Use the caller's user content controller (holds WKUserScript for bridge polyfill).
+        // Use the caller's user content controller (holds WKUserScript for
+        // bridge polyfill and WKScriptMessageHandlerWithReply for native IPC).
         config.userContentController = userContentController
-
-        // Register the native bridge URL scheme handler
-        if let scheme = URLScheme("nativebridge") {
-            config.urlSchemeHandlers[scheme] = bridgeHandler
-        }
 
         return config
     }

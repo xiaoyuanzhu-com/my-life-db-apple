@@ -76,15 +76,25 @@ final class TabWebViewModel {
         self.route = route
         self.featureFlags = featureFlags
 
-        // Register the document-start user script with bridge + token + flags.
+        // Register the document-start user script with bridge polyfill + token + flags.
         Self.registerBridgeScript(
             on: userContentController,
             featureFlags: featureFlags,
             accessToken: AuthManager.shared.accessToken
         )
 
+        // Register the native bridge as a WKScriptMessageHandlerWithReply under
+        // name "native". This is what backs window.webkit.messageHandlers.native
+        // and lets postMessage(...) round-trip a Promise reply. Lives for the
+        // lifetime of this WebView; not re-registered on reload (the WCC
+        // persists across loads).
+        userContentController.addScriptMessageHandler(
+            bridgeHandler,
+            contentWorld: .page,
+            name: "native"
+        )
+
         let config = WebViewConfiguration.create(
-            bridgeHandler: bridgeHandler,
             userContentController: userContentController
         )
         self.webPage = WebPage(configuration: config)
@@ -476,7 +486,6 @@ final class TabWebViewModel {
         )
 
         let config = WebViewConfiguration.create(
-            bridgeHandler: bridgeHandler,
             userContentController: userContentController
         )
         self.webPage = WebPage(configuration: config)

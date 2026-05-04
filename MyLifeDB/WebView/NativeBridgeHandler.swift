@@ -2,22 +2,27 @@
 //  NativeBridgeHandler.swift
 //  MyLifeDB
 //
-//  URLSchemeHandler that receives messages from the web frontend
-//  via fetch('nativebridge://message', { method: 'POST', body: JSON.stringify({ action, ... }) }).
+//  WKScriptMessageHandlerWithReply that receives messages from the web frontend
+//  via window.webkit.messageHandlers.native.postMessage({ action, ... }).
 //
-//  Also provides a JavaScript polyfill so existing web code using
-//  window.webkit.messageHandlers.native.postMessage({ action, ... })
-//  continues to work unchanged.
+//  Why not URLSchemeHandler? Custom URL schemes (e.g. nativebridge://) are
+//  treated as insecure by WebKit's mixed-content blocker, so fetch() calls to
+//  them from HTTPS pages are rejected before reaching the handler. Script
+//  message handlers travel over WebKit's IPC channel and are unaffected.
 //
 //  Supported actions:
-//  - share: Present native share sheet
-//  - haptic: Trigger haptic feedback (iOS only)
-//  - openExternal: Open URL in Safari
-//  - copyToClipboard: Copy text to system clipboard
-//  - log: Forward console messages to native log
-//  - requestTokenRefresh: Await native token refresh (returns JSON response)
-//  - fullscreenPreview: Toggle fullscreen preview state (disables swipe-back)
-//  - navigate: Navigate to a route in the native app (switches tabs)
+//  - share: Present native share sheet (no reply)
+//  - haptic: Trigger haptic feedback, iOS only (no reply)
+//  - openExternal: Open URL in Safari (no reply)
+//  - copyToClipboard: Copy text to system clipboard (no reply)
+//  - log: Forward console messages to native log (no reply)
+//  - fullscreenPreview: Toggle fullscreen preview state (no reply)
+//  - navigate: Navigate to a route in the native app (no reply)
+//  - goBack: Request back navigation in the host NavigationStack (no reply)
+//  - pickAndUploadFiles: Present document picker, upload picked files,
+//      reply with { attachments: [...] } (iOS only; macOS replies with [])
+//  - requestTokenRefresh: Await native token refresh,
+//      reply with { success: Bool, accessToken?: String }
 //
 
 import WebKit
@@ -29,7 +34,7 @@ import AppKit
 #endif
 
 @Observable
-final class NativeBridgeHandler: URLSchemeHandler {
+final class NativeBridgeHandler: NSObject, WKScriptMessageHandlerWithReply {
 
     // MARK: - Observable State
 
@@ -52,108 +57,51 @@ final class NativeBridgeHandler: URLSchemeHandler {
     var activeFilePickerCoordinator: FilePickerCoordinator?
     #endif
 
-    // MARK: - URLSchemeHandler
+    // MARK: - WKScriptMessageHandlerWithReply
 
-    // CORS headers required because the WebView's page origin (e.g. http://192.168.x.x:12346)
-    // differs from the nativebridge:// scheme, triggering cross-origin enforcement in WebKit.
-    private static let corsHeaders: [String: String] = [
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-    ]
+    func userContentController(
+        _ userContentController: WKUserContentController,
+        didReceive message: WKScriptMessage,
+        replyHandler: @escaping (Any?, String?) -> Void
+    ) {
+        guard let body = message.body as? [String: Any],
+              let action = body["action"] as? String else {
+            replyHandler(nil, "Invalid message format: expected { action: ... }")
+            return
+        }
 
-    func reply(for request: URLRequest) -> AsyncThrowingStream<URLSchemeTaskResult, any Error> {
-        // Capture request data before entering the stream
-        let body = request.httpBody
-        let url = request.url ?? URL(string: "nativebridge://message")!
-        let method = request.httpMethod ?? "POST"
+        switch action {
+        case "pickAndUploadFiles":
+            #if os(iOS)
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    replyHandler(["attachments": []], nil)
+                    return
+                }
+                let storageId = body["storageId"] as? String
+                let result = await self.handlePickAndUploadFiles(storageId: storageId)
+                replyHandler(result, nil)
+            }
+            #else
+            replyHandler(["attachments": []], nil)
+            #endif
 
-        return AsyncThrowingStream { continuation in
-            // Handle CORS preflight
-            if method == "OPTIONS" {
-                let response = HTTPURLResponse(url: url, statusCode: 204, httpVersion: nil, headerFields: Self.corsHeaders)!
-                continuation.yield(.response(response))
-                continuation.finish()
-                return
+        case "requestTokenRefresh":
+            Task { @MainActor in
+                let success = await AuthManager.shared.refreshAccessToken()
+                var result: [String: Any] = ["success": success]
+                if success, let token = AuthManager.shared.accessToken {
+                    result["accessToken"] = token
+                }
+                replyHandler(result, nil)
             }
 
-            guard let body,
-                  let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
-                  let action = json["action"] as? String else {
-                print("[NativeBridge] Invalid message format from URL scheme request")
-                let response = HTTPURLResponse(url: url, statusCode: 204, httpVersion: nil, headerFields: Self.corsHeaders)!
-                continuation.yield(.response(response))
-                continuation.finish()
-                return
+        default:
+            // Fire-and-forget — dispatch and reply immediately with nil.
+            Task { @MainActor [weak self] in
+                self?.dispatch(action: action, body: body)
             }
-
-            if action == "pickAndUploadFiles" {
-                // Async action: present native file picker, upload picked
-                // files via APIClient, return resulting Attachment records
-                // as JSON. Empty array on cancel or any failure.
-                #if os(iOS)
-                Task { @MainActor [weak self] in
-                    guard let self else {
-                        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: Self.corsHeaders)!
-                        continuation.yield(.response(response))
-                        continuation.yield(.data(Data(#"{"attachments":[]}"#.utf8)))
-                        continuation.finish()
-                        return
-                    }
-                    let storageId = json["storageId"] as? String
-                    let result = await self.handlePickAndUploadFiles(storageId: storageId)
-                    let bodyData = (try? JSONSerialization.data(withJSONObject: result)) ?? Data(#"{"attachments":[]}"#.utf8)
-                    var headers = Self.corsHeaders
-                    headers["Content-Type"] = "application/json"
-                    let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: headers)!
-                    continuation.yield(.response(response))
-                    continuation.yield(.data(bodyData))
-                    continuation.finish()
-                }
-                #else
-                // Not implemented on macOS yet — return empty so JS falls back
-                // gracefully (or shows nothing, depending on caller).
-                var headers = Self.corsHeaders
-                headers["Content-Type"] = "application/json"
-                let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: headers)!
-                continuation.yield(.response(response))
-                continuation.yield(.data(Data(#"{"attachments":[]}"#.utf8)))
-                continuation.finish()
-                #endif
-            } else if action == "requestTokenRefresh" {
-                // Async action: await native token refresh before responding.
-                // Include the new access token so the web side can update its
-                // Authorization header immediately (before the async notification).
-                Task { @MainActor in
-                    let success = await AuthManager.shared.refreshAccessToken()
-                    var result: [String: Any] = ["success": success]
-                    if success, let token = AuthManager.shared.accessToken {
-                        result["accessToken"] = token
-                    }
-                    let responseBody = (try? JSONSerialization.data(
-                        withJSONObject: result
-                    )) ?? Data("{}".utf8)
-                    var headers = Self.corsHeaders
-                    headers["Content-Type"] = "application/json"
-                    let response = HTTPURLResponse(
-                        url: url,
-                        statusCode: 200,
-                        httpVersion: nil,
-                        headerFields: headers
-                    )!
-                    continuation.yield(.response(response))
-                    continuation.yield(.data(responseBody))
-                    continuation.finish()
-                }
-            } else {
-                // Fire-and-forget for other actions
-                Task { @MainActor [weak self] in
-                    self?.dispatch(action: action, body: json)
-                }
-                let response = HTTPURLResponse(url: url, statusCode: 204, httpVersion: nil, headerFields: Self.corsHeaders)!
-                continuation.yield(.response(response))
-                continuation.finish()
-            }
+            replyHandler(nil, nil)
         }
     }
 
@@ -264,10 +212,10 @@ final class NativeBridgeHandler: URLSchemeHandler {
 
     // MARK: - JavaScript Polyfill
 
-    /// Returns a JavaScript snippet that sets up the native bridge polyfill.
-    /// This maps the old `window.webkit.messageHandlers.native.postMessage(msg)`
-    /// API to the new `fetch('nativebridge://message', ...)` URL scheme approach,
-    /// so existing web frontend code works without changes.
+    /// Returns a JavaScript snippet that sets up native-app feature flags and
+    /// viewport hardening. The actual `webkit.messageHandlers.native` object
+    /// is registered natively via WKUserContentController.addScriptMessageHandler,
+    /// so this script must NOT redefine it.
     static let bridgePolyfillScript: String = """
         window.isNativeApp = true;
         window.nativePlatform = '\(nativePlatform)';
@@ -321,19 +269,6 @@ final class NativeBridgeHandler: URLSchemeHandler {
         // Dispatches the same event that React's AuthProvider listens for.
         window.__nativeRecheckAuth = function() {
             window.dispatchEvent(new Event('native-recheck-auth'));
-        };
-
-        // Polyfill: map window.webkit.messageHandlers.native.postMessage → fetch
-        if (!window.webkit) window.webkit = {};
-        if (!window.webkit.messageHandlers) window.webkit.messageHandlers = {};
-        window.webkit.messageHandlers.native = {
-            postMessage: function(msg) {
-                fetch('nativebridge://message', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(msg)
-                }).catch(function() {});
-            }
         };
 
         // Open target="_blank" links (external URLs) in Safari instead of the WebView.
