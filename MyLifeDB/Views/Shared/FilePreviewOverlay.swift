@@ -7,8 +7,8 @@
 //  experience where non-media files had buttons and media files had
 //  tap-to-dismiss only.
 //
-//  For media files: toolbar starts visible, single-tap toggles visibility,
-//  drag-down dismisses.
+//  For media files: toolbar starts hidden so the preview reads as a clean
+//  fullscreen lightbox; single-tap toggles visibility, drag-down dismisses.
 //  For non-media files: toolbar always visible, no drag-down, no tap-to-toggle.
 //
 
@@ -29,7 +29,7 @@ struct FilePreviewOverlay<Content: View>: View {
     let onDismiss: () -> Void
     let content: (@escaping () -> Void) -> Content
 
-    @State private var toolbarVisible = true
+    @State private var toolbarVisible: Bool
     @State private var isDownloadingForShare = false
     @State private var isDownloadingForSave = false
     @State private var showDeleteConfirmation = false
@@ -81,6 +81,9 @@ struct FilePreviewOverlay<Content: View>: View {
         self.isMedia = isMedia
         self.onDismiss = onDismiss
         self.content = content
+        // Media files start chromeless (lightbox feel); non-media keep the toolbar
+        // visible since they have no other affordance for close/share/menu.
+        self._toolbarVisible = State(initialValue: !isMedia)
     }
 
     // MARK: - Body
