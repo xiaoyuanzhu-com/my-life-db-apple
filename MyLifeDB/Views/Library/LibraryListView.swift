@@ -26,7 +26,12 @@ struct LibraryListView: View {
                     }
                 } else {
                     Button {
-                        openFilePreview?(fullPath, node.name, nil, nil)
+                        let pagerContext = makeLibraryPagerContext(
+                            children: children,
+                            tapped: node,
+                            folderPath: folderPath
+                        )
+                        openFilePreview?(fullPath, node.name, nil, pagerContext)
                     } label: {
                         LibraryListRow(node: node)
                     }

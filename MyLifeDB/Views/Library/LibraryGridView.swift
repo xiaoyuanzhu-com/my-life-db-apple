@@ -32,7 +32,12 @@ struct LibraryGridView: View {
                         .buttonStyle(.plain)
                     } else {
                         Button {
-                            openFilePreview?(fullPath, node.name, nil, nil)
+                            let pagerContext = makeLibraryPagerContext(
+                                children: children,
+                                tapped: node,
+                                folderPath: folderPath
+                            )
+                            openFilePreview?(fullPath, node.name, nil, pagerContext)
                         } label: {
                             LibraryGridItem(node: node)
                         }

@@ -51,6 +51,42 @@ struct FilePreviewPagerContext {
     let loadMore: () async -> [PreviewItem]
 }
 
+// MARK: - Library Pager Context Helper
+
+extension FileTreeNode {
+    /// Whether this node looks like a media file (image or video) based on its extension.
+    /// Used to decide whether siblings should be eligible for swipe-to-navigate.
+    var isMediaLike: Bool {
+        guard !isFolder, let ext = fileExtension else { return false }
+        let imageExts: Set<String> = ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "bmp", "tiff", "svg", "ico"]
+        let videoExts: Set<String> = ["mp4", "mov", "avi", "mkv", "webm", "m4v"]
+        return imageExts.contains(ext) || videoExts.contains(ext)
+    }
+}
+
+/// Build a pager context from sibling library nodes so that opening a media file
+/// in the data tab supports swipe-to-prev/next between sibling media items in the
+/// same folder. Returns nil if the tapped node is not media.
+func makeLibraryPagerContext(
+    children: [FileTreeNode],
+    tapped node: FileTreeNode,
+    folderPath: String
+) -> FilePreviewPagerContext? {
+    guard node.isMediaLike else { return nil }
+    let mediaNodes = children.filter { $0.isMediaLike }
+    guard let startIndex = mediaNodes.firstIndex(where: { $0.id == node.id }) else { return nil }
+    let items = mediaNodes.map { sibling -> PreviewItem in
+        let path = folderPath.isEmpty ? sibling.name : "\(folderPath)/\(sibling.name)"
+        return PreviewItem(path: path, name: sibling.name, file: nil)
+    }
+    return FilePreviewPagerContext(
+        items: items,
+        startIndex: startIndex,
+        hasMoreOlder: false,
+        loadMore: { [] }
+    )
+}
+
 // MARK: - File Preview Environment
 
 /// Identifiable wrapper for preview presentation.
