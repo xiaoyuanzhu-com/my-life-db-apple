@@ -178,6 +178,13 @@ struct LibraryFolderView: View {
         }
         .task {
             if children.isEmpty {
+                // Render cached snapshot synchronously so the user sees the
+                // last-known folder contents immediately, with no spinner.
+                if let cached = LibraryTreeCache.shared.snapshot(for: folderPath) {
+                    children = cached.children
+                }
+                // Always refresh in the background. The fetch updates `children`
+                // (and the on-disk snapshot) only if the response differs.
                 await loadChildren()
             }
         }
@@ -317,7 +324,13 @@ struct LibraryFolderView: View {
 
         do {
             let response = try await APIClient.shared.library.getTree(path: folderPath, depth: 1, ignoreCache: ignoreCache)
-            children = response.children
+            // Avoid pointlessly reassigning when nothing changed — keeps the
+            // SwiftUI diff trivial when the snapshot already matched the
+            // server's response.
+            if response.children != children {
+                children = response.children
+            }
+            LibraryTreeCache.shared.save(response, for: folderPath)
         } catch {
             self.error = error
         }

@@ -124,15 +124,39 @@ final class AuthManager {
         // Load tokens from Keychain
         accessToken = KeychainHelper.load(key: Self.accessTokenKey)
         refreshToken = KeychainHelper.load(key: Self.refreshTokenKey)
+
+        // Optimistic initial state: if the access token's JWT exp claim is
+        // still in the future (with a small safety margin), assume the user
+        // is authenticated and skip the launch-time "Connecting..." spinner.
+        // The 401 handler will recover if the server has revoked the token.
+        if let token = accessToken, !isTokenExpiringSoon(token) {
+            state = .authenticated(jwtUsername(token) ?? "User")
+        } else if accessToken == nil && refreshToken == nil {
+            // No tokens at all — go straight to LoginView, no spinner.
+            state = .unauthenticated
+        }
+        // Otherwise leave state as .unknown so MyLifeDBApp's .task will
+        // call checkAuth() and run the validate/refresh path.
     }
 
     // MARK: - Auth Check (called on app launch)
 
     @MainActor
     func checkAuth() async {
+        // Optimistic auth: if we have an access token whose JWT exp claim is
+        // not expiring soon, transition to .authenticated synchronously and
+        // skip the network round-trip. The 401 handler (handleUnauthorized)
+        // will recover if the server has revoked the token.
+        if let token = accessToken, !isTokenExpiringSoon(token) {
+            let username = jwtUsername(token) ?? "User"
+            state = .authenticated(username)
+            return
+        }
+
         state = .checking
 
-        // If we have an access token, validate it
+        // Token is missing/expiring — fall through to validate (and refresh on
+        // failure) so we don't show a stale UI with a guaranteed-bad token.
         if let token = accessToken {
             let result = await validateToken(token)
             switch result {
@@ -287,6 +311,7 @@ final class AuthManager {
         accessToken = nil
         refreshToken = nil
         KeychainHelper.deleteAll()
+        LibraryTreeCache.shared.clear()
         state = .unauthenticated
     }
 
