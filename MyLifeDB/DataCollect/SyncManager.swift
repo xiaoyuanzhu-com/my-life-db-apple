@@ -39,22 +39,10 @@ final class SyncManager {
     /// Detailed breakdown of the last sync cycle
     private(set) var lastSyncDetail: SyncDetail?
 
-    /// Per-day progress for full sync (nil when not doing full sync)
-    var fullSyncProgress: FullSyncProgress?
-
-    /// Whether a full sync has prior progress that can be resumed
-    var hasResumableFullSync: Bool {
-        let keys = UserDefaults.standard.stringArray(forKey: Self.completedMonthsKey) ?? []
-        return !keys.isEmpty
-    }
-
     // MARK: - Configuration
 
     /// Minimum interval between syncs (seconds)
     private let throttleInterval: TimeInterval = 300  // 5 minutes
-
-    /// UserDefaults key for persisted full sync progress
-    private static let completedMonthsKey = "sync.fullSync.completedMonths"
 
     // MARK: - Private
 
@@ -83,7 +71,6 @@ final class SyncManager {
     private init() {
         // Register all collectors
         collectors = [
-            HealthKitCollector(),
             // Future: LocationCollector(),
             // Future: ScreenTimeCollector(),
         ]
@@ -121,18 +108,6 @@ final class SyncManager {
         syncTask?.cancel()
         syncTask = Task {
             await performSync()
-        }
-    }
-
-    /// Trigger a full sync of all HealthKit history, month by month.
-    @MainActor
-    func syncAll() {
-        guard state == .idle else { return }
-        guard AuthManager.shared.isAuthenticated else { return }
-
-        syncTask?.cancel()
-        syncTask = Task {
-            await performFullSync()
         }
     }
 
@@ -191,8 +166,8 @@ final class SyncManager {
     // MARK: - Core Sync Logic
 
     @MainActor
-    private func performSync(fullSync: Bool = false) async {
-        state = fullSync ? .syncingAll : .syncing
+    private func performSync() async {
+        state = .syncing
         lastError = nil
 
         var uploadedCount = 0
@@ -240,7 +215,7 @@ final class SyncManager {
 
             do {
                 // 1. Collect new samples (now returns CollectionResult with stats)
-                let result = try await collector.collectNewSamples(fullSync: fullSync)
+                let result = try await collector.collectNewSamples(fullSync: false)
                 let batches = result.batches
 
                 // Accumulate stats
@@ -344,224 +319,4 @@ final class SyncManager {
         state = .idle
     }
 
-    // MARK: - Full Sync (Month-by-Month)
-
-    /// Discovers the HealthKit date range and builds the calendar model for full sync.
-    @MainActor
-    func prepareFullSync() async {
-        guard let hkCollector = collectors.first(where: { $0 is HealthKitCollector }) as? HealthKitCollector else {
-            return
-        }
-
-        guard let range = await hkCollector.discoverDateRange() else { return }
-
-        let calendar = Calendar(identifier: .gregorian)
-        let startComponents = calendar.dateComponents([.year, .month], from: range.start)
-        let endComponents = calendar.dateComponents([.year, .month], from: range.end)
-
-        guard let startYear = startComponents.year, let startMonth = startComponents.month,
-              let endYear = endComponents.year, let endMonth = endComponents.month else {
-            return
-        }
-
-        var progress = FullSyncProgress(
-            startYear: startYear, startMonth: startMonth,
-            endYear: endYear, endMonth: endMonth
-        )
-
-        // Restore completed months from UserDefaults
-        let completedKeys = Set(
-            UserDefaults.standard.stringArray(forKey: Self.completedMonthsKey) ?? []
-        )
-        if !completedKeys.isEmpty {
-            progress.restoreCompleted(completedKeys)
-        }
-
-        fullSyncProgress = progress
-    }
-
-    /// Core month-by-month full sync orchestration.
-    /// Iterates oldest-first through every month in the HealthKit date range,
-    /// collecting samples and workouts for each month, then uploading day-by-day.
-    @MainActor
-    private func performFullSync() async {
-        guard let hkCollector = collectors.first(where: { $0 is HealthKitCollector }) as? HealthKitCollector else {
-            state = .idle
-            return
-        }
-
-        state = .syncingAll
-        lastError = nil
-
-        // Authorization check (same pattern as performSync)
-        let authStatus = hkCollector.authorizationStatus()
-        if authStatus == .notDetermined {
-            let granted = await hkCollector.requestAuthorization()
-            if !granted {
-                lastError = SyncError(failures: [hkCollector.id: "Permission denied"])
-                state = .idle
-                return
-            }
-        } else if authStatus == .denied || authStatus == .restricted {
-            lastError = SyncError(failures: [hkCollector.id: "Permission denied"])
-            state = .idle
-            return
-        } else if authStatus == .unavailable {
-            state = .idle
-            return
-        }
-
-        // Build calendar model if not already built
-        if fullSyncProgress == nil {
-            await prepareFullSync()
-        }
-        guard fullSyncProgress != nil else {
-            // No data range found
-            lastSyncResult = .noNewData
-            state = .idle
-            return
-        }
-
-        var totalUploaded = 0
-        var totalSkipped = 0
-        var failures: [String: String] = [:]
-
-        // Loop through months oldest first
-        for monthIndex in fullSyncProgress!.months.indices {
-            guard !Task.isCancelled else {
-                state = .idle
-                return
-            }
-
-            let monthProgress = fullSyncProgress!.months[monthIndex]
-
-            // Skip if already done
-            if monthProgress.status == .done {
-                continue
-            }
-
-            let year = monthProgress.year
-            let month = monthProgress.month
-            let daysInMonth = monthProgress.daysInMonth
-
-            // Collect samples and workouts for this month
-            var allBatches: [DaySamples] = []
-
-            do {
-                let sampleResult = try await hkCollector.collectSamplesForMonth(year: year, month: month)
-                allBatches.append(contentsOf: sampleResult.batches)
-            } catch {
-                print("[SyncManager] Failed to collect samples for \(year)-\(month): \(error)")
-            }
-
-            do {
-                let workoutBatches = try await hkCollector.collectWorkoutsForMonth(year: year, month: month)
-                allBatches.append(contentsOf: workoutBatches)
-            } catch {
-                print("[SyncManager] Failed to collect workouts for \(year)-\(month): \(error)")
-            }
-
-            // Group batches by day number
-            let calendar = Calendar(identifier: .gregorian)
-            var batchesByDay: [Int: [DaySamples]] = [:]
-            for batch in allBatches {
-                let day = calendar.component(.day, from: batch.date)
-                batchesByDay[day, default: []].append(batch)
-            }
-
-            // Process each day 1...daysInMonth
-            for day in 1...daysInMonth {
-                guard !Task.isCancelled else {
-                    state = .idle
-                    return
-                }
-
-                // Skip if already done (from restored progress)
-                if fullSyncProgress!.months[monthIndex].dayStatuses[day] == .done {
-                    continue
-                }
-
-                // Mark day as syncing
-                fullSyncProgress!.months[monthIndex].dayStatuses[day] = .syncing
-
-                guard let dayBatches = batchesByDay[day], !dayBatches.isEmpty else {
-                    // No data for this day — mark done
-                    fullSyncProgress!.months[monthIndex].dayStatuses[day] = .done
-                    continue
-                }
-
-                // Upload each batch for this day
-                var dayHasError = false
-                for batch in dayBatches {
-                    guard !Task.isCancelled else {
-                        state = .idle
-                        return
-                    }
-
-                    // Watermark check: skip if file hasn't changed
-                    if !watermark.hasChanged(path: batch.uploadPath, data: batch.data) {
-                        totalSkipped += 1
-                        continue
-                    }
-
-                    do {
-                        try await APIClient.shared.saveRawFile(
-                            path: batch.uploadPath,
-                            data: batch.data
-                        )
-                        watermark.recordUpload(path: batch.uploadPath, data: batch.data)
-                        await hkCollector.commitAnchor(for: batch)
-                        totalUploaded += 1
-                    } catch {
-                        dayHasError = true
-                        failures["\(hkCollector.id)/\(batch.uploadPath)"] = error.localizedDescription
-                    }
-                }
-
-                // Mark day done or error
-                if dayHasError {
-                    fullSyncProgress!.months[monthIndex].dayStatuses[day] = .error("Upload failed")
-                } else {
-                    fullSyncProgress!.months[monthIndex].dayStatuses[day] = .done
-                }
-            }
-
-            // After all days in a month, if month is done, persist to UserDefaults
-            if fullSyncProgress!.months[monthIndex].status == .done {
-                var completedKeys = Set(
-                    UserDefaults.standard.stringArray(forKey: Self.completedMonthsKey) ?? []
-                )
-                completedKeys.insert(fullSyncProgress!.months[monthIndex].id)
-                UserDefaults.standard.set(Array(completedKeys), forKey: Self.completedMonthsKey)
-            }
-        }
-
-        // Finalize
-        if !failures.isEmpty {
-            lastError = SyncError(failures: failures)
-        }
-
-        lastSyncDate = Date()
-        UserDefaults.standard.set(lastSyncDate, forKey: "sync.lastSyncDate")
-
-        let errorCount = failures.count
-        if totalUploaded > 0 && errorCount == 0 {
-            lastSyncResult = .success(fileCount: totalUploaded)
-        } else if totalUploaded > 0 && errorCount > 0 {
-            lastSyncResult = .partial(uploaded: totalUploaded, failed: errorCount)
-        } else if errorCount > 0 {
-            lastSyncResult = .failed(errors: errorCount)
-        } else {
-            lastSyncResult = .noNewData
-        }
-
-        state = .idle
-    }
-
-    /// Clears all full sync progress, including persisted completed months.
-    @MainActor
-    func clearFullSyncProgress() {
-        fullSyncProgress = nil
-        UserDefaults.standard.removeObject(forKey: Self.completedMonthsKey)
-    }
 }

@@ -2,7 +2,7 @@
 //  DataCollector.swift
 //  MyLifeDB
 //
-//  Protocol for data collectors. Each Apple framework (HealthKit, CoreLocation,
+//  Protocol for data collectors. Each Apple framework (CoreLocation,
 //  DeviceActivity, etc.) implements this protocol. SyncManager orchestrates them.
 //
 
@@ -29,7 +29,7 @@ protocol DataCollector {
     /// Whether any sources are enabled.
     var hasEnabledSources: Bool { get }
 
-    /// Request any necessary permissions (e.g., HealthKit authorization).
+    /// Request any necessary permissions.
     /// Called when sources are first enabled, not on every sync.
     /// Returns true if authorization was granted (even partially).
     func requestAuthorization() async -> Bool

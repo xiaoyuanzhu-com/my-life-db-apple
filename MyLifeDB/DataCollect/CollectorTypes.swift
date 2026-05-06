@@ -17,8 +17,7 @@ struct DaySamples {
     let collectorID: String
 
     /// The upload path on the backend
-    /// e.g., "imports/fitness/apple-health/2026/02/09/step-count.json"
-    /// or    "imports/fitness/apple-health/2026/02/09/workout-running.json"
+    /// e.g., "imports/device/battery/2026/02/09/battery-level.json"
     let uploadPath: String
 
     /// The JSON data to upload (already encoded)
@@ -50,10 +49,10 @@ struct CollectionResult {
 /// Errors specific to data collection
 enum CollectorError: LocalizedError {
 
-    /// Framework permission was denied (e.g., "HealthKit access denied")
+    /// Framework permission was denied
     case authorizationDenied(String)
 
-    /// Framework not available on this device (e.g., HealthKit on iPad)
+    /// Framework not available on this device
     case frameworkUnavailable(String)
 
     /// All data source toggles are off for this collector

@@ -318,6 +318,28 @@ let dataCategories: [DataCategory] = [
     ),
 ]
 
+private let appleHealthSourceIDs: Set<String> = [
+    "steps", "distance", "flights", "active_energy", "basal_energy", "exercise_min",
+    "stand_hours", "heart_rate", "hrv", "blood_oxygen", "respiratory_rate",
+    "vo2max", "body_weight", "body_height", "body_fat", "lean_body_mass", "bmi",
+    "waist_circumference", "wrist_temperature", "walking_steadiness",
+    "high_heart_rate_event", "low_heart_rate_event", "irregular_rhythm_event",
+    "afib_burden", "blood_pressure", "blood_glucose",
+    "walking_speed", "walking_step_length", "walking_asymmetry",
+    "walking_double_support", "stair_ascent_speed", "stair_descent_speed",
+    "sleep_duration", "sleep_stages", "bedtime", "sleep_consistency",
+    "workouts", "running", "swimming", "cycling", "workout_routes",
+    "water", "caffeine", "calories_in",
+    "noise", "headphone_audio", "uv_exposure",
+    "mindful_min", "mood",
+]
+
+private let visibleDataCategories: [DataCategory] = dataCategories.compactMap { category in
+    let sources = category.sources.filter { !appleHealthSourceIDs.contains($0.id) }
+    guard !sources.isEmpty else { return nil }
+    return DataCategory(id: category.id, name: category.name, icon: category.icon, sources: sources)
+}
+
 // MARK: - View
 
 struct DataCollectView: View {
@@ -333,11 +355,6 @@ struct DataCollectView: View {
                         ProgressView()
                             .controlSize(.small)
                         Text("Syncing...")
-                            .foregroundStyle(.secondary)
-                    } else if syncManager.state == .syncingAll {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Syncing all history...")
                             .foregroundStyle(.secondary)
                     } else if let lastSync = syncManager.lastSyncDate {
                         syncResultIcon
@@ -363,18 +380,6 @@ struct DataCollectView: View {
                     .disabled(syncManager.state != .idle)
                 }
 
-                // Row 2: NavigationLink to full-history sync
-                NavigationLink {
-                    SyncDataView()
-                } label: {
-                    HStack {
-                        Text("Sync All History")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                    }
-                }
-
                 // Detailed sync breakdown
                 if let detail = syncManager.lastSyncDetail, syncManager.state == .idle {
                     syncDetailView(detail)
@@ -395,7 +400,7 @@ struct DataCollectView: View {
             }
 
             // Data source categories
-            ForEach(dataCategories) { category in
+            ForEach(visibleDataCategories) { category in
                 Section {
                     ForEach(category.sources) { source in
                         DataSourceRow(source: source)
@@ -476,7 +481,7 @@ extension DataCollectView {
                 HStack(spacing: 4) {
                     Image(systemName: "hand.raised.fill")
                         .foregroundStyle(.blue)
-                    Text("Health permissions requested")
+                    Text("Permissions requested")
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -499,7 +504,7 @@ extension DataCollectView {
                 HStack(spacing: 4) {
                     Image(systemName: "info.circle.fill")
                         .foregroundStyle(.orange)
-                    Text(String(localized: "Queried \(detail.typesQueried) data types but found 0 samples. Check that Health permissions are granted in Settings → Privacy → Health."))
+                    Text(String(localized: "Queried \(detail.typesQueried) data types but found 0 samples. Check that permissions are granted in Settings."))
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)

@@ -13,40 +13,6 @@
         }
       }
     },
-    "NSHealthShareUsageDescription" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "MyLifeDB reads your health data to sync it to your personal knowledge base."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "MyLifeDB 需要读取你的健康数据，以将其同步到个人知识库。"
-          }
-        }
-      }
-    },
-    "NSHealthUpdateUsageDescription" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "MyLifeDB may write health data back when correcting or enriching records."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "MyLifeDB 在更正或丰富记录时可能会写入健康数据。"
-          }
-        }
-      }
-    },
     "NSPhotoLibraryAddUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {

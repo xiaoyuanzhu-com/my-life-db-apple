@@ -1176,26 +1176,6 @@
         }
       }
     },
-    "Health Data Sync" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "健康数据同步"
-          }
-        }
-      }
-    },
-    "Health permissions requested" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已请求健康权限"
-          }
-        }
-      }
-    },
     "Heart Rate" : {
 
     },
@@ -1666,16 +1646,6 @@
     "No auto agents yet" : {
 
     },
-    "No Health Data Sources" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无健康数据源"
-          }
-        }
-      }
-    },
     "No internet connection. Please check your network." : {
       "localizations" : {
         "zh-Hans" : {
@@ -1969,16 +1939,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "效率"
-          }
-        }
-      }
-    },
-    "Queried %lld data types but found 0 samples. Check that Health permissions are granted in Settings → Privacy → Health." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "查询了 %lld 种数据类型但未找到样本。请在\"设置 → 隐私 → 健康\"中确认已授予权限。"
           }
         }
       }
@@ -2522,32 +2482,12 @@
         }
       }
     },
-    "Sync All History" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步全部历史"
-          }
-        }
-      }
-    },
     "Sync Now" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "立即同步"
-          }
-        }
-      }
-    },
-    "Syncing all history..." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在同步全部历史…"
           }
         }
       }
