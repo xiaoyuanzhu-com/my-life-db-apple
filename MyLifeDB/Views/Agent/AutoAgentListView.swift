@@ -26,6 +26,11 @@ struct AutoAgentListView: View {
     /// down to AutoAgentTree.
     let sessions: [AgentSession]
 
+    /// Highlight bookkeeping shared with the parent so the "you were just
+    /// here" cue fires on pop regardless of which tab pushed the detail.
+    @Binding var lastSelectedSessionId: String?
+    var recentlyVisitedSessionId: String?
+
     @State private var defs: [AgentDef] = []
     @State private var isLoading = false
     @State private var error: Error?
@@ -229,7 +234,9 @@ struct AutoAgentListView: View {
     }
 
     private func autoSessionRow(_ session: AgentSession) -> some View {
-        Button {
+        let isRecentlyVisited = recentlyVisitedSessionId == session.id
+        return Button {
+            lastSelectedSessionId = session.id
             path.append(AgentDestination.session(session))
         } label: {
             HStack(spacing: 8) {
@@ -256,6 +263,13 @@ struct AutoAgentListView: View {
                         .frame(minWidth: 28, alignment: .trailing)
                 }
             }
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isRecentlyVisited ? Color(.systemFill) : Color.clear)
+                    .padding(.horizontal, -8)
+                    .padding(.vertical, -4)
+            )
+            .animation(.easeOut(duration: 0.3), value: recentlyVisitedSessionId)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -390,8 +404,14 @@ private func personaColor(for name: String) -> Color {
 
 #Preview {
     @Previewable @State var path = NavigationPath()
+    @Previewable @State var lastSelectedSessionId: String? = nil
     return NavigationStack(path: $path) {
-        AutoAgentListView(path: $path, sessions: [])
-            .navigationTitle("Auto Agents")
+        AutoAgentListView(
+            path: $path,
+            sessions: [],
+            lastSelectedSessionId: $lastSelectedSessionId,
+            recentlyVisitedSessionId: nil
+        )
+        .navigationTitle("Auto Agents")
     }
 }

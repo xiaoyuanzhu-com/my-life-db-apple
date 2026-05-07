@@ -40,6 +40,10 @@ struct AgentSessionListView: View {
     @State private var sseManager = NotificationsSSEManager()
     @State private var statusFilter = "active"
     @State private var section: AgentSection = .sessions
+    // Briefly highlight the just-visited session row when the user pops back
+    // to the list — a "you were just here" cue to help find the spot.
+    @State private var lastSelectedSessionId: String? = nil
+    @State private var recentlyVisitedSessionId: String? = nil
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -47,7 +51,9 @@ struct AgentSessionListView: View {
                 if section == .auto {
                     AutoAgentListView(
                         path: $path,
-                        sessions: autoSessions
+                        sessions: autoSessions,
+                        lastSelectedSessionId: $lastSelectedSessionId,
+                        recentlyVisitedSessionId: recentlyVisitedSessionId
                     )
                 } else if isLoading && userSessions.isEmpty {
                     loadingView
@@ -133,6 +139,15 @@ struct AgentSessionListView: View {
         .onChange(of: path) { oldValue, newValue in
             if newValue.isEmpty && !oldValue.isEmpty {
                 Task { await refreshSessions() }
+                if let id = lastSelectedSessionId {
+                    recentlyVisitedSessionId = id
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(200))
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            recentlyVisitedSessionId = nil
+                        }
+                    }
+                }
             }
         }
         .onChange(of: statusFilter) { _, _ in
@@ -149,6 +164,7 @@ struct AgentSessionListView: View {
             let components = link.split(separator: "/").map(String.init)
             if components.count >= 2, components[0] == "agent" {
                 let sessionId = components[1]
+                lastSelectedSessionId = sessionId
                 if let session = sessions.first(where: { $0.id == sessionId }) {
                     path.append(AgentDestination.session(session))
                 } else {
@@ -285,9 +301,10 @@ struct AgentSessionListView: View {
                let index = sessions.firstIndex(where: { $0.id == session.id }) {
                 sessions[index] = session.withSessionState(.idle)
             }
+            lastSelectedSessionId = session.id
             path.append(AgentDestination.session(session))
         } label: {
-            SessionRow(session: session)
+            SessionRow(session: session, recentlyVisitedId: recentlyVisitedSessionId)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -611,6 +628,7 @@ private struct NewAgentSessionView: View {
 private struct SessionRow: View {
 
     let session: AgentSession
+    var recentlyVisitedId: String? = nil
 
     var body: some View {
         HStack(spacing: 8) {
@@ -635,6 +653,13 @@ private struct SessionRow: View {
             }
         }
         .opacity(session.isArchived ? 0.6 : 1.0)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(recentlyVisitedId == session.id ? Color(.systemFill) : Color.clear)
+                .padding(.horizontal, -8)
+                .padding(.vertical, -4)
+        )
+        .animation(.easeOut(duration: 0.3), value: recentlyVisitedId)
     }
 
     private func shortRelativeTime(_ date: Date, now: Date) -> String {
