@@ -47,11 +47,13 @@ struct MeView: View {
                         Label("General", systemImage: "gearshape")
                     }
 
+                    #if os(macOS)
                     NavigationLink {
                         DataCollectView()
                     } label: {
                         Label("Data Collect", systemImage: "antenna.radiowaves.left.and.right")
                     }
+                    #endif
 
                     NavigationLink {
                         ServerSettingsView()
