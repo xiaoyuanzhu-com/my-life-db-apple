@@ -75,6 +75,15 @@ struct MyLifeDBApp: App {
             .onOpenURL { url in
                 handleDeepLink(url)
             }
+            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                // Universal Links land here. The Share Extension hands off
+                // via https://my.xiaoyuanzhu.com/ios-share/<uuid>, which iOS
+                // routes to this callback (vs opening Safari) because the
+                // domain's AASA file declares that path for our App ID.
+                if let url = activity.webpageURL {
+                    handleDeepLink(url)
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .webViewShouldReload)) { _ in
                 refreshID = UUID()
             }
@@ -106,27 +115,32 @@ struct MyLifeDBApp: App {
 
     // MARK: - Deep Linking
 
-    /// Handle deep links (e.g., mylifedb://oauth/callback?access_token=..., mylifedb://library/foo).
+    /// Handle incoming deep links and universal links.
+    ///
+    /// Supported inputs:
+    ///   - `mylifedb://oauth/callback?access_token=...` — OAuth completion
+    ///   - `mylifedb://<host>[/path]` — SPA routes (library, file/..., etc.)
+    ///   - `https://my.xiaoyuanzhu.com/ios-share/<uuid>` — Share Extension
+    ///     handoff via Universal Links. The domain's AASA file declares
+    ///     this path; iOS routes the URL here instead of Safari.
     @MainActor
     private func handleDeepLink(_ url: URL) {
-        // Only handle our custom scheme
+        // Universal link from the Share Extension
+        if url.scheme == "https",
+           url.host == "my.xiaoyuanzhu.com",
+           url.path.hasPrefix("/ios-share/") {
+            let id = String(url.path.dropFirst("/ios-share/".count))
+            guard !id.isEmpty else { return }
+            Task { await ShareQueueDrainer.drain(id: id) }
+            return
+        }
+
+        // Custom-scheme deep links below
         guard url.scheme == "mylifedb" else { return }
 
         // Handle OAuth callback
         if url.host == "oauth" && url.path == "/callback" {
             handleOAuthCallback(url)
-            return
-        }
-
-        // Handle Share Extension handoff: mylifedb://share/<uuid>
-        // The share extension stages files into the App Group queue and
-        // calls this URL so we can finish the upload using the main app's
-        // authenticated APIClient (with token refresh, etc.).
-        if url.host == "share" {
-            // Path is "/<uuid>" → strip the leading slash.
-            let id = String(url.path.dropFirst())
-            guard !id.isEmpty else { return }
-            Task { await ShareQueueDrainer.drain(id: id) }
             return
         }
 

@@ -134,7 +134,12 @@ final class ShareViewModel {
         // it up next time it foregrounds. We don't auto-wake the app
         // here — the user gets to choose on the success screen between
         // staying in the share sheet and jumping into MyLifeDB.
-        pendingShareURL = URL(string: "mylifedb://share/\(shareID)")
+        //
+        // The handoff URL is a Universal Link (https), not a custom
+        // scheme. iOS routes this to the main app via Associated Domains
+        // instead of the deprecated openURL selector path that Apple
+        // has progressively locked down on iOS 18+.
+        pendingShareURL = URL(string: "https://my.xiaoyuanzhu.com/ios-share/\(shareID)")
         state = .success
     }
 
