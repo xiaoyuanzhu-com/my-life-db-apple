@@ -2,6 +2,7 @@
   "sourceLanguage" : "en",
   "strings" : {
     "Add a note..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -22,6 +23,7 @@
       }
     },
     "Done" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -52,6 +54,7 @@
       }
     },
     "Not Signed In" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -62,6 +65,7 @@
       }
     },
     "Please open MyLifeDB and sign in first." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
