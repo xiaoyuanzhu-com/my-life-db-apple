@@ -159,22 +159,27 @@ actor ContentExtractor {
     // MARK: - Image Loading
 
     private func loadImage(from provider: NSItemProvider) async -> SharedContent? {
-        // Try specific image formats in order of preference
-        let imageTypes: [(UTType, String, String)] = [
-            (.jpeg, "image.jpg", "image/jpeg"),
-            (.png, "image.png", "image/png"),
-            (.heic, "image.heic", "image/heic"),
-            (.gif, "image.gif", "image/gif"),
-            (.webP, "image.webp", "image/webp"),
+        // Try specific image formats in order of preference.
+        let imageTypes: [(UTType, String)] = [
+            (.jpeg, "image/jpeg"),
+            (.png, "image/png"),
+            (.heic, "image/heic"),
+            (.gif, "image/gif"),
+            (.webP, "image/webp"),
         ]
 
-        for (utType, filename, mimeType) in imageTypes {
+        for (utType, mimeType) in imageTypes {
             if provider.hasItemConformingToTypeIdentifier(utType.identifier) {
                 if let data = await loadDataRepresentation(from: provider, for: utType) {
                     let thumbnail = createThumbnail(from: data, maxDimension: 600)
                     if let thumbnail {
+                        let filename = makeFilename(
+                            suggested: provider.suggestedName,
+                            prefix: "photo",
+                            ext: utType.preferredFilenameExtension ?? "jpg"
+                        )
                         return SharedContent(kind: .imageFile(
-                            filename: provider.suggestedName.map { "\($0).\(utType.preferredFilenameExtension ?? "")" } ?? filename,
+                            filename: filename,
                             data: data,
                             mimeType: mimeType,
                             thumbnail: thumbnail
@@ -187,8 +192,13 @@ actor ContentExtractor {
         // Fallback: load as generic image
         if let data = await loadDataRepresentation(from: provider, for: .image) {
             let thumbnail = createThumbnail(from: data, maxDimension: 600) ?? UIImage(systemName: "photo")!
+            let filename = makeFilename(
+                suggested: provider.suggestedName,
+                prefix: "photo",
+                ext: "jpg"
+            )
             return SharedContent(kind: .imageFile(
-                filename: provider.suggestedName ?? "image.jpg",
+                filename: filename,
                 data: data,
                 mimeType: "image/jpeg",
                 thumbnail: thumbnail
@@ -206,9 +216,11 @@ actor ContentExtractor {
         for utType in videoTypes {
             if provider.hasItemConformingToTypeIdentifier(utType.identifier) {
                 if let data = await loadDataRepresentation(from: provider, for: utType) {
-                    let suggestedName = provider.suggestedName ?? "video"
-                    let ext = utType.preferredFilenameExtension ?? "mp4"
-                    let filename = suggestedName.hasSuffix(".\(ext)") ? suggestedName : "\(suggestedName).\(ext)"
+                    let filename = makeFilename(
+                        suggested: provider.suggestedName,
+                        prefix: "video",
+                        ext: utType.preferredFilenameExtension ?? "mp4"
+                    )
                     let mime = utType.preferredMIMEType ?? "video/mp4"
 
                     let thumbnail = await generateVideoThumbnail(from: data)
@@ -234,9 +246,11 @@ actor ContentExtractor {
         for utType in audioTypes {
             if provider.hasItemConformingToTypeIdentifier(utType.identifier) {
                 if let data = await loadDataRepresentation(from: provider, for: utType) {
-                    let suggestedName = provider.suggestedName ?? "audio"
-                    let ext = utType.preferredFilenameExtension ?? "m4a"
-                    let filename = suggestedName.hasSuffix(".\(ext)") ? suggestedName : "\(suggestedName).\(ext)"
+                    let filename = makeFilename(
+                        suggested: provider.suggestedName,
+                        prefix: "audio",
+                        ext: utType.preferredFilenameExtension ?? "m4a"
+                    )
                     let mime = utType.preferredMIMEType ?? "audio/mpeg"
 
                     return SharedContent(kind: .audioFile(
@@ -265,10 +279,10 @@ actor ContentExtractor {
                utType.conforms(to: .video) || utType.conforms(to: .audio) { continue }
 
             if let data = await loadDataRepresentation(from: provider, for: utType) {
-                let suggestedName = provider.suggestedName ?? "file"
-                let ext = utType.preferredFilenameExtension ?? ""
-                let filename = ext.isEmpty ? suggestedName : (
-                    suggestedName.hasSuffix(".\(ext)") ? suggestedName : "\(suggestedName).\(ext)"
+                let filename = makeFilename(
+                    suggested: provider.suggestedName,
+                    prefix: "file",
+                    ext: utType.preferredFilenameExtension ?? ""
                 )
                 let mime = utType.preferredMIMEType ?? "application/octet-stream"
 
@@ -367,5 +381,47 @@ actor ContentExtractor {
                 continuation.resume(returning: data)
             }
         }
+    }
+
+    /// Decide the filename to use for a shared item.
+    ///
+    /// When the item provider gives us a `suggestedName` (e.g. from the
+    /// Files app, Mail attachments, or screenshots), keep it — it carries
+    /// real user intent. Apple Photos historically does **not** expose
+    /// the original asset filename through `NSItemProvider.suggestedName`
+    /// for privacy reasons, so we fall back to a timestamped name like
+    /// `photo-2026-05-07-143052.jpg` rather than a generic `image.jpg`
+    /// that would collide on every share.
+    ///
+    /// - Parameters:
+    ///   - suggested: `provider.suggestedName`. May be nil or empty.
+    ///   - prefix: Type-specific prefix used when no suggested name is
+    ///     available (e.g. `"photo"`, `"video"`, `"audio"`, `"file"`).
+    ///   - ext: Lowercase file extension (no leading dot). May be empty
+    ///     for unknown types.
+    private func makeFilename(suggested: String?, prefix: String, ext: String) -> String {
+        let trimmed = suggested?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !trimmed.isEmpty {
+            return appendExtensionIfNeeded(trimmed, ext: ext)
+        }
+        let stem = "\(prefix)-\(timestampString())"
+        return appendExtensionIfNeeded(stem, ext: ext)
+    }
+
+    /// Add `.<ext>` to `name` unless the extension is empty or already
+    /// matches (case-insensitive).
+    private func appendExtensionIfNeeded(_ name: String, ext: String) -> String {
+        guard !ext.isEmpty else { return name }
+        let currentExt = (name as NSString).pathExtension.lowercased()
+        if currentExt == ext.lowercased() { return name }
+        return "\(name).\(ext)"
+    }
+
+    private func timestampString() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "yyyy-MM-dd-HHmmss"
+        return formatter.string(from: Date())
     }
 }

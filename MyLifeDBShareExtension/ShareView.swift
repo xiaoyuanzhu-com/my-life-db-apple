@@ -240,20 +240,27 @@ struct ShareView: View {
     // MARK: - Success
 
     private var successView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 48))
                 .foregroundStyle(.green)
             Text("Sent")
                 .font(.headline)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
-            // Auto-dismiss after a short delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                onDismiss()
+
+            HStack(spacing: 12) {
+                Button("Done") { onDismiss() }
+                    .buttonStyle(.bordered)
+                Button("Open MyLifeDB") {
+                    Task {
+                        await viewModel.openMainApp()
+                        onDismiss()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
             }
         }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Error

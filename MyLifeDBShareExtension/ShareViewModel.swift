@@ -53,6 +53,11 @@ final class ShareViewModel {
     /// whether the OS reported a successful open.
     var openHostURL: ((URL) async -> Bool)?
 
+    /// Deeplink for the most recently staged share, if any. The success
+    /// view's "Open MyLifeDB" button uses this to wake the main app
+    /// when the user explicitly asks for it.
+    private var pendingShareURL: URL?
+
     // MARK: - Computed Properties
 
     var hasContent: Bool {
@@ -125,18 +130,19 @@ final class ShareViewModel {
             return
         }
 
-        // The share is on disk now — the main app's `drainAll()` will
-        // upload it on next launch/foreground regardless of what
-        // happens next, so from the user's perspective we're done.
+        // The share is on disk; the main app's `drainAll()` will pick
+        // it up next time it foregrounds. We don't auto-wake the app
+        // here — the user gets to choose on the success screen between
+        // staying in the share sheet and jumping into MyLifeDB.
+        pendingShareURL = URL(string: "mylifedb://share/\(shareID)")
         state = .success
+    }
 
-        // Best-effort: try to wake the main app immediately so the
-        // upload happens now instead of on next open. Either result
-        // is fine; we don't surface failures here.
-        if let openHostURL,
-           let url = URL(string: "mylifedb://share/\(shareID)") {
-            _ = await openHostURL(url)
-        }
+    /// Wake the main app to process the share that was just staged.
+    /// Used by the success view's "Open MyLifeDB" button.
+    func openMainApp() async {
+        guard let url = pendingShareURL, let openHostURL else { return }
+        _ = await openHostURL(url)
     }
 
     // MARK: - Helpers
