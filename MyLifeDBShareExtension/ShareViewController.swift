@@ -80,18 +80,31 @@ class ShareViewController: UIViewController {
         return chained
     }
 
-    /// Fallback: walk the responder chain looking for an object that
-    /// responds to `openURL:`. On iOS the running `UIApplication`
-    /// instance does — extensions can't import the symbol, but the
-    /// selector dispatch still works.
+    /// Fallback: walk the responder chain looking for the running
+    /// `UIApplication` and dispatch its modern open-URL method via
+    /// selector. Extensions can't reference `UIApplication.shared`
+    /// directly, but we can find it as a UIResponder and invoke the
+    /// non-deprecated `openURL:options:completionHandler:` selector.
+    ///
+    /// We deliberately do NOT use the deprecated `openURL:` selector —
+    /// since iOS 18 (or thereabouts) the runtime force-returns NO and
+    /// logs `BUG IN CLIENT OF UIKIT: The caller of UIApplication.openURL(_:)
+    /// needs to migrate to the non-deprecated open(_:options:completionHandler:)`.
     @MainActor
     private func openURLViaResponderChain(_ url: URL) -> Bool {
-        let selector = NSSelectorFromString("openURL:")
+        let selector = NSSelectorFromString("openURL:options:completionHandler:")
         var responder: UIResponder? = self
         while let r = responder {
             if r.responds(to: selector) {
                 print("[ShareExt] responder-chain openURL: dispatching to \(type(of: r))")
-                _ = r.perform(selector, with: url)
+
+                // perform(_:with:) caps at 2 args; use IMP-cast for 3.
+                typealias OpenURLIMP = @convention(c) (
+                    AnyObject, Selector, URL, [AnyHashable: Any], Any?
+                ) -> Void
+                let imp = r.method(for: selector)
+                let openURL = unsafeBitCast(imp, to: OpenURLIMP.self)
+                openURL(r, selector, url, [:], nil)
                 return true
             }
             responder = r.next
