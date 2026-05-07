@@ -1,18 +1,29 @@
 //
-//  AgentSessionSSEManager.swift
+//  NotificationsSSEManager.swift
 //  MyLifeDB
 //
-//  Server-Sent Events manager for agent session real-time updates.
-//  Connects to GET /api/data/events and listens for
-//  claude-session-updated events to trigger session list refreshes.
+//  Server-Sent Events manager for backend notifications.
+//  Connects to GET /api/data/events and dispatches incoming events to
+//  per-event-type callbacks. Currently dispatches:
+//    - "agent-session-updated"  -> onSessionUpdated
+//    - "library-changed"        -> onLibraryChanged(path, operation)
+//
+//  Each consumer (e.g. AgentSessionListView, LibraryFolderView) registers
+//  the callback(s) it cares about; everything else is ignored.
 //
 
 import Foundation
 
 @Observable
-final class AgentSessionSSEManager {
+final class NotificationsSSEManager {
 
+    /// Fired when the backend sends `agent-session-updated`.
     var onSessionUpdated: (() -> Void)?
+
+    /// Fired when the backend sends `library-changed`.
+    /// `path` is the relative path that changed; `operation` is one of
+    /// "create" / "write" / "delete" / "move" / "rename" / "upload" / "extract".
+    var onLibraryChanged: ((_ path: String, _ operation: String) -> Void)?
 
     private var task: URLSessionDataTask?
     private var session: URLSession?
@@ -62,7 +73,7 @@ final class AgentSessionSSEManager {
 
         let baseURL = AuthManager.shared.baseURL
         guard let url = URL(string: "\(baseURL)/api/data/events") else {
-            print("[AgentSSE] Invalid URL")
+            print("[NotificationsSSE] Invalid URL")
             return
         }
 
@@ -76,7 +87,7 @@ final class AgentSessionSSEManager {
 
         buffer = "" // Reset buffer for new connection
 
-        let delegate = AgentSSESessionDelegate(manager: self)
+        let delegate = NotificationsSSESessionDelegate(manager: self)
         session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
         task = session?.dataTask(with: request)
         task?.resume()
@@ -89,7 +100,7 @@ final class AgentSessionSSEManager {
     ///
     /// The backend sends unnamed events — the event type lives inside the
     /// JSON payload as `"type"`, NOT in an SSE `event:` header.
-    /// Format:  `data: {"type":"claude-session-updated",...}\n\n`
+    /// Format:  `data: {"type":"library-changed",...}\n\n`
     ///
     /// This matches how the web frontend parses events
     /// (`EventSource.onmessage` -> `JSON.parse` -> `data.type`).
@@ -124,6 +135,10 @@ final class AgentSessionSSEManager {
             switch type {
             case "agent-session-updated":
                 self?.onSessionUpdated?()
+            case "library-changed":
+                let path = (obj["path"] as? String) ?? ""
+                let operation = ((obj["data"] as? [String: Any])?["operation"] as? String) ?? "unknown"
+                self?.onLibraryChanged?(path, operation)
             default:
                 break
             }
@@ -159,10 +174,10 @@ final class AgentSessionSSEManager {
 
 // MARK: - URLSession Delegate
 
-private class AgentSSESessionDelegate: NSObject, URLSessionDataDelegate {
-    weak var manager: AgentSessionSSEManager?
+private class NotificationsSSESessionDelegate: NSObject, URLSessionDataDelegate {
+    weak var manager: NotificationsSSEManager?
 
-    init(manager: AgentSessionSSEManager) {
+    init(manager: NotificationsSSEManager) {
         self.manager = manager
     }
 

@@ -37,7 +37,7 @@ struct AgentSessionListView: View {
     @State private var hasMore = false
     @State private var nextCursor: String?
     @State private var path = NavigationPath()
-    @State private var sseManager = AgentSessionSSEManager()
+    @State private var sseManager = NotificationsSSEManager()
     @State private var statusFilter = "active"
     @State private var section: AgentSection = .sessions
 

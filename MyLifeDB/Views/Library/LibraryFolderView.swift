@@ -30,6 +30,8 @@ struct LibraryFolderView: View {
     @Binding var viewMode: LibraryViewMode
     @Binding var navigationPath: NavigationPath
 
+    @Environment(\.scenePhase) private var scenePhase
+
     @State private var children: [FileTreeNode] = []
     @State private var isLoading = false
     @State private var error: Error?
@@ -50,6 +52,10 @@ struct LibraryFolderView: View {
     // New folder state
     @State private var showNewFolderDialog = false
     @State private var newFolderName = ""
+
+    // SSE auto-refresh
+    @State private var sseManager = NotificationsSSEManager()
+    @State private var sseRefreshWorkItem: DispatchWorkItem?
 
     // MARK: - Filtered Children
 
@@ -186,6 +192,19 @@ struct LibraryFolderView: View {
                 // Always refresh in the background. The fetch updates `children`
                 // (and the on-disk snapshot) only if the response differs.
                 await loadChildren()
+            }
+            setupSSE()
+        }
+        .onDisappear {
+            sseManager.onLibraryChanged = nil
+            sseManager.stop()
+            sseRefreshWorkItem?.cancel()
+            sseRefreshWorkItem = nil
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                sseManager.ensureRunning()
+                Task { await loadChildren(ignoreCache: true) }
             }
         }
     }
@@ -336,6 +355,36 @@ struct LibraryFolderView: View {
         }
 
         isLoading = false
+    }
+
+    // MARK: - SSE Auto-Refresh
+
+    /// Subscribes to backend `library-changed` events and refetches this
+    /// folder's contents whenever a relevant change is observed.  Mirrors
+    /// the web `FileGrid` behavior: 200 ms debounce, then re-query the tree.
+    private func setupSSE() {
+        sseManager.onLibraryChanged = { changedPath, _ in
+            // Only refetch when the change concerns this folder.  Empty
+            // folderPath = root, which sees every change.  Otherwise we
+            // care about anything at-or-below the current folder.
+            if !folderPath.isEmpty {
+                let prefix = folderPath.hasSuffix("/") ? folderPath : folderPath + "/"
+                if changedPath != folderPath && !changedPath.hasPrefix(prefix) {
+                    return
+                }
+            }
+
+            // Cancel-and-reschedule debounce: a single user-visible action
+            // (e.g. extracting an archive) can fire dozens of CREATE events
+            // back-to-back; one refetch at the tail end is enough.
+            sseRefreshWorkItem?.cancel()
+            let work = DispatchWorkItem {
+                Task { await loadChildren(ignoreCache: true) }
+            }
+            sseRefreshWorkItem = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
+        }
+        sseManager.start()
     }
 
     // MARK: - File Upload
