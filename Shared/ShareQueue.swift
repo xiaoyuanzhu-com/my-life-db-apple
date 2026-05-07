@@ -90,6 +90,22 @@ enum ShareQueue {
         try queueRoot().appendingPathComponent(id, isDirectory: true)
     }
 
+    /// List share IDs currently staged in the queue. The queue contains
+    /// one folder per share (named by UUID); this returns those folder
+    /// names. Best-effort: returns an empty list if the queue can't be
+    /// read for any reason.
+    static func listPendingIDs() -> [String] {
+        guard let root = try? queueRoot() else { return [] }
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        return contents
+            .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+            .map { $0.lastPathComponent }
+    }
+
     // MARK: - Enqueue (called by extension)
 
     /// Stage a new share to disk. Returns the generated share ID.

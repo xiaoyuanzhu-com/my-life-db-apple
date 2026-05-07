@@ -2,24 +2,65 @@
 //  ShareQueueDrainer.swift
 //  MyLifeDB
 //
-//  Processes a single share that the Share Extension staged into the
-//  App Group queue (`<App Group>/share-queue/<uuid>/`).
+//  Processes shares that the Share Extension staged into the App Group
+//  queue (`<App Group>/share-queue/<uuid>/`).
 //
-//  Per-share isolation: this drainer only ever touches the share named
-//  in the deep-link URL. Previous failed shares are left untouched —
-//  they will be processed only when their own deep link is followed,
-//  or cleaned up manually. This avoids surprise re-uploads of stale
-//  content.
+//  Two entry points:
+//    - `drain(id:)` — called from the `mylifedb://share/<uuid>` deep link
+//      when the extension successfully wakes the app.
+//    - `drainAll()` — called on app launch and on every foreground so
+//      shares whose deeplink handoff failed (or that arrived while the
+//      app was offline) eventually upload without manual retry.
+//
+//  Per-share semantics: each share folder is uploaded as one atomic
+//  unit. On any upload failure, the folder stays on disk and will be
+//  retried on the next drain pass. On full success the folder is
+//  removed. Shares are independent — failing share A does not block
+//  share B from uploading.
 //
 
 import Foundation
 
 enum ShareQueueDrainer {
 
-    /// Upload one staged share to the user data root, then remove it.
+    /// In-flight guard so simultaneous foreground + deeplink triggers
+    /// don't race each other on the same folders. Reads/writes are
+    /// safe because both entry points are reached from the main actor.
+    @MainActor private static var draining = false
+
+    /// Drain every staged share. Called on app launch / foreground so
+    /// shares that arrived while the app was backgrounded (or while the
+    /// extension's `open(_:)` handoff failed) are uploaded without the
+    /// user having to retry by hand.
+    @MainActor
+    static func drainAll() async {
+        guard !draining else { return }
+        draining = true
+        defer { draining = false }
+
+        let ids = ShareQueue.listPendingIDs()
+        guard !ids.isEmpty else { return }
+        print("[ShareQueue] draining \(ids.count) pending share(s)")
+        for id in ids {
+            await drainInternal(id: id)
+        }
+    }
+
+    /// Upload one staged share. Public entry point for the deep-link
+    /// path; safe to call concurrently with `drainAll()` (the in-flight
+    /// guard makes the second caller a no-op rather than a duplicate).
     ///
     /// - Parameter id: Share UUID, parsed from `mylifedb://share/<id>`.
+    @MainActor
     static func drain(id: String) async {
+        guard !draining else { return }
+        draining = true
+        defer { draining = false }
+        await drainInternal(id: id)
+    }
+
+    @MainActor
+    private static func drainInternal(id: String) async {
         let loaded: ShareQueue.LoadedShare
         do {
             loaded = try ShareQueue.load(id: id)
@@ -56,9 +97,7 @@ enum ShareQueueDrainer {
         }
 
         if anyFailure {
-            // Leave the share folder on disk so it can be retried by
-            // re-following the same deep link or by a future "pending
-            // shares" UI. Never sweep up other shares.
+            // Keep the folder so the next drain pass retries it.
             print("[ShareQueue] \(id) had failures; leaving folder on disk")
         } else {
             ShareQueue.remove(id: id)

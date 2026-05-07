@@ -125,31 +125,17 @@ final class ShareViewModel {
             return
         }
 
-        // Hand off to the main app.
-        guard var components = URLComponents(string: "mylifedb://share") else {
-            state = .error("Invalid share URL.")
-            return
-        }
-        components.path = "/\(shareID)"
-        guard let url = components.url else {
-            state = .error("Invalid share URL.")
-            return
-        }
+        // The share is on disk now — the main app's `drainAll()` will
+        // upload it on next launch/foreground regardless of what
+        // happens next, so from the user's perspective we're done.
+        state = .success
 
-        guard let openHostURL else {
-            // No host context available — share is staged on disk and
-            // will be processed next time the user opens the app.
-            state = .success
-            return
-        }
-
-        let opened = await openHostURL(url)
-        if opened {
-            state = .success
-        } else {
-            // Couldn't wake the app; the staged share remains on disk
-            // so opening MyLifeDB later will still finish the job.
-            state = .error("Couldn't open MyLifeDB. Open the app to finish sending.")
+        // Best-effort: try to wake the main app immediately so the
+        // upload happens now instead of on next open. Either result
+        // is fine; we don't surface failures here.
+        if let openHostURL,
+           let url = URL(string: "mylifedb://share/\(shareID)") {
+            _ = await openHostURL(url)
         }
     }
 

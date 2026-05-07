@@ -52,15 +52,45 @@ class ShareViewController: UIViewController {
         extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
     }
 
-    /// Bridge `NSExtensionContext.open(_:completionHandler:)` into an
-    /// `async` boolean for the view model.
+    /// Best-effort wake the host app via its URL scheme. Tries the
+    /// official extension-context API first; falls back to walking up
+    /// the responder chain to invoke `UIApplication.open(_:options:completionHandler:)`,
+    /// since `NSExtensionContext.open(_:)` is documented as supported
+    /// for Today/Action extensions but not Share extensions and tends
+    /// to return `false` here.
+    ///
+    /// Returns whether *some* path believed it triggered the open.
+    /// Either way, the share is already staged on disk, so the main
+    /// app's `drainAll()` on next launch/foreground will finish the
+    /// upload regardless of this result.
     @MainActor
     private func openHostURL(_ url: URL) async -> Bool {
-        guard let context = extensionContext else { return false }
-        return await withCheckedContinuation { continuation in
-            context.open(url) { success in
-                continuation.resume(returning: success)
+        if let context = extensionContext {
+            let success = await withCheckedContinuation { continuation in
+                context.open(url) { success in
+                    continuation.resume(returning: success)
+                }
             }
+            if success { return true }
         }
+        return openURLViaResponderChain(url)
+    }
+
+    /// Fallback: walk the responder chain looking for an object that
+    /// responds to `openURL:`. On iOS the running `UIApplication`
+    /// instance does — extensions can't import the symbol, but the
+    /// selector dispatch still works.
+    @MainActor
+    private func openURLViaResponderChain(_ url: URL) -> Bool {
+        let selector = NSSelectorFromString("openURL:")
+        var responder: UIResponder? = self
+        while let r = responder {
+            if r.responds(to: selector) {
+                _ = r.perform(selector, with: url)
+                return true
+            }
+            responder = r.next
+        }
+        return false
     }
 }

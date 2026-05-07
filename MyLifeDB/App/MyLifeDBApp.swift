@@ -56,6 +56,13 @@ struct MyLifeDBApp: App {
                             // Share Extension can access it via App Group.
                             syncSharedDefaults()
 
+                            // Drain any shares that the Share Extension
+                            // staged while the app was offline. This is
+                            // the safety net for the deeplink handoff —
+                            // shares always get uploaded once the user
+                            // opens the app, even if `open(_:)` failed.
+                            await ShareQueueDrainer.drainAll()
+
                             // Register background sync task
                             #if os(iOS)
                             SyncManager.shared.registerBackgroundTask()
@@ -79,6 +86,10 @@ struct MyLifeDBApp: App {
 
                 // Trigger data collection sync (throttled internally)
                 SyncManager.shared.sync()
+
+                // Pick up any shares the extension staged while we were
+                // backgrounded. Cheap when the queue is empty.
+                Task { await ShareQueueDrainer.drainAll() }
             }
         }
     }
