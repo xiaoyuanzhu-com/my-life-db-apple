@@ -87,9 +87,19 @@ class ShareViewController: UIViewController {
     /// non-deprecated `openURL:options:completionHandler:` selector.
     ///
     /// We deliberately do NOT use the deprecated `openURL:` selector —
-    /// since iOS 18 (or thereabouts) the runtime force-returns NO and
-    /// logs `BUG IN CLIENT OF UIKIT: The caller of UIApplication.openURL(_:)
+    /// since iOS 18 the runtime force-returns NO and logs:
+    /// `BUG IN CLIENT OF UIKIT: The caller of UIApplication.openURL(_:)
     /// needs to migrate to the non-deprecated open(_:options:completionHandler:)`.
+    ///
+    /// Two argument-type pitfalls UIKit will crash on:
+    ///   - The options arg must be a real `NSDictionary` instance.
+    ///     Passing Swift's `[:]` bridges to `__EmptyDictionarySingleton`,
+    ///     which doesn't respond to UIKit's KVC lookups (e.g. for the
+    ///     `universalLinksOnly` key) and crashes with
+    ///     `unrecognized selector sent to instance` on launch.
+    ///   - The completion arg must be either a real Objective-C block
+    ///     or `nil` typed correctly via the IMP signature — Swift's
+    ///     `Any?` boxes won't survive the call.
     @MainActor
     private func openURLViaResponderChain(_ url: URL) -> Bool {
         let selector = NSSelectorFromString("openURL:options:completionHandler:")
@@ -98,13 +108,18 @@ class ShareViewController: UIViewController {
             if r.responds(to: selector) {
                 print("[ShareExt] responder-chain openURL: dispatching to \(type(of: r))")
 
+                // Use a real NSDictionary; the empty-Swift-dict singleton
+                // doesn't implement UIKit's expected KVC keys.
+                let options = NSDictionary()
+
                 // perform(_:with:) caps at 2 args; use IMP-cast for 3.
                 typealias OpenURLIMP = @convention(c) (
-                    AnyObject, Selector, URL, [AnyHashable: Any], Any?
+                    AnyObject, Selector, URL, NSDictionary,
+                    (@convention(block) (Bool) -> Void)?
                 ) -> Void
                 let imp = r.method(for: selector)
                 let openURL = unsafeBitCast(imp, to: OpenURLIMP.self)
-                openURL(r, selector, url, [:], nil)
+                openURL(r, selector, url, options, nil)
                 return true
             }
             responder = r.next
