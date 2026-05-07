@@ -13,12 +13,6 @@ enum SharedConstants {
     /// App Group identifier for sharing data between app and extensions.
     static let appGroupID = "group.xiaoyuanzhu.MyLifeDB"
 
-    /// Keychain service name (must match KeychainHelper.service in main app).
-    static let keychainService = "com.mylifedb.auth"
-
-    /// Keychain key for the access token (must match AuthManager.accessTokenKey).
-    static let accessTokenKey = "mylifedb.accessToken"
-
     /// UserDefaults key for the API base URL.
     static let apiBaseURLKey = "apiBaseURL"
 

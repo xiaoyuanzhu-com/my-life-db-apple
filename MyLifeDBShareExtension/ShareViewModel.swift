@@ -3,7 +3,11 @@
 //  MyLifeDBShareExtension
 //
 //  State management for the Share Extension compose view.
-//  Handles content extraction, preview generation, and upload.
+//
+//  The extension does not upload directly. Each "Send" stages a new
+//  share folder (UUID-named) into the App Group container, then opens
+//  `mylifedb://share/<uuid>` so the main app — which already owns auth,
+//  token refresh, and the API client — performs the actual upload.
 //
 
 import Foundation
@@ -17,18 +21,16 @@ final class ShareViewModel {
     enum State: Equatable {
         case loading
         case ready
-        case uploading
+        case staging
         case success
         case error(String)
-        case notAuthenticated
 
         static func == (lhs: State, rhs: State) -> Bool {
             switch (lhs, rhs) {
             case (.loading, .loading),
                  (.ready, .ready),
-                 (.uploading, .uploading),
-                 (.success, .success),
-                 (.notAuthenticated, .notAuthenticated):
+                 (.staging, .staging),
+                 (.success, .success):
                 return true
             case (.error(let a), .error(let b)):
                 return a == b
@@ -40,15 +42,16 @@ final class ShareViewModel {
 
     private(set) var state: State = .loading
 
-    /// User-provided note to include with the shared content.
-    var userNote: String = ""
-
     // MARK: - Extracted Content
 
     private(set) var items: [SharedContent] = []
 
-    private let apiClient = SharedAPIClient()
     private let extractor = ContentExtractor()
+
+    /// Closure provided by ShareViewController. Asks the extension's
+    /// host context to open a URL (i.e., wake the main app). Returns
+    /// whether the OS reported a successful open.
+    var openHostURL: ((URL) async -> Bool)?
 
     // MARK: - Computed Properties
 
@@ -59,12 +62,6 @@ final class ShareViewModel {
     // MARK: - Content Extraction
 
     func extractContent(from inputItems: [Any]) async {
-        // Check auth first
-        guard SharedKeychainHelper.loadAccessToken() != nil else {
-            state = .notAuthenticated
-            return
-        }
-
         state = .loading
         items = await extractor.extract(from: inputItems)
 
@@ -75,29 +72,34 @@ final class ShareViewModel {
         }
     }
 
-    // MARK: - Upload
+    // MARK: - Send (stage + handoff)
 
-    func upload() async {
-        state = .uploading
+    func send() async {
+        state = .staging
 
-        // Build the text payload
-        var textParts: [String] = []
-
-        // User note first
-        let trimmedNote = userNote.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedNote.isEmpty {
-            textParts.append(trimmedNote)
-        }
-
-        // Collect URLs and text from items
+        // Convert all shared items into a uniform list of file payloads.
+        // URL/text shares become auto-named .txt files so the main app's
+        // upload path stays purely file-oriented.
         var files: [(filename: String, data: Data, mimeType: String)] = []
 
         for item in items {
             switch item.kind {
             case .url(let url):
-                textParts.append(url.absoluteString)
+                if let data = url.absoluteString.data(using: .utf8) {
+                    files.append((
+                        filename: makeAutoFilename(prefix: "link", ext: "txt"),
+                        data: data,
+                        mimeType: "text/plain"
+                    ))
+                }
             case .text(let text):
-                textParts.append(text)
+                if let data = text.data(using: .utf8) {
+                    files.append((
+                        filename: makeAutoFilename(prefix: "text", ext: "txt"),
+                        data: data,
+                        mimeType: "text/plain"
+                    ))
+                }
             case .imageFile(let filename, let data, let mimeType, _):
                 files.append((filename: filename, data: data, mimeType: mimeType))
             case .videoFile(let filename, let data, let mimeType, _):
@@ -109,22 +111,56 @@ final class ShareViewModel {
             }
         }
 
-        let combinedText = textParts.isEmpty ? nil : textParts.joined(separator: "\n\n")
-
-        do {
-            try await apiClient.upload(
-                text: combinedText,
-                files: files
-            )
-            state = .success
-        } catch let error as ShareUploadError {
-            if case .notAuthenticated = error {
-                state = .notAuthenticated
-            } else {
-                state = .error(error.localizedDescription)
-            }
-        } catch {
-            state = .error("Upload failed: \(error.localizedDescription)")
+        guard !files.isEmpty else {
+            state = .error("Nothing to send.")
+            return
         }
+
+        // Stage to the App Group queue.
+        let shareID: String
+        do {
+            shareID = try ShareQueue.enqueue(files: files)
+        } catch {
+            state = .error("Failed to stage share: \(error.localizedDescription)")
+            return
+        }
+
+        // Hand off to the main app.
+        guard var components = URLComponents(string: "mylifedb://share") else {
+            state = .error("Invalid share URL.")
+            return
+        }
+        components.path = "/\(shareID)"
+        guard let url = components.url else {
+            state = .error("Invalid share URL.")
+            return
+        }
+
+        guard let openHostURL else {
+            // No host context available — share is staged on disk and
+            // will be processed next time the user opens the app.
+            state = .success
+            return
+        }
+
+        let opened = await openHostURL(url)
+        if opened {
+            state = .success
+        } else {
+            // Couldn't wake the app; the staged share remains on disk
+            // so opening MyLifeDB later will still finish the job.
+            state = .error("Couldn't open MyLifeDB. Open the app to finish sending.")
+        }
+    }
+
+    // MARK: - Helpers
+
+    /// Build a timestamped filename like `link-2026-05-06-143052.txt`.
+    private func makeAutoFilename(prefix: String, ext: String) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "yyyy-MM-dd-HHmmss"
+        return "\(prefix)-\(formatter.string(from: Date())).\(ext)"
     }
 }

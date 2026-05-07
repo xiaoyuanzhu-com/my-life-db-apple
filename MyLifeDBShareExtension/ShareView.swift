@@ -22,14 +22,11 @@ struct ShareView: View {
                 case .loading:
                     loadingView
 
-                case .notAuthenticated:
-                    notAuthenticatedView
-
                 case .ready:
                     composeView
 
-                case .uploading:
-                    uploadingView
+                case .staging:
+                    stagingView
 
                 case .success:
                     successView
@@ -44,7 +41,7 @@ struct ShareView: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    if viewModel.state != .uploading {
+                    if viewModel.state != .staging {
                         Button("Cancel") { onDismiss() }
                     }
                 }
@@ -75,13 +72,8 @@ struct ShareView: View {
             }
 
             Section {
-                TextField("Add a note...", text: $viewModel.userNote, axis: .vertical)
-                    .lineLimit(3...8)
-            }
-
-            Section {
                 Button {
-                    Task { await viewModel.upload() }
+                    Task { await viewModel.send() }
                 } label: {
                     Text("Send")
                         .fontWeight(.semibold)
@@ -232,9 +224,9 @@ struct ShareView: View {
         return "doc"
     }
 
-    // MARK: - Uploading
+    // MARK: - Staging
 
-    private var uploadingView: some View {
+    private var stagingView: some View {
         VStack(spacing: 16) {
             ProgressView()
                 .scaleEffect(1.2)
@@ -264,26 +256,6 @@ struct ShareView: View {
         }
     }
 
-    // MARK: - Not Authenticated
-
-    private var notAuthenticatedView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "person.badge.key")
-                .font(.system(size: 48))
-                .foregroundStyle(.secondary)
-            Text("Not Signed In")
-                .font(.headline)
-            Text("Please open MyLifeDB and sign in first.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Button("Done") { onDismiss() }
-                .buttonStyle(.borderedProminent)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
     // MARK: - Error
 
     private func errorView(message: String) -> some View {
@@ -303,7 +275,7 @@ struct ShareView: View {
                 Button("Cancel") { onDismiss() }
                     .buttonStyle(.bordered)
                 Button("Retry") {
-                    Task { await viewModel.upload() }
+                    Task { await viewModel.send() }
                 }
                 .buttonStyle(.borderedProminent)
             }

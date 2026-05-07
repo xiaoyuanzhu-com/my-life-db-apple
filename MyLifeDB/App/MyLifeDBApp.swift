@@ -107,6 +107,18 @@ struct MyLifeDBApp: App {
             return
         }
 
+        // Handle Share Extension handoff: mylifedb://share/<uuid>
+        // The share extension stages files into the App Group queue and
+        // calls this URL so we can finish the upload using the main app's
+        // authenticated APIClient (with token refresh, etc.).
+        if url.host == "share" {
+            // Path is "/<uuid>" → strip the leading slash.
+            let id = String(url.path.dropFirst())
+            guard !id.isEmpty else { return }
+            Task { await ShareQueueDrainer.drain(id: id) }
+            return
+        }
+
         // The host + path form the web route
         // e.g., mylifedb://library → /library
         //        mylifedb://library/foo → /library/foo
