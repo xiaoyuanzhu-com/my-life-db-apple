@@ -126,7 +126,7 @@ struct SimpleUploadResponse: Codable {
 /// A node in the tree response from GET /api/data/tree.
 /// Note: `path` is just the filename/folder name, NOT the full path.
 /// The parent directory is implicit from the API request context.
-struct FileTreeNode: Codable, Identifiable, Hashable {
+nonisolated struct FileTreeNode: Codable, Identifiable, Hashable {
 
     // MARK: - Identifiable
 
@@ -201,7 +201,7 @@ struct FileTreeNode: Codable, Identifiable, Hashable {
 }
 
 /// Response from GET /api/data/tree?path=&depth=
-struct FileTreeResponse: Codable {
+nonisolated struct FileTreeResponse: Codable {
     let basePath: String?
     let path: String?
     let children: [FileTreeNode]
