@@ -22,7 +22,11 @@
         }
       }
     },
+    "Dismiss" : {
+
+    },
     "Done" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -41,6 +45,9 @@
           }
         }
       }
+    },
+    "Go to MyLifeDB" : {
+
     },
     "No shareable content found." : {
       "localizations" : {
@@ -62,9 +69,6 @@
           }
         }
       }
-    },
-    "Open MyLifeDB" : {
-
     },
     "Please open MyLifeDB and sign in first." : {
       "extractionState" : "stale",
