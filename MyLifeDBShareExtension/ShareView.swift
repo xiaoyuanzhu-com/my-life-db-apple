@@ -240,24 +240,36 @@ struct ShareView: View {
     // MARK: - Success
 
     private var successView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 48))
                 .foregroundStyle(.green)
             Text("Sent")
                 .font(.headline)
 
-            HStack(spacing: 12) {
-                Button("Done") { onDismiss() }
-                    .buttonStyle(.bordered)
-                Button("Open MyLifeDB") {
-                    Task {
-                        await viewModel.openMainApp()
-                        onDismiss()
-                    }
+            VStack(spacing: 12) {
+                Button {
+                    Task { await viewModel.openMainApp(then: onDismiss) }
+                } label: {
+                    Text("Go to MyLifeDB")
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 4)
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+
+                Button {
+                    onDismiss()
+                } label: {
+                    Text("Dismiss")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 4)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
             }
+            .padding(.horizontal, 24)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)

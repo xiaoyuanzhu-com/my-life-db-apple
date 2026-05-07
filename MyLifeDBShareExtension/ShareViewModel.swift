@@ -139,10 +139,32 @@ final class ShareViewModel {
     }
 
     /// Wake the main app to process the share that was just staged.
-    /// Used by the success view's "Open MyLifeDB" button.
-    func openMainApp() async {
-        guard let url = pendingShareURL, let openHostURL else { return }
-        _ = await openHostURL(url)
+    /// Used by the success view's "Go to MyLifeDB" button.
+    ///
+    /// Calls `dismiss` *before* awaiting the open call's completion
+    /// handler. iOS tears down the extension's UI when we complete the
+    /// extension request, and that teardown was racing the in-flight
+    /// `openURL` and silently canceling it. Letting the dismiss happen
+    /// first means iOS finishes returning focus to the host app, then
+    /// our open request takes effect and brings MyLifeDB to the front.
+    func openMainApp(then dismiss: @escaping () -> Void) async {
+        guard let url = pendingShareURL, let openHostURL else {
+            print("[ShareExt] openMainApp: missing url or opener")
+            dismiss()
+            return
+        }
+        print("[ShareExt] openMainApp: scheduling open for \(url)")
+
+        // Fire-and-forget the open so the dismiss can run synchronously.
+        Task.detached {
+            let opened = await openHostURL(url)
+            print("[ShareExt] openMainApp: opener reported success=\(opened)")
+        }
+
+        // Give the open request one runloop tick to register before
+        // we tear the extension down.
+        try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
+        dismiss()
     }
 
     // MARK: - Helpers

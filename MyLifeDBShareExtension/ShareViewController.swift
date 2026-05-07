@@ -66,14 +66,18 @@ class ShareViewController: UIViewController {
     @MainActor
     private func openHostURL(_ url: URL) async -> Bool {
         if let context = extensionContext {
+            print("[ShareExt] trying extensionContext.open for \(url)")
             let success = await withCheckedContinuation { continuation in
                 context.open(url) { success in
                     continuation.resume(returning: success)
                 }
             }
+            print("[ShareExt] extensionContext.open returned \(success)")
             if success { return true }
         }
-        return openURLViaResponderChain(url)
+        let chained = openURLViaResponderChain(url)
+        print("[ShareExt] responder-chain openURL returned \(chained)")
+        return chained
     }
 
     /// Fallback: walk the responder chain looking for an object that
@@ -86,11 +90,13 @@ class ShareViewController: UIViewController {
         var responder: UIResponder? = self
         while let r = responder {
             if r.responds(to: selector) {
+                print("[ShareExt] responder-chain openURL: dispatching to \(type(of: r))")
                 _ = r.perform(selector, with: url)
                 return true
             }
             responder = r.next
         }
+        print("[ShareExt] responder-chain openURL: no responder found")
         return false
     }
 }
