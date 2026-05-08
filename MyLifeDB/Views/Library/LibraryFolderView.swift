@@ -197,6 +197,7 @@ struct LibraryFolderView: View {
         }
         .onDisappear {
             sseManager.onLibraryChanged = nil
+            sseManager.onPreviewUpdated = nil
             sseManager.stop()
             sseRefreshWorkItem?.cancel()
             sseRefreshWorkItem = nil
@@ -359,9 +360,10 @@ struct LibraryFolderView: View {
 
     // MARK: - SSE Auto-Refresh
 
-    /// Subscribes to backend `library-changed` events and refetches this
-    /// folder's contents whenever a relevant change is observed.  Mirrors
-    /// the web `FileGrid` behavior: 200 ms debounce, then re-query the tree.
+    /// Subscribes to backend `library-changed` and `preview-updated` events
+    /// and refetches this folder's contents whenever a relevant change is
+    /// observed.  Mirrors the web `FileGrid` behavior: 200 ms debounce, then
+    /// re-query the tree.
     private func setupSSE() {
         sseManager.onLibraryChanged = { changedPath, _ in
             // Only refetch when the change concerns this folder.  Empty
@@ -377,6 +379,21 @@ struct LibraryFolderView: View {
             // Cancel-and-reschedule debounce: a single user-visible action
             // (e.g. extracting an archive) can fire dozens of CREATE events
             // back-to-back; one refetch at the tail end is enough.
+            sseRefreshWorkItem?.cancel()
+            let work = DispatchWorkItem {
+                Task { await loadChildren(ignoreCache: true) }
+            }
+            sseRefreshWorkItem = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
+        }
+        sseManager.onPreviewUpdated = { changedPath, _ in
+            // Same containment check as library-changed.
+            if !folderPath.isEmpty {
+                let prefix = folderPath.hasSuffix("/") ? folderPath : folderPath + "/"
+                if changedPath != folderPath && !changedPath.hasPrefix(prefix) {
+                    return
+                }
+            }
             sseRefreshWorkItem?.cancel()
             let work = DispatchWorkItem {
                 Task { await loadChildren(ignoreCache: true) }

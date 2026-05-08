@@ -7,6 +7,7 @@
 //  per-event-type callbacks. Currently dispatches:
 //    - "agent-session-updated"  -> onSessionUpdated
 //    - "library-changed"        -> onLibraryChanged(path, operation)
+//    - "preview-updated"        -> onPreviewUpdated(path, previewType)
 //
 //  Each consumer (e.g. AgentSessionListView, LibraryFolderView) registers
 //  the callback(s) it cares about; everything else is ignored.
@@ -24,6 +25,11 @@ final class NotificationsSSEManager {
     /// `path` is the relative path that changed; `operation` is one of
     /// "create" / "write" / "delete" / "move" / "rename" / "upload" / "extract".
     var onLibraryChanged: ((_ path: String, _ operation: String) -> Void)?
+
+    /// Fired when the backend sends `preview-updated` (e.g. a thumbnail
+    /// finished generating). `path` is the relative file path, `previewType`
+    /// is "thumbnail" or "screenshot".
+    var onPreviewUpdated: ((_ path: String, _ previewType: String) -> Void)?
 
     private var task: URLSessionDataTask?
     private var session: URLSession?
@@ -139,6 +145,10 @@ final class NotificationsSSEManager {
                 let path = (obj["path"] as? String) ?? ""
                 let operation = ((obj["data"] as? [String: Any])?["operation"] as? String) ?? "unknown"
                 self?.onLibraryChanged?(path, operation)
+            case "preview-updated":
+                let path = (obj["path"] as? String) ?? ""
+                let previewType = ((obj["data"] as? [String: Any])?["previewType"] as? String) ?? "unknown"
+                self?.onPreviewUpdated?(path, previewType)
             default:
                 break
             }
