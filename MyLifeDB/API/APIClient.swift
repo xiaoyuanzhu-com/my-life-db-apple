@@ -340,6 +340,66 @@ final class APIClient {
         }
     }
 
+    /// Performs a raw PUT upload streamed from a file URL on disk, with
+    /// optional progress callbacks. Preferred over `uploadRaw` for large
+    /// payloads (videos, big images) to keep memory bounded.
+    ///
+    /// `onProgress` is called on the main actor with a 0...1 fractional
+    /// value. On 401-refresh-retry, progress resets to 0 before the
+    /// retry begins.
+    func uploadRawFromFile<T: Decodable>(
+        path: String,
+        fileURL: URL,
+        contentType: String,
+        allowRetryOn401: Bool = true,
+        onProgress: (@Sendable (Double) -> Void)? = nil
+    ) async throws -> T {
+        let components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: true)
+        guard let url = components?.url else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = HTTPMethod.put.rawValue
+        request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        // Generous per-request timeout — large videos can legitimately take
+        // minutes over cellular even when the connection is healthy.
+        request.timeoutInterval = 600
+
+        if let token = AuthManager.shared.accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        let delegate = onProgress.map { UploadProgressDelegate(onProgress: $0) }
+        let (responseData, response) = try await session.upload(
+            for: request, fromFile: fileURL, delegate: delegate
+        )
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+
+        switch httpResponse.statusCode {
+        case 200...299:
+            return try decoder.decode(T.self, from: responseData)
+        case 401:
+            if allowRetryOn401 {
+                let refreshed = await AuthManager.shared.handleUnauthorized()
+                if refreshed {
+                    onProgress?(0)
+                    return try await self.uploadRawFromFile(
+                        path: path, fileURL: fileURL, contentType: contentType,
+                        allowRetryOn401: false, onProgress: onProgress
+                    )
+                }
+            }
+            throw APIError.unauthorized
+        default:
+            throw APIError.serverError(httpResponse.statusCode, parseErrorMessage(from: responseData))
+        }
+    }
+
     // MARK: - Raw File Access
 
     /// Gets raw file data from /raw/*path

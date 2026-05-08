@@ -151,6 +151,31 @@ struct LibraryAPI {
         )
     }
 
+    /// Same as `simpleUpload(data:...)` but streams from a file URL on disk
+    /// and reports fractional upload progress on the main actor. Use this
+    /// for shares where the bytes already live in the App Group container —
+    /// avoids holding the whole file (a 4K video) in memory.
+    func simpleUploadFromFile(
+        fileURL: URL,
+        filename: String,
+        destination: String,
+        mimeType: String,
+        onProgress: (@Sendable (Double) -> Void)? = nil
+    ) async throws -> SimpleUploadResponse {
+        let uploadPath: String
+        if destination.isEmpty {
+            uploadPath = "/api/data/uploads/simple/\(filename)"
+        } else {
+            uploadPath = "/api/data/uploads/simple/\(destination)/\(filename)"
+        }
+        return try await client.uploadRawFromFile(
+            path: uploadPath,
+            fileURL: fileURL,
+            contentType: mimeType,
+            onProgress: onProgress
+        )
+    }
+
     // MARK: - Pin Operations
 
     /// Pin a file (idempotent — PUT)

@@ -168,6 +168,12 @@ enum ShareQueue {
                 throw ShareQueueError.fileMissing(entry.filename)
             }
         }
+
+        /// On-disk URL for a file entry. Preferred over `data(for:)` for
+        /// uploads — keeps large videos out of memory by streaming from disk.
+        func fileURL(for entry: SharePayload.FileEntry) -> URL {
+            folder.appendingPathComponent(entry.filename)
+        }
     }
 
     /// Load a share by ID. Throws if the share folder or manifest is missing.

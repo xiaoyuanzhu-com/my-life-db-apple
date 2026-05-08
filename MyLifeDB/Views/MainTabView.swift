@@ -50,13 +50,26 @@ struct MainTabView: View {
     @State private var selectedTab: AppTab = .data
     @State private var filePreview: FilePreviewDestination?
     @State private var agentDeepLink: String?
+    @State private var uploadTracker = UploadTracker.shared
 
     var body: some View {
-        #if os(macOS)
-        macOSLayout
-        #else
-        iOSLayout
-        #endif
+        Group {
+            #if os(macOS)
+            macOSLayout
+            #else
+            iOSLayout
+            #endif
+        }
+        .sheet(item: Binding(
+            get: { uploadTracker.activeShare },
+            set: { newValue in
+                if newValue == nil { uploadTracker.dismiss() }
+            }
+        )) { share in
+            ShareUploadProgressSheet(share: share) {
+                uploadTracker.dismiss()
+            }
+        }
     }
 
     /// Shared modifiers for file preview presentation.

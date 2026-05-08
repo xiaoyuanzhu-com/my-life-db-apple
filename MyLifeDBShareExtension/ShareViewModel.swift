@@ -51,6 +51,13 @@ final class ShareViewModel {
     /// Closure provided by ShareViewController. Asks the extension's
     /// host context to open a URL (i.e., wake the main app). Returns
     /// whether the OS reported a successful open.
+    ///
+    /// `@ObservationIgnored`: the `((URL) async -> Bool)?` type breaks
+    /// the `@Observable` macro under the `NonisolatedNonsendingByDefault`
+    /// upcoming feature (the macro and the closure disagree on async
+    /// isolation). Views never read this property anyway — it's
+    /// dependency injection — so skipping observation tracking is fine.
+    @ObservationIgnored
     var openHostURL: ((URL) async -> Bool)?
 
     /// Deeplink for the most recently staged share, if any. The success
