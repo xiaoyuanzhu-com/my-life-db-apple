@@ -16,22 +16,31 @@ class ShareViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        // Provide the view model with a way to open URLs in the host app.
+        // Provide the view model with a way to wake the host app.
         //
         // We hand off via a Universal Link
         // (https://my.xiaoyuanzhu.com/ios-share/<uuid>) which the domain's
-        // apple-app-site-association file declares for our App ID. iOS
-        // recognizes the URL as belonging to MyLifeDB and routes it to
-        // the app via NSUserActivity — this is the Apple-supported path
-        // for share extensions to wake their containing app on iOS 18+.
+        // apple-app-site-association file declares for our App ID.
         //
-        // We previously fell back to a responder-chain UIApplication.open
-        // hack for custom schemes. That path was killed by iOS 18 (the
-        // deprecated `openURL:` selector force-returns NO, and the modern
-        // 3-arg selector crashes on Swift's empty-dictionary singleton).
-        // Universal Links make the fallback unnecessary.
-        viewModel.openHostURL = { [weak self] url in
-            await self?.openHostURL(url) ?? false
+        // The actual call uses SwiftUI's `EnvironmentValues().openURL(_:)`.
+        // We tried the obvious alternatives first; only this one works:
+        //
+        //   - `NSExtensionContext.open` — Apple documents this as Today-
+        //     widget-only. From a Share Extension, the completion handler
+        //     fires with `success = false` and the host app is not woken.
+        //   - Responder-chain `UIApplication.openURL:` — the deprecated
+        //     single-arg selector force-returns NO on iOS 18 and logs
+        //     "BUG IN CLIENT OF UIKIT". The modern 3-arg selector
+        //     (`openURL:options:completionHandler:`) crashes inside UIKit's
+        //     KVC probe of the options dictionary.
+        //
+        // Instantiating `EnvironmentValues()` directly and calling its
+        // `openURL` is public API (no runtime hack, no deprecated
+        // selector) and works from a Share Extension to wake the
+        // containing app via a Universal Link. Reference:
+        // https://medium.com/@itsuki.enjoy/swift-when-extensioncontext-open-does-not-open-my-app-solution-eaf59ab552c2
+        viewModel.openHostURL = { url in
+            await Self.openHostURL(url)
         }
 
         let shareView = ShareView(viewModel: viewModel) { [weak self] in
@@ -63,42 +72,12 @@ class ShareViewController: UIViewController {
     }
 
     @MainActor
-    private func openHostURL(_ url: URL) async -> Bool {
-        // Try two approaches and log both outcomes. We don't actually know
-        // which one (if either) wakes the app from a Share Extension on
-        // iOS 18 — Apple's docs say extensionContext.open is Today-only,
-        // but reports in the wild are mixed and we haven't tried the
-        // SwiftUI-native path before.
-
-        // Path A — SwiftUI EnvironmentValues().openURL
-        // Per https://medium.com/@itsuki.enjoy/swift-when-extensioncontext-open-does-not-open-my-app-solution-eaf59ab552c2
-        // (2026), instantiating EnvironmentValues directly and calling its
-        // openURL outside a View context can wake the host app where
-        // extensionContext.open returns false. Public API, not a runtime
-        // hack. No completion handler, so we can't confirm success — just
-        // log that we fired it.
-        print("[ShareExt] path A: EnvironmentValues().openURL \(url)")
-        let env = EnvironmentValues()
-        env.openURL(url)
-        print("[ShareExt] path A: EnvironmentValues().openURL fired")
-
-        // Path B — NSExtensionContext.open
-        // Documented as Today-widget-only. We try it anyway for evidence.
-        guard let context = extensionContext else {
-            print("[ShareExt] path B: no extensionContext, skipping")
-            // Optimistically report success — Path A may have worked.
-            return true
-        }
-        print("[ShareExt] path B: extensionContext.open \(url)")
-        let pathBSuccess = await withCheckedContinuation { continuation in
-            context.open(url) { success in
-                print("[ShareExt] path B: extensionContext.open returned \(success)")
-                continuation.resume(returning: success)
-            }
-        }
-        // Either path may have worked. We can only confirm B; assume A
-        // succeeded if B failed (the worst case is the dismiss-without-jump
-        // we already saw, which our drainAll() safety net handles).
-        return pathBSuccess || true
+    private static func openHostURL(_ url: URL) async -> Bool {
+        EnvironmentValues().openURL(url)
+        // openURL has no completion handler, so we can't observe whether
+        // the open actually succeeded. Report success optimistically; the
+        // main app's drainAll() on next launch covers any case where it
+        // didn't.
+        return true
     }
 }
