@@ -64,16 +64,41 @@ class ShareViewController: UIViewController {
 
     @MainActor
     private func openHostURL(_ url: URL) async -> Bool {
+        // Try two approaches and log both outcomes. We don't actually know
+        // which one (if either) wakes the app from a Share Extension on
+        // iOS 18 — Apple's docs say extensionContext.open is Today-only,
+        // but reports in the wild are mixed and we haven't tried the
+        // SwiftUI-native path before.
+
+        // Path A — SwiftUI EnvironmentValues().openURL
+        // Per https://medium.com/@itsuki.enjoy/swift-when-extensioncontext-open-does-not-open-my-app-solution-eaf59ab552c2
+        // (2026), instantiating EnvironmentValues directly and calling its
+        // openURL outside a View context can wake the host app where
+        // extensionContext.open returns false. Public API, not a runtime
+        // hack. No completion handler, so we can't confirm success — just
+        // log that we fired it.
+        print("[ShareExt] path A: EnvironmentValues().openURL \(url)")
+        let env = EnvironmentValues()
+        env.openURL(url)
+        print("[ShareExt] path A: EnvironmentValues().openURL fired")
+
+        // Path B — NSExtensionContext.open
+        // Documented as Today-widget-only. We try it anyway for evidence.
         guard let context = extensionContext else {
-            print("[ShareExt] openHostURL: no extensionContext")
-            return false
+            print("[ShareExt] path B: no extensionContext, skipping")
+            // Optimistically report success — Path A may have worked.
+            return true
         }
-        print("[ShareExt] extensionContext.open \(url)")
-        return await withCheckedContinuation { continuation in
+        print("[ShareExt] path B: extensionContext.open \(url)")
+        let pathBSuccess = await withCheckedContinuation { continuation in
             context.open(url) { success in
-                print("[ShareExt] extensionContext.open returned \(success)")
+                print("[ShareExt] path B: extensionContext.open returned \(success)")
                 continuation.resume(returning: success)
             }
         }
+        // Either path may have worked. We can only confirm B; assume A
+        // succeeded if B failed (the worst case is the dismiss-without-jump
+        // we already saw, which our drainAll() safety net handles).
+        return pathBSuccess || true
     }
 }
