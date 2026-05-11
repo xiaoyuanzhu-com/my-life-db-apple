@@ -655,7 +655,7 @@ private struct SessionRow: View {
         .opacity(session.isArchived ? 0.6 : 1.0)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(recentlyVisitedId == session.id ? Color(.systemFill) : Color.clear)
+                .fill(recentlyVisitedId == session.id ? Color.primary.opacity(0.1) : Color.clear)
                 .padding(.horizontal, -8)
                 .padding(.vertical, -4)
         )

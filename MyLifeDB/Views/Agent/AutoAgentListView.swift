@@ -265,7 +265,7 @@ struct AutoAgentListView: View {
             }
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(isRecentlyVisited ? Color(.systemFill) : Color.clear)
+                    .fill(isRecentlyVisited ? Color.primary.opacity(0.1) : Color.clear)
                     .padding(.horizontal, -8)
                     .padding(.vertical, -4)
             )
