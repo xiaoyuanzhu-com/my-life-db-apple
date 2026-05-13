@@ -118,7 +118,7 @@ struct MyLifeDBApp: App {
     /// Handle incoming deep links and universal links.
     ///
     /// Supported inputs:
-    ///   - `mylifedb://oauth/callback?access_token=...` — OAuth completion
+    ///   - `mylifedb://oauth/callback?session_token=...` — OAuth completion
     ///   - `mylifedb://<host>[/path]` — SPA routes (library, file/..., etc.)
     ///   - `https://my.xiaoyuanzhu.com/ios-share/<uuid>` — Share Extension
     ///     handoff via Universal Links. The domain's AASA file declares
@@ -165,11 +165,10 @@ struct MyLifeDBApp: App {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
         let queryItems = components.queryItems ?? []
 
-        guard let accessToken = queryItems.first(where: { $0.name == "access_token" })?.value else {
+        guard let sessionToken = queryItems.first(where: { $0.name == "session_token" })?.value else {
             return
         }
 
-        let refreshToken = queryItems.first(where: { $0.name == "refresh_token" })?.value
-        authManager.handleOAuthCompletion(accessToken: accessToken, refreshToken: refreshToken)
+        authManager.handleOAuthCompletion(sessionToken: sessionToken)
     }
 }

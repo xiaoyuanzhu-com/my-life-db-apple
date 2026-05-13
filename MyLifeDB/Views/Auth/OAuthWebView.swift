@@ -12,7 +12,7 @@ import SwiftUI
 
 struct OAuthWebView: View {
     let baseURL: URL
-    let onCompletion: (String, String?) -> Void // (accessToken, refreshToken?)
+    let onCompletion: (String) -> Void // sessionToken
     let onError: (String) -> Void
     let onCancel: () -> Void
 
@@ -35,7 +35,7 @@ struct OAuthWebView: View {
         let callbackScheme = "mylifedb"
         let nativeRedirect = "\(callbackScheme)://oauth/callback"
         var components = URLComponents(
-            url: baseURL.appendingPathComponent("api/oauth/authorize"),
+            url: baseURL.appendingPathComponent("gw/auth/login"),
             resolvingAgainstBaseURL: true
         )
         components?.queryItems = [
@@ -95,17 +95,16 @@ struct OAuthWebView: View {
             }
 
             let queryItems = components.queryItems ?? []
-            guard let accessToken = queryItems.first(where: { $0.name == "access_token" })?.value else {
+            guard let sessionToken = queryItems.first(where: { $0.name == "session_token" })?.value else {
                 if let error = queryItems.first(where: { $0.name == "error" })?.value {
                     onError("Login failed: \(error)")
                 } else {
-                    onError("No access token received")
+                    onError("No session token received")
                 }
                 return
             }
 
-            let refreshToken = queryItems.first(where: { $0.name == "refresh_token" })?.value
-            onCompletion(accessToken, refreshToken)
+            onCompletion(sessionToken)
 
         } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
             onCancel()

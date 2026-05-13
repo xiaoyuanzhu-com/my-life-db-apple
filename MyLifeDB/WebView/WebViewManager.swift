@@ -391,11 +391,17 @@ final class TabWebViewModel {
 
     // MARK: - Cookie Management (belt-and-suspenders)
 
-    /// Inject auth cookies via WebKit's cookie store (WKHTTPCookieStore).
-    /// Supplementary to the Authorization header approach — ensures cookies
-    /// are present for any code paths that don't go through fetchWithRefresh
-    /// (e.g. nested iframe navigations like `<iframe src="/raw/.generated/...">`
-    /// inside srcdoc preview iframes, which can't attach Authorization headers).
+    /// Inject the gateway session cookie via WebKit's cookie store
+    /// (WKHTTPCookieStore). Supplementary to the Authorization header approach
+    /// for any code paths that don't go through fetchWithRefresh (e.g. nested
+    /// iframe navigations like `<iframe src="/raw/.generated/...">` inside
+    /// srcdoc preview iframes, which can't attach Authorization headers).
+    ///
+    /// Cookie name `mxy_session` matches the gateway's `auth.SessionCookieName`
+    /// — it must be that exact value for the gateway's SoftAuth to recognise
+    /// it. Lifetime is the gateway's session TTL (30 days); when the session
+    /// is revoked server-side, requests 401 and AuthManager.handleUnauthorized
+    /// clears everything.
     ///
     /// Two attributes are critical for WKWebView cookie delivery:
     ///
@@ -415,33 +421,18 @@ final class TabWebViewModel {
         let isSecure = baseURL.scheme == "https"
         let cookieStore = WKWebsiteDataStore.default().httpCookieStore
 
-        if let accessToken = auth.accessToken {
-            let expiry = auth.accessTokenExpiry ?? Date().addingTimeInterval(3600)
-            var accessProps: [HTTPCookiePropertyKey: Any] = [
-                .name: "access_token",
-                .value: accessToken,
+        if let sessionToken = auth.accessToken {
+            let expiry = Date().addingTimeInterval(60 * 60 * 24 * 30) // 30 days
+            var props: [HTTPCookiePropertyKey: Any] = [
+                .name: "mxy_session",
+                .value: sessionToken,
                 .domain: host,
                 .path: "/",
                 .expires: expiry,
                 .sameSitePolicy: HTTPCookieStringPolicy.sameSiteLax,
             ]
-            if isSecure { accessProps[.secure] = "TRUE" }
-            if let cookie = HTTPCookie(properties: accessProps) {
-                await cookieStore.setCookie(cookie)
-            }
-        }
-
-        if let refreshToken = auth.refreshTokenForCookie {
-            var refreshProps: [HTTPCookiePropertyKey: Any] = [
-                .name: "refresh_token",
-                .value: refreshToken,
-                .domain: host,
-                .path: "/api/system/oauth",
-                .expires: Date().addingTimeInterval(60 * 60 * 24 * 30),
-                .sameSitePolicy: HTTPCookieStringPolicy.sameSiteLax,
-            ]
-            if isSecure { refreshProps[.secure] = "TRUE" }
-            if let cookie = HTTPCookie(properties: refreshProps) {
+            if isSecure { props[.secure] = "TRUE" }
+            if let cookie = HTTPCookie(properties: props) {
                 await cookieStore.setCookie(cookie)
             }
         }

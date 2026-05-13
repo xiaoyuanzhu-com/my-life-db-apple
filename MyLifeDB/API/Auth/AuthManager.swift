@@ -2,8 +2,11 @@
 //  AuthManager.swift
 //  MyLifeDB
 //
-//  Central authentication state manager.
-//  Handles OAuth login, token storage, reactive refresh (401 + foreground resume), and logout.
+//  Central authentication state manager. The app authenticates to the cloud
+//  gateway (`my.xiaoyuanzhu.com`), which mints an opaque session id over
+//  `/gw/auth/login` → `/gw/auth/callback` → `mylifedb://oauth/callback`. The
+//  session id is the only credential — no JWT, no refresh, no expiry math.
+//  When the gateway returns 401, the session is gone and the user re-logs in.
 //
 
 import Foundation
@@ -12,7 +15,7 @@ import Observation
 // MARK: - Notifications
 
 extension Notification.Name {
-    /// Posted after AuthManager successfully refreshes tokens or completes OAuth login.
+    /// Posted after AuthManager completes OAuth login or logs out.
     /// WebView models observe this to push fresh cookies to the web layer.
     static let authTokensDidChange = Notification.Name("authTokensDidChange")
 }
@@ -47,60 +50,34 @@ final class AuthManager {
         return nil
     }
 
-    // MARK: - Tokens
+    // MARK: - Token
 
-    private static let accessTokenKey = "mylifedb.accessToken"
-    private static let refreshTokenKey = "mylifedb.refreshToken"
+    // New keychain key — distinct from the old JWT-era keys (`mylifedb.accessToken`,
+    // `mylifedb.refreshToken`). On upgrade those old values are simply ignored
+    // and overwritten on next login.
+    private static let sessionTokenKey = "mylifedb.sessionToken"
 
     private(set) var accessToken: String? {
         didSet {
             if let token = accessToken {
-                KeychainHelper.save(key: Self.accessTokenKey, value: token)
+                KeychainHelper.save(key: Self.sessionTokenKey, value: token)
             } else {
-                KeychainHelper.delete(key: Self.accessTokenKey)
+                KeychainHelper.delete(key: Self.sessionTokenKey)
             }
         }
     }
 
-    private var refreshToken: String? {
-        didSet {
-            if let token = refreshToken {
-                KeychainHelper.save(key: Self.refreshTokenKey, value: token)
-            } else {
-                KeychainHelper.delete(key: Self.refreshTokenKey)
-            }
-        }
+    // MARK: - Base URL
+
+    var baseURL: URL {
+        let urlString = UserDefaults.standard.string(forKey: "apiBaseURL") ?? "https://my.xiaoyuanzhu.com"
+        return URL(string: urlString) ?? URL(string: "https://my.xiaoyuanzhu.com")!
     }
-
-    // MARK: - Cookie Helpers (used by TabWebViewModel for cookie injection)
-
-    /// The refresh token for WebView cookie injection.
-    /// Native is the single auth owner; the cookie is an emergency fallback.
-    /// WebView delegates refresh to native via the bridge (requestTokenRefresh).
-    var refreshTokenForCookie: String? { refreshToken }
-
-    /// Seconds until the access token expires (for cookie max-age). Defaults to 3600.
-    var accessTokenMaxAge: Int {
-        guard let token = accessToken, let exp = jwtExpiration(token) else { return 3600 }
-        return max(Int(exp.timeIntervalSinceNow), 0)
-    }
-
-    /// The access token's expiry date (for cookie .expires property).
-    var accessTokenExpiry: Date? {
-        guard let token = accessToken else { return nil }
-        return jwtExpiration(token)
-    }
-
-    // MARK: - Refresh
-
-    /// In-flight refresh task. Concurrent callers await the same task
-    /// instead of being rejected (single-flight pattern).
-    private var refreshInFlight: Task<RefreshResult, Never>?
 
     // MARK: - Dedicated Auth Session
 
     /// Ephemeral session for auth requests. Cookies disabled to prevent
-    /// dual-storage — Keychain is the single source of truth for tokens.
+    /// dual-storage — Keychain is the single source of truth.
     private static let authSession: URLSession = {
         let config = URLSessionConfiguration.ephemeral
         config.httpShouldSetCookies = false
@@ -109,238 +86,100 @@ final class AuthManager {
         return URLSession(configuration: config)
     }()
 
-    // MARK: - Base URL
-
-    /// The backend base URL (configurable via Settings → Server).
-    /// Used by both APIClient and TabWebViewModel.
-    var baseURL: URL {
-        let urlString = UserDefaults.standard.string(forKey: "apiBaseURL") ?? "https://my.xiaoyuanzhu.com"
-        return URL(string: urlString) ?? URL(string: "https://my.xiaoyuanzhu.com")!
-    }
-
     // MARK: - Init
 
     private init() {
-        // Load tokens from Keychain
-        accessToken = KeychainHelper.load(key: Self.accessTokenKey)
-        refreshToken = KeychainHelper.load(key: Self.refreshTokenKey)
-
-        // Optimistic initial state: if the access token's JWT exp claim is
-        // still in the future (with a small safety margin), assume the user
-        // is authenticated and skip the launch-time "Connecting..." spinner.
-        // The 401 handler will recover if the server has revoked the token.
-        if let token = accessToken, !isTokenExpiringSoon(token) {
-            state = .authenticated(jwtUsername(token) ?? "User")
-        } else if accessToken == nil && refreshToken == nil {
-            // No tokens at all — go straight to LoginView, no spinner.
+        accessToken = KeychainHelper.load(key: Self.sessionTokenKey)
+        if accessToken == nil {
             state = .unauthenticated
         }
-        // Otherwise leave state as .unknown so MyLifeDBApp's .task will
-        // call checkAuth() and run the validate/refresh path.
+        // Otherwise leave .unknown so MyLifeDBApp's .task triggers checkAuth().
     }
 
     // MARK: - Auth Check (called on app launch)
 
     @MainActor
     func checkAuth() async {
-        // Optimistic auth: if we have an access token whose JWT exp claim is
-        // not expiring soon, transition to .authenticated synchronously and
-        // skip the network round-trip. The 401 handler (handleUnauthorized)
-        // will recover if the server has revoked the token.
-        if let token = accessToken, !isTokenExpiringSoon(token) {
-            let username = jwtUsername(token) ?? "User"
-            state = .authenticated(username)
+        guard let token = accessToken else {
+            state = .unauthenticated
             return
         }
 
         state = .checking
 
-        // Token is missing/expiring — fall through to validate (and refresh on
-        // failure) so we don't show a stale UI with a guaranteed-bad token.
-        if let token = accessToken {
-            let result = await validateToken(token)
-            switch result {
-            case .valid(let username):
-                state = .authenticated(username)
-                return
-            case .invalid, .noOAuth:
-                // Token expired or OAuth not configured, try refresh
-                if await tryRefresh() == .success {
-                    return
-                }
-                state = .unauthenticated
-                return
-            case .connectionError:
-                // Can't reach server - stay unauthenticated so user can fix server URL
-                state = .unauthenticated
-                return
-            }
+        switch await validateSession(token) {
+        case .valid(let username):
+            state = .authenticated(username)
+        case .invalid:
+            // Server explicitly rejected the session — clear it.
+            accessToken = nil
+            state = .unauthenticated
+        case .connectionError:
+            // Can't reach the server. Stay optimistic-authenticated so the
+            // UI loads; subsequent API calls will surface real errors. Without
+            // a server round-trip we have no username, fall back to "User".
+            state = .authenticated("User")
         }
-
-        // Try refresh if we have a refresh token
-        if refreshToken != nil {
-            if await tryRefresh() == .success {
-                return
-            }
-        }
-
-        state = .unauthenticated
     }
 
     // MARK: - OAuth Completion
 
     @MainActor
-    func handleOAuthCompletion(accessToken: String, refreshToken: String?) {
-        self.accessToken = accessToken
-        self.refreshToken = refreshToken
+    func handleOAuthCompletion(sessionToken: String) {
+        self.accessToken = sessionToken
 
-        // Set authenticated state SYNCHRONOUSLY — the token was just issued
-        // by the OAuth provider, no need to validate via network before
-        // transitioning the UI. Extract username from JWT payload directly.
-        let username = jwtUsername(accessToken) ?? "User"
-        state = .authenticated(username)
+        // Optimistic transition: the gateway just minted this session, so it
+        // *is* valid. Fetch the username from /gw/api/me in the background;
+        // until then label the user "User".
+        state = .authenticated("User")
         NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
-    }
 
-    // MARK: - Token Refresh
-
-    @MainActor
-    func refreshAccessToken() async -> Bool {
-        return await tryRefresh() == .success
-    }
-
-    /// Outcome of a token refresh attempt. Distinguishes "refresh token is
-    /// confirmed invalid" (server returned 401) from transient failures
-    /// (network error, server 5xx) so callers can decide whether to logout.
-    private enum RefreshResult {
-        case success
-        case rejected   // Server confirmed refresh token is invalid (401)
-        case failed     // Transient error — network, timeout, server error, etc.
-    }
-
-    @MainActor
-    private func tryRefresh() async -> RefreshResult {
-        // Single-flight: if a refresh is already in progress, wait for it
-        if let existing = refreshInFlight {
-            return await existing.value
-        }
-
-        guard let refreshToken = refreshToken else { return .failed }
-
-        let task = Task<RefreshResult, Never> { @MainActor [weak self] in
-            guard let self else { return .failed }
-
-            do {
-                let url = self.baseURL.appendingPathComponent("api/system/oauth/refresh")
-                var request = URLRequest(url: url)
-                request.httpMethod = "POST"
-                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                request.httpBody = try JSONSerialization.data(
-                    withJSONObject: ["refresh_token": refreshToken]
-                )
-                request.timeoutInterval = 10
-
-                let (data, response) = try await Self.authSession.data(for: request)
-
-                guard let httpResponse = response as? HTTPURLResponse else { return .failed }
-
-                // 401 = server explicitly rejected the refresh token
-                if httpResponse.statusCode == 401 {
-                    return .rejected
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if case .valid(let username) = await self.validateSession(sessionToken) {
+                if case .authenticated = self.state {
+                    self.state = .authenticated(username)
                 }
-
-                guard httpResponse.statusCode == 200 else { return .failed }
-
-                // Parse tokens from JSON response body
-                guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                    return .failed
-                }
-
-                if let newAccess = json["access_token"] as? String, !newAccess.isEmpty {
-                    self.accessToken = newAccess
-                }
-                if let newRefresh = json["refresh_token"] as? String, !newRefresh.isEmpty {
-                    self.refreshToken = newRefresh
-                }
-
-                // Validate new token and update state
-                if let token = self.accessToken {
-                    let result = await self.validateToken(token)
-                    if case .valid(let username) = result {
-                        self.state = .authenticated(username)
-                        NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
-                        return .success
-                    }
-                }
-
-                // Even if validation fails, if we got new tokens, consider it success
-                if self.accessToken != nil {
-                    NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
-                    return .success
-                }
-
-                return .failed
-            } catch {
-                return .failed
             }
         }
-
-        refreshInFlight = task
-        let result = await task.value
-        refreshInFlight = nil
-        return result
     }
 
     // MARK: - Logout
 
     @MainActor
     func logout() async {
-        // Call backend logout (best-effort)
-        do {
-            let url = baseURL.appendingPathComponent("api/system/oauth/logout")
+        if let token = accessToken {
+            let url = baseURL.appendingPathComponent("gw/auth/logout")
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
-            if let token = accessToken {
-                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            }
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             request.timeoutInterval = 5
             _ = try? await Self.authSession.data(for: request)
         }
 
-        // Clear local state
         accessToken = nil
-        refreshToken = nil
         KeychainHelper.deleteAll()
         LibraryTreeCache.shared.clear()
         state = .unauthenticated
+        NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
     }
 
     // MARK: - 401 Handler (called by APIClient)
 
     @MainActor
     func handleUnauthorized() async -> Bool {
-        let result = await tryRefresh()
-        switch result {
-        case .success:
-            return true // Caller should retry the request
-        case .rejected:
-            // Refresh token is confirmed invalid — full logout
-            await logout()
-            return false
-        case .failed:
-            // Transient error (network, server 5xx, etc.) — don't destroy
-            // tokens, the user may recover on retry or foreground resume.
-            return false
-        }
+        // Opaque sessions don't refresh — a 401 means the session is gone.
+        // Clear local state so the next launch goes straight to LoginView.
+        await logout()
+        return false
     }
 
     // MARK: - 503 Provisioning Handler (called by APIClient)
 
     @MainActor
     func handleProvisioning() async {
-        // Already in provisioning state — no-op
         if case .provisioning = state { return }
-        let currentUsername = username ?? jwtUsername(accessToken ?? "") ?? "User"
+        let currentUsername = username ?? "User"
         state = .provisioning(currentUsername)
     }
 
@@ -355,110 +194,76 @@ final class AuthManager {
 
     @MainActor
     func handleForeground() {
-        guard isAuthenticated else { return }
-
-        // Check if token needs refresh
-        if let token = accessToken, isTokenExpiringSoon(token) {
-            Task {
-                _ = await tryRefresh()
+        guard isAuthenticated, let token = accessToken else { return }
+        // Re-validate against the gateway opportunistically; if the session
+        // was revoked while the app was backgrounded, surface that now
+        // instead of waiting for the next API call to 401.
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            switch await self.validateSession(token) {
+            case .valid(let username):
+                if case .authenticated = self.state {
+                    self.state = .authenticated(username)
+                }
+            case .invalid:
+                await self.logout()
+            case .connectionError:
+                break
             }
         }
     }
 
-    // MARK: - Private Helpers
+    // MARK: - Refresh shim (called by NativeBridgeHandler)
 
-    private enum TokenValidationResult {
+    /// Compatibility shim for the web frontend's `requestTokenRefresh` bridge
+    /// action. Opaque sessions don't refresh; returning false signals "no
+    /// fresh token available" and the web fetch path falls back to its own
+    /// error handling. The native APIClient's 401 handler will logout the
+    /// user on the next request.
+    @MainActor
+    func refreshAccessToken() async -> Bool {
+        return false
+    }
+
+    // MARK: - Private
+
+    private enum SessionValidationResult {
         case valid(String) // username
         case invalid
-        case noOAuth
         case connectionError
     }
 
-    private func validateToken(_ token: String) async -> TokenValidationResult {
+    /// Validate the session against the gateway's `/gw/api/me` endpoint.
+    /// 200 → valid with username; 401 → invalid; anything else → transient.
+    private func validateSession(_ token: String) async -> SessionValidationResult {
         do {
-            let url = baseURL.appendingPathComponent("api/system/oauth/token")
+            let url = baseURL.appendingPathComponent("gw/api/me")
             var request = URLRequest(url: url)
             request.httpMethod = "GET"
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             request.timeoutInterval = 10
 
             let (data, response) = try await Self.authSession.data(for: request)
-
             guard let httpResponse = response as? HTTPURLResponse else {
                 return .connectionError
             }
 
-            if httpResponse.statusCode == 404 {
-                return .noOAuth
+            if httpResponse.statusCode == 401 {
+                return .invalid
             }
-
             guard httpResponse.statusCode == 200 else {
-                return .invalid
+                return .connectionError
             }
 
-            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                return .invalid
+            // /gw/api/me wraps the body as { data: { username, ... } }
+            guard let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let payload = envelope["data"] as? [String: Any],
+                  let username = payload["username"] as? String, !username.isEmpty else {
+                return .valid("User")
             }
-
-            if json["authenticated"] as? Bool == true {
-                let username = json["username"] as? String ?? "User"
-                return .valid(username)
-            }
-
-            return .invalid
+            return .valid(username)
         } catch {
             return .connectionError
         }
-    }
-
-    // MARK: - JWT Helpers
-
-    /// Extract the username from a JWT's payload (checks "username", "sub",
-    /// "preferred_username", "name" claims in order).
-    private func jwtUsername(_ token: String) -> String? {
-        guard let json = jwtPayload(token) else { return nil }
-        for key in ["username", "sub", "preferred_username", "name"] {
-            if let value = json[key] as? String, !value.isEmpty {
-                return value
-            }
-        }
-        return nil
-    }
-
-    private func isTokenExpiringSoon(_ token: String) -> Bool {
-        guard let exp = jwtExpiration(token) else { return true }
-        return exp.timeIntervalSinceNow < 120 // Less than 2 minutes
-    }
-
-    /// Decode the payload (second segment) of a JWT into a dictionary.
-    private func jwtPayload(_ token: String) -> [String: Any]? {
-        let parts = token.split(separator: ".")
-        guard parts.count >= 2 else { return nil }
-
-        var base64 = String(parts[1])
-        // Pad base64 string
-        let remainder = base64.count % 4
-        if remainder > 0 {
-            base64 += String(repeating: "=", count: 4 - remainder)
-        }
-
-        // JWT uses base64url encoding
-        base64 = base64
-            .replacingOccurrences(of: "-", with: "+")
-            .replacingOccurrences(of: "_", with: "/")
-
-        guard let data = Data(base64Encoded: base64),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
-        }
-        return json
-    }
-
-    private func jwtExpiration(_ token: String) -> Date? {
-        guard let json = jwtPayload(token),
-              let exp = json["exp"] as? TimeInterval else {
-            return nil
-        }
-        return Date(timeIntervalSince1970: exp)
     }
 }
