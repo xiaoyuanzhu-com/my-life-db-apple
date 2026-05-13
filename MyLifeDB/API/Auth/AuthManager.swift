@@ -37,7 +37,11 @@ final class AuthManager {
         case unauthenticated
     }
 
-    private(set) var state: AuthState = .unknown
+    private(set) var state: AuthState = .unknown {
+        didSet {
+            print("[AuthManager] state: \(oldValue) -> \(state)")
+        }
+    }
 
     var isAuthenticated: Bool {
         if case .authenticated = state { return true }
@@ -195,13 +199,16 @@ final class AuthManager {
 
     @MainActor
     func handleForeground() {
+        print("[AuthManager] handleForeground entry, isAuthenticated=\(isAuthenticated)")
         guard isAuthenticated, let token = accessToken else { return }
         // Re-validate against the gateway opportunistically; if the session
         // was revoked while the app was backgrounded, surface that now
         // instead of waiting for the next API call to 401.
         Task { @MainActor [weak self] in
             guard let self else { return }
-            switch await self.validateSession(token) {
+            let result = await self.validateSession(token)
+            print("[AuthManager] handleForeground validation result: \(result)")
+            switch result {
             case .valid(let username):
                 if case .authenticated = self.state {
                     self.state = .authenticated(username)
@@ -246,8 +253,10 @@ final class AuthManager {
 
             let (data, response) = try await Self.authSession.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse else {
+                print("[validateSession] non-HTTP response")
                 return .connectionError
             }
+            print("[validateSession] HTTP \(httpResponse.statusCode) from \(url.absoluteString)")
 
             if httpResponse.statusCode == 401 {
                 return .invalid
@@ -264,6 +273,7 @@ final class AuthManager {
             }
             return .valid(username)
         } catch {
+            print("[validateSession] error: \(error)")
             return .connectionError
         }
     }

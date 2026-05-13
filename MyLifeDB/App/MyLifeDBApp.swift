@@ -89,7 +89,8 @@ struct MyLifeDBApp: App {
             }
         }
         .modelContainer(sharedModelContainer)
-        .onChange(of: scenePhase) { _, newPhase in
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            print("[Scene] phase: \(oldPhase) -> \(newPhase)")
             if newPhase == .active {
                 authManager.handleForeground()
 
