@@ -126,6 +126,7 @@ final class AuthManager {
 
     @MainActor
     func handleOAuthCompletion(sessionToken: String) {
+        print("[AuthManager] handleOAuthCompletion — transitioning to .authenticated")
         self.accessToken = sessionToken
 
         // Optimistic transition: the gateway just minted this session, so it

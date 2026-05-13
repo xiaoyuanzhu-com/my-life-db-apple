@@ -125,6 +125,8 @@ struct MyLifeDBApp: App {
     ///     this path; iOS routes the URL here instead of Safari.
     @MainActor
     private func handleDeepLink(_ url: URL) {
+        print("[DeepLink] received: \(url.absoluteString)")
+
         // Universal link from the Share Extension
         if url.scheme == "https",
            url.host == "my.xiaoyuanzhu.com",
@@ -135,40 +137,44 @@ struct MyLifeDBApp: App {
             return
         }
 
-        // Custom-scheme deep links below
-        guard url.scheme == "mylifedb" else { return }
+        // Custom-scheme deep links — parse via URLComponents for robustness.
+        // On iOS 17+ URL.host / URL.path are deprecated and can return
+        // unexpected values for custom-scheme URLs; URLComponents stays
+        // accurate across versions.
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let scheme = components.scheme,
+              scheme.caseInsensitiveCompare("mylifedb") == .orderedSame else {
+            print("[DeepLink] not a mylifedb URL, ignoring")
+            return
+        }
+
+        let host = components.host ?? ""
+        let path = components.path
+        print("[DeepLink] mylifedb host=\(host) path=\(path)")
 
         // Handle OAuth callback
-        if url.host == "oauth" && url.path == "/callback" {
-            handleOAuthCallback(url)
+        if host == "oauth" && path == "/callback" {
+            handleOAuthCallback(components: components)
             return
         }
 
         // The host + path form the web route
         // e.g., mylifedb://library → /library
         //        mylifedb://library/foo → /library/foo
-        let path: String
-        if let host = url.host {
-            path = "/\(host)\(url.path)"
-        } else {
-            path = url.path
-        }
-
-        guard !path.isEmpty else { return }
-
-        // Pass to MainTabView via binding
-        deepLinkPath = path
+        let routePath = host.isEmpty ? path : "/\(host)\(path)"
+        guard !routePath.isEmpty else { return }
+        deepLinkPath = routePath
     }
 
     @MainActor
-    private func handleOAuthCallback(_ url: URL) {
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
+    private func handleOAuthCallback(components: URLComponents) {
         let queryItems = components.queryItems ?? []
-
-        guard let sessionToken = queryItems.first(where: { $0.name == "session_token" })?.value else {
+        guard let sessionToken = queryItems.first(where: { $0.name == "session_token" })?.value,
+              !sessionToken.isEmpty else {
+            print("[OAuthCallback] no session_token in queryItems=\(queryItems)")
             return
         }
-
+        print("[OAuthCallback] received session_token (len=\(sessionToken.count)) — completing auth")
         authManager.handleOAuthCompletion(sessionToken: sessionToken)
     }
 }
