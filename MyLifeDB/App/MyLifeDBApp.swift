@@ -94,11 +94,12 @@ struct MyLifeDBApp: App {
             if newPhase == .active {
                 authManager.handleForeground()
 
-                // Trigger data collection sync (throttled internally)
+                // Background sync and share-drain are only meaningful when
+                // we have a session. Firing them while unauthenticated (or
+                // mid-OAuth bounce) causes useless 401s and contributes to
+                // race-prone state flips.
+                guard authManager.isAuthenticated else { return }
                 SyncManager.shared.sync()
-
-                // Pick up any shares the extension staged while we were
-                // backgrounded. Cheap when the queue is empty.
                 Task { await ShareQueueDrainer.drainAll() }
             }
         }

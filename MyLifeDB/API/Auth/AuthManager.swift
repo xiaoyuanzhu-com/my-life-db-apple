@@ -8,6 +8,20 @@
 //  session id is the only credential — no JWT, no refresh, no expiry math.
 //  When the gateway returns 401, the session is gone and the user re-logs in.
 //
+//  STATE MACHINE
+//  The state transitions are intentionally minimal to prevent races:
+//
+//    init                    → .unauthenticated (no token) | .unknown (token in keychain)
+//    checkAuth (.unknown)    → .authenticated (always; optimistic)
+//    handleOAuthCompletion   → .authenticated (always; optimistic)
+//    handleUnauthorized      → .unauthenticated (skip during fresh-login window)
+//    logout (user-initiated) → .unauthenticated
+//
+//  No path proactively demotes .authenticated → .unauthenticated based on a
+//  validation result. The only logout vector is an explicit 401 routed through
+//  APIClient (and even that is suppressed for a short window after token
+//  issuance, so racy background tasks at login time can't kick the user out).
+//
 
 import Foundation
 import Observation
@@ -56,20 +70,30 @@ final class AuthManager {
 
     // MARK: - Token
 
-    // New keychain key — distinct from the old JWT-era keys (`mylifedb.accessToken`,
-    // `mylifedb.refreshToken`). On upgrade those old values are simply ignored
-    // and overwritten on next login.
+    // Keychain key — distinct from the old JWT-era keys (`mylifedb.accessToken`,
+    // `mylifedb.refreshToken`). On upgrade those old values are ignored and
+    // overwritten on next login.
     private static let sessionTokenKey = "mylifedb.sessionToken"
 
     private(set) var accessToken: String? {
         didSet {
             if let token = accessToken {
                 KeychainHelper.save(key: Self.sessionTokenKey, value: token)
+                tokenIssuedAt = Date()
             } else {
                 KeychainHelper.delete(key: Self.sessionTokenKey)
             }
         }
     }
+
+    /// When the current token was set. Used as a fresh-login grace window —
+    /// racy background tasks that 401 right after login (e.g. a request that
+    /// went out before WebKit picked up the new cookie, or a network blip
+    /// the system surfaces as 401) must not log the user out within this
+    /// window. After the window expires, real 401s are honored.
+    @ObservationIgnored
+    private var tokenIssuedAt: Date?
+    private static let freshLoginGrace: TimeInterval = 10
 
     // MARK: - Base URL
 
@@ -93,37 +117,28 @@ final class AuthManager {
     // MARK: - Init
 
     private init() {
-        accessToken = KeychainHelper.load(key: Self.sessionTokenKey)
-        if accessToken == nil {
+        let token = KeychainHelper.load(key: Self.sessionTokenKey)
+        accessToken = token
+        if token == nil {
             state = .unauthenticated
         }
         // Otherwise leave .unknown so MyLifeDBApp's .task triggers checkAuth().
     }
 
-    // MARK: - Auth Check (called on app launch)
+    // MARK: - Auth Check (called on app launch when state is .unknown)
 
+    /// Optimistic launch path: if we have a token in keychain, trust it.
+    /// The first real API call will surface a 401 if the server has revoked
+    /// the session — at which point handleUnauthorized clears state.
     @MainActor
     func checkAuth() async {
-        guard let token = accessToken else {
+        guard accessToken != nil else {
             state = .unauthenticated
             return
         }
-
-        state = .checking
-
-        switch await validateSession(token) {
-        case .valid(let username):
-            state = .authenticated(username)
-        case .invalid:
-            // Server explicitly rejected the session — clear it.
-            accessToken = nil
-            state = .unauthenticated
-        case .connectionError:
-            // Can't reach the server. Stay optimistic-authenticated so the
-            // UI loads; subsequent API calls will surface real errors. Without
-            // a server round-trip we have no username, fall back to "User".
-            state = .authenticated("User")
-        }
+        state = .authenticated("User")
+        // Refine the username in the background; never demote on failure.
+        refreshUsernameInBackground()
     }
 
     // MARK: - OAuth Completion
@@ -132,27 +147,16 @@ final class AuthManager {
     func handleOAuthCompletion(sessionToken: String) {
         print("[AuthManager] handleOAuthCompletion — transitioning to .authenticated")
         self.accessToken = sessionToken
-
-        // Optimistic transition: the gateway just minted this session, so it
-        // *is* valid. Fetch the username from /gw/api/me in the background;
-        // until then label the user "User".
         state = .authenticated("User")
         NotificationCenter.default.post(name: .authTokensDidChange, object: nil)
-
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            if case .valid(let username) = await self.validateSession(sessionToken) {
-                if case .authenticated = self.state {
-                    self.state = .authenticated(username)
-                }
-            }
-        }
+        refreshUsernameInBackground()
     }
 
     // MARK: - Logout
 
     @MainActor
     func logout() async {
+        print("[AuthManager] logout() called")
         if let token = accessToken {
             let url = baseURL.appendingPathComponent("gw/auth/logout")
             var request = URLRequest(url: url)
@@ -163,6 +167,7 @@ final class AuthManager {
         }
 
         accessToken = nil
+        tokenIssuedAt = nil
         KeychainHelper.deleteAll()
         LibraryTreeCache.shared.clear()
         state = .unauthenticated
@@ -171,10 +176,20 @@ final class AuthManager {
 
     // MARK: - 401 Handler (called by APIClient)
 
+    /// Called by APIClient when a request returns 401. Opaque sessions don't
+    /// refresh, so a genuine 401 means logout. BUT — racy background tasks
+    /// firing at login time (cookies not yet in the store, a transient
+    /// network blip, etc.) can produce 401-like outcomes that aren't real
+    /// auth failures. We suppress logout for `freshLoginGrace` seconds after
+    /// the token is set; after that, real 401s logout normally.
     @MainActor
     func handleUnauthorized() async -> Bool {
-        // Opaque sessions don't refresh — a 401 means the session is gone.
-        // Clear local state so the next launch goes straight to LoginView.
+        if let issuedAt = tokenIssuedAt,
+           Date().timeIntervalSince(issuedAt) < Self.freshLoginGrace {
+            print("[AuthManager] handleUnauthorized: within fresh-login grace, suppressing logout")
+            return false
+        }
+        print("[AuthManager] handleUnauthorized: logging out")
         await logout()
         return false
     }
@@ -197,28 +212,14 @@ final class AuthManager {
 
     // MARK: - Scene Phase Handling
 
+    /// Opportunistic username refresh on foreground resume. Never demotes
+    /// state — if the server says the session is invalid, the next real API
+    /// call will 401 and handleUnauthorized handles it.
     @MainActor
     func handleForeground() {
         print("[AuthManager] handleForeground entry, isAuthenticated=\(isAuthenticated)")
-        guard isAuthenticated, let token = accessToken else { return }
-        // Re-validate against the gateway opportunistically; if the session
-        // was revoked while the app was backgrounded, surface that now
-        // instead of waiting for the next API call to 401.
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            let result = await self.validateSession(token)
-            print("[AuthManager] handleForeground validation result: \(result)")
-            switch result {
-            case .valid(let username):
-                if case .authenticated = self.state {
-                    self.state = .authenticated(username)
-                }
-            case .invalid:
-                await self.logout()
-            case .connectionError:
-                break
-            }
-        }
+        guard isAuthenticated else { return }
+        refreshUsernameInBackground()
     }
 
     // MARK: - Refresh shim (called by NativeBridgeHandler)
@@ -226,14 +227,30 @@ final class AuthManager {
     /// Compatibility shim for the web frontend's `requestTokenRefresh` bridge
     /// action. Opaque sessions don't refresh; returning false signals "no
     /// fresh token available" and the web fetch path falls back to its own
-    /// error handling. The native APIClient's 401 handler will logout the
-    /// user on the next request.
+    /// error handling.
     @MainActor
     func refreshAccessToken() async -> Bool {
         return false
     }
 
     // MARK: - Private
+
+    /// Fire-and-forget call to `/gw/api/me` to refine the username. Never
+    /// demotes state — on .invalid we just leave the optimistic "User"
+    /// label in place; the next real API call will 401 and the proper
+    /// logout path runs.
+    private func refreshUsernameInBackground() {
+        guard let token = accessToken else { return }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let result = await self.validateSession(token)
+            print("[AuthManager] refreshUsernameInBackground result: \(result)")
+            if case .valid(let username) = result,
+               case .authenticated = self.state {
+                self.state = .authenticated(username)
+            }
+        }
+    }
 
     private enum SessionValidationResult {
         case valid(String) // username
