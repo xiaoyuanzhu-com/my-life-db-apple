@@ -45,6 +45,10 @@ enum AppTab: String, CaseIterable {
 struct MainTabView: View {
     /// Deep link path passed from MyLifeDBApp.
     @Binding var deepLinkPath: String?
+    /// Pending third-party OAuth Connect authorize request. Owned by
+    /// MyLifeDBApp so it can be set before the user is authenticated
+    /// (and survive across the login transition).
+    @Binding var connectAuthorizeRequest: ConnectAuthorizeRequest?
 
     @Namespace private var previewNamespace
     @State private var selectedTab: AppTab = .data
@@ -69,6 +73,14 @@ struct MainTabView: View {
             ShareUploadProgressSheet(share: share) {
                 uploadTracker.dismiss()
             }
+        }
+        .sheet(item: $connectAuthorizeRequest) { request in
+            ConnectAuthorizeView(request: request) {
+                connectAuthorizeRequest = nil
+            }
+            #if os(iOS)
+            .presentationDetents([.large])
+            #endif
         }
     }
 
@@ -220,5 +232,6 @@ private struct SharedModifiers: ViewModifier {
 
 #Preview {
     @Previewable @State var deepLink: String? = nil
-    MainTabView(deepLinkPath: $deepLink)
+    @Previewable @State var connectReq: ConnectAuthorizeRequest? = nil
+    MainTabView(deepLinkPath: $deepLink, connectAuthorizeRequest: $connectReq)
 }

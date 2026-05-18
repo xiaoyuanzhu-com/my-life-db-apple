@@ -30,6 +30,13 @@ struct MyLifeDBApp: App {
     @State private var authManager = AuthManager.shared
     @State private var deepLinkPath: String?
     @State private var refreshID = UUID()
+    /// Pending Connect authorize request parsed from a Universal Link.
+    /// Set immediately when the URL arrives. If the user is authenticated,
+    /// the binding is consumed by MainTabView's sheet presenter. If not,
+    /// it stays here until login completes; once the state machine reaches
+    /// `.authenticated` and MainTabView mounts, the binding flows through
+    /// and the consent sheet appears.
+    @State private var pendingConnectAuthorize: ConnectAuthorizeRequest?
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
@@ -49,7 +56,10 @@ struct MyLifeDBApp: App {
                     ProvisioningView()
 
                 case .authenticated:
-                    MainTabView(deepLinkPath: $deepLinkPath)
+                    MainTabView(
+                        deepLinkPath: $deepLinkPath,
+                        connectAuthorizeRequest: $pendingConnectAuthorize
+                    )
                         .id(refreshID)
                         .task {
                             // Sync API base URL to shared UserDefaults so the
@@ -136,6 +146,22 @@ struct MyLifeDBApp: App {
             let id = String(url.path.dropFirst("/ios-share/".count))
             guard !id.isEmpty else { return }
             Task { await ShareQueueDrainer.drain(id: id) }
+            return
+        }
+
+        // Universal link: third-party OAuth Connect authorize.
+        //   https://my.xiaoyuanzhu.com/connect/authorize?response_type=code&...
+        // If unauthenticated, the request is stashed in `pendingConnectAuthorize`
+        // and MainTabView picks it up automatically once the user logs in.
+        if url.scheme == "https",
+           url.host == "my.xiaoyuanzhu.com",
+           url.path == "/connect/authorize" {
+            guard let req = ConnectAuthorizeRequest.from(url: url) else {
+                print("[DeepLink] connect/authorize URL missing or invalid params, ignoring")
+                return
+            }
+            print("[DeepLink] queued Connect authorize for client=\(req.params["client_id"] ?? "?")")
+            pendingConnectAuthorize = req
             return
         }
 
