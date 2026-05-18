@@ -16,6 +16,12 @@
     "% of time in atrial fibrillation" : {
 
     },
+    "%@ is requesting access to your MyLifeDB:" : {
+
+    },
+    "%@ is requesting additional access to your MyLifeDB:" : {
+
+    },
     "%lld" : {
 
     },
@@ -302,6 +308,12 @@
     "All workout types with duration and calories" : {
 
     },
+    "Allow" : {
+
+    },
+    "Already granted: %@" : {
+
+    },
     "Ambient Noise" : {
 
     },
@@ -382,6 +394,9 @@
           }
         }
       }
+    },
+    "Authorization request rejected" : {
+
     },
     "Auto" : {
       "localizations" : {
@@ -540,6 +555,9 @@
       }
     },
     "Claude Code session history" : {
+
+    },
+    "Close" : {
 
     },
     "Code Written" : {
@@ -760,6 +778,9 @@
           }
         }
       }
+    },
+    "Deny" : {
+
     },
     "Developer & Knowledge Work" : {
       "localizations" : {
@@ -1384,6 +1405,9 @@
       }
     },
     "Loading agents…" : {
+
+    },
+    "Loading authorization request…" : {
 
     },
     "Loading file..." : {
@@ -2756,6 +2780,9 @@
     "UV radiation exposure (manual entry or compatible device)" : {
 
     },
+    "Verified" : {
+
+    },
     "Version" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2897,6 +2924,9 @@
           }
         }
       }
+    },
+    "You'll be redirected back to %@ after you decide." : {
+
     },
     "YouTube History" : {
 
