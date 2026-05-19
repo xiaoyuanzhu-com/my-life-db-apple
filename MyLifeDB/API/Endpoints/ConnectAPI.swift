@@ -76,9 +76,9 @@ struct ConnectPreviewResponse: Decodable {
 
     struct PreviewData: Decodable {
         let client: Client
-        let requestedScopes: [String]
-        let grantedScopes: [String]
-        let newScopes: [String]
+        let requestedMethods: [Method]
+        let grantedMethods: [Method]
+        let newMethods: [Method]
         let canSilentApprove: Bool
         let redirectUri: String
     }
@@ -88,6 +88,13 @@ struct ConnectPreviewResponse: Decodable {
         let name: String
         let iconUrl: String
         let verified: Bool
+    }
+
+    /// A capability the app is asking for. Server provides the human-readable
+    /// `label` so the consent screen doesn't have to map names locally.
+    struct Method: Decodable, Hashable {
+        let name: String
+        let label: String
     }
 }
 

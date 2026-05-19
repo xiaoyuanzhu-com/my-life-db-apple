@@ -155,9 +155,9 @@ struct ConnectAuthorizeView: View {
     @ViewBuilder
     private func consentCard(preview: ConnectPreviewResponse.PreviewData, submitting: Bool?) -> some View {
         let client = preview.client
-        let isReturning = !preview.grantedScopes.isEmpty
-        let onlyNewMatters = isReturning && !preview.newScopes.isEmpty
-        let scopesToShow = onlyNewMatters ? preview.newScopes : preview.requestedScopes
+        let isReturning = !preview.grantedMethods.isEmpty
+        let onlyNewMatters = isReturning && !preview.newMethods.isEmpty
+        let methodsToShow = onlyNewMatters ? preview.newMethods : preview.requestedMethods
         let isSubmitting = submitting != nil
 
         VStack(alignment: .leading, spacing: 16) {
@@ -194,13 +194,13 @@ struct ConnectAuthorizeView: View {
                 .font(.subheadline)
 
             VStack(spacing: 8) {
-                ForEach(scopesToShow, id: \.self) { scope in
-                    scopeRow(scope: scope)
+                ForEach(methodsToShow, id: \.self) { method in
+                    methodRow(method: method)
                 }
             }
 
             if onlyNewMatters {
-                Text("Already granted: \(preview.grantedScopes.joined(separator: ", "))")
+                Text("Already granted: \(preview.grantedMethods.map(\.label).joined(separator: ", "))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -289,34 +289,31 @@ struct ConnectAuthorizeView: View {
         }
     }
 
-    // MARK: - Scope Row
+    // MARK: - Method Row
 
-    private func scopeRow(scope: String) -> some View {
-        let h = humanizeScope(scope)
+    private func methodRow(method: ConnectPreviewResponse.Method) -> some View {
+        // Write capabilities get a warning treatment; read does not.
+        // Path-level distinctions no longer exist in the methods model
+        // (see docs/specs/2026-05-19-oauth-methods-design.md in the gateway repo).
+        let destructive = method.name == "write_file"
         return HStack(alignment: .top, spacing: 10) {
-            Image(systemName: h.destructive ? "exclamationmark.shield.fill" : "checkmark.shield")
-                .foregroundStyle(h.destructive ? .red : .secondary)
+            Image(systemName: destructive ? "exclamationmark.shield.fill" : "checkmark.shield")
+                .foregroundStyle(destructive ? .red : .secondary)
                 .font(.body)
                 .frame(width: 20)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
-                    Text(h.verb)
-                        .fontWeight(.medium)
-                    Text(h.target)
-                        .font(.system(.subheadline, design: .monospaced))
-                }
+            Text(method.label.isEmpty ? method.name : method.label)
                 .font(.subheadline)
-            }
+                .fontWeight(.medium)
             Spacer(minLength: 0)
         }
         .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(h.destructive ? Color.red.opacity(0.1) : Color.gray.opacity(0.08))
+                .fill(destructive ? Color.red.opacity(0.1) : Color.gray.opacity(0.08))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(h.destructive ? Color.red.opacity(0.3) : Color.clear, lineWidth: 1)
+                .stroke(destructive ? Color.red.opacity(0.3) : Color.clear, lineWidth: 1)
         )
     }
 
@@ -384,35 +381,6 @@ struct ConnectAuthorizeView: View {
     }
 }
 
-// MARK: - Scope Humanization
-
-/// Turn `files.read:/journal` into a phrase like "Read files in /journal".
-/// Kept dumb on purpose — the permission text is what the user actually
-/// consents to, so it must be obvious.
-func humanizeScope(_ scope: String) -> (verb: String, target: String, destructive: Bool) {
-    let parts = scope.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
-    let family = String(parts.first ?? "")
-    let path = parts.count > 1 ? String(parts[1]) : ""
-    let target: String
-    if path == "/" {
-        target = "everything"
-    } else if path.isEmpty {
-        target = ""
-    } else {
-        target = path
-    }
-
-    var verb = family
-    var destructive = false
-    if family == "files.read" {
-        verb = "Read files in"
-    } else if family == "files.write" {
-        verb = "Write and modify files in"
-        destructive = path == "/"
-    }
-    return (verb, target, destructive)
-}
-
 // MARK: - Preview
 
 #Preview {
@@ -421,7 +389,7 @@ func humanizeScope(_ scope: String) -> (verb: String, target: String, destructiv
             "response_type": "code",
             "client_id": "com.example.myhealth",
             "redirect_uri": "myhealth://callback",
-            "scope": "files.read:/health files.write:/health",
+            "scope": "read_file write_file",
             "state": "abc123",
             "code_challenge": "xyz",
             "code_challenge_method": "S256",
