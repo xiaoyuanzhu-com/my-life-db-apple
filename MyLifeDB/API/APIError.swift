@@ -46,8 +46,10 @@ enum APIError: LocalizedError {
 
     // MARK: - Parsing Errors
 
-    /// Failed to decode response
-    case decodingError(Error)
+    /// Failed to decode response. Carries diagnostic context (endpoint,
+    /// status, body snippet, underlying DecodingError) so a parse failure
+    /// names the exact endpoint and shape mismatch.
+    case decodingError(DecodingFailure)
 
     /// Failed to encode request body
     case encodingError(Error)
@@ -87,8 +89,8 @@ enum APIError: LocalizedError {
             return message ?? "Server error (\(code))"
         case .unexpectedStatusCode(let code):
             return "Unexpected response (\(code))"
-        case .decodingError(let error):
-            return "Failed to parse response: \(error.localizedDescription)"
+        case .decodingError(let failure):
+            return "Failed to parse \(failure.path) [HTTP \(failure.statusCode)]: \(failure.detail)\nBody: \(failure.bodySnippet)"
         case .encodingError(let error):
             return "Failed to encode request: \(error.localizedDescription)"
         case .networkError(let error):
@@ -132,5 +134,63 @@ enum APIError: LocalizedError {
         default:
             return errorDescription ?? "An error occurred."
         }
+    }
+}
+
+/// Diagnostic context captured when a 2xx response body fails to decode.
+/// Turns iOS's opaque "data isn't in the correct format" into something
+/// actionable: which endpoint, what status, the exact DecodingError, and a
+/// snippet of the body that failed to parse.
+struct DecodingFailure: Error {
+    let path: String
+    let statusCode: Int
+    let bodySnippet: String
+    let underlying: Error
+
+    /// Coding path + reason pulled out of the underlying DecodingError.
+    /// Distinguishes "body isn't JSON" (dataCorrupted at root) from a
+    /// per-field type/shape mismatch.
+    var detail: String {
+        guard let decodingError = underlying as? DecodingError else {
+            return underlying.localizedDescription
+        }
+        switch decodingError {
+        case .dataCorrupted(let ctx):
+            return "dataCorrupted at [\(Self.codingPath(ctx))]: \(ctx.debugDescription)"
+        case .keyNotFound(let key, let ctx):
+            return "keyNotFound '\(key.stringValue)' at [\(Self.codingPath(ctx))]: \(ctx.debugDescription)"
+        case .typeMismatch(let type, let ctx):
+            return "typeMismatch (expected \(type)) at [\(Self.codingPath(ctx))]: \(ctx.debugDescription)"
+        case .valueNotFound(let type, let ctx):
+            return "valueNotFound (\(type)) at [\(Self.codingPath(ctx))]: \(ctx.debugDescription)"
+        @unknown default:
+            return decodingError.localizedDescription
+        }
+    }
+
+    /// One-line form for Console logging.
+    var logLine: String {
+        "\(path) [HTTP \(statusCode)] \(detail) | body: \(bodySnippet)"
+    }
+
+    private static func codingPath(_ ctx: DecodingError.Context) -> String {
+        let joined = ctx.codingPath.map(\.stringValue).joined(separator: ".")
+        return joined.isEmpty ? "<root>" : joined
+    }
+
+    /// First `limit` chars of the body as UTF-8 (or a byte-count placeholder
+    /// for binary). Whitespace-trimmed so an HTML/empty body is obvious.
+    static func snippet(from data: Data, limit: Int = 300) -> String {
+        guard let text = String(data: data, encoding: .utf8) else {
+            return "<\(data.count) bytes, non-UTF8>"
+        }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return "<empty, \(data.count) bytes>"
+        }
+        if trimmed.count > limit {
+            return String(trimmed.prefix(limit)) + "…(\(trimmed.count) chars total)"
+        }
+        return trimmed
     }
 }

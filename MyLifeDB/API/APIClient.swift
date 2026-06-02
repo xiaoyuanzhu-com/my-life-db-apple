@@ -136,11 +136,7 @@ final class APIClient {
         // Handle HTTP status codes
         switch httpResponse.statusCode {
         case 200...299:
-            do {
-                return try decoder.decode(T.self, from: data)
-            } catch {
-                throw APIError.decodingError(error)
-            }
+            return try decode(T.self, from: data, path: path, statusCode: httpResponse.statusCode)
         case 400:
             throw APIError.badRequest(parseErrorMessage(from: data))
         case 401:
@@ -288,7 +284,7 @@ final class APIClient {
             throw APIError.serverError(httpResponse.statusCode, parseErrorMessage(from: data))
         }
 
-        return try decoder.decode(T.self, from: data)
+        return try decode(T.self, from: data, path: path, statusCode: httpResponse.statusCode)
     }
 
     // MARK: - Raw Upload
@@ -324,7 +320,7 @@ final class APIClient {
 
         switch httpResponse.statusCode {
         case 200...299:
-            return try decoder.decode(T.self, from: responseData)
+            return try decode(T.self, from: responseData, path: path, statusCode: httpResponse.statusCode)
         case 401:
             if allowRetryOn401 {
                 let refreshed = await AuthManager.shared.handleUnauthorized()
@@ -383,7 +379,7 @@ final class APIClient {
 
         switch httpResponse.statusCode {
         case 200...299:
-            return try decoder.decode(T.self, from: responseData)
+            return try decode(T.self, from: responseData, path: path, statusCode: httpResponse.statusCode)
         case 401:
             if allowRetryOn401 {
                 let refreshed = await AuthManager.shared.handleUnauthorized()
@@ -472,6 +468,30 @@ final class APIClient {
     }
 
     // MARK: - Helpers
+
+    /// Decodes a 2xx response body. On failure, attaches diagnostic context
+    /// (endpoint, status, body snippet, underlying DecodingError) and logs a
+    /// one-liner, so a parse failure points at the exact endpoint and shape
+    /// mismatch instead of iOS's opaque "data isn't in the correct format".
+    private func decode<T: Decodable>(
+        _ type: T.Type,
+        from data: Data,
+        path: String,
+        statusCode: Int
+    ) throws -> T {
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch {
+            let failure = DecodingFailure(
+                path: path,
+                statusCode: statusCode,
+                bodySnippet: DecodingFailure.snippet(from: data),
+                underlying: error
+            )
+            print("[APIClient] decode failed — \(failure.logLine)")
+            throw APIError.decodingError(failure)
+        }
+    }
 
     /// Parses error message from response body
     private func parseErrorMessage(from data: Data) -> String? {
