@@ -14,10 +14,26 @@ import Foundation
 /// NOT intermediate messages like assistant text, tool calls, or progress
 /// updates that stream while the agent is working.
 enum SessionState: String, Codable, Hashable {
-    case idle       // User is up to date, nothing needs attention
-    case working    // Agent is mid-turn (processing)
-    case unread     // Unread result messages or pending permission
-    case archived   // User explicitly archived
+    case idle         // User is up to date, nothing needs attention
+    case working      // Agent is mid-turn (processing)
+    case unread       // Unread result messages or pending permission
+    case archived     // User explicitly archived
+    case interrupted  // Last turn was interrupted — needs attention
+    case cancelled    // Last turn was cancelled by the user
+    case error        // Last turn errored — needs attention
+    case unknown      // Forward-compat: any state this build doesn't recognise
+
+    /// Tolerant decoding. The backend's set of turn-outcome states grows over
+    /// time (e.g. `interrupted`, `cancelled`, `error` were added after this
+    /// client shipped). A strict enum decode would throw on an unrecognised
+    /// value, and because sessions are decoded as an array, a single unknown
+    /// state would poison the whole list — the user sees "会话加载失败 /
+    /// Failed to parse response" and no sessions at all. Falling back to
+    /// `.unknown` keeps the list loading no matter what future states appear.
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = SessionState(rawValue: raw) ?? .unknown
+    }
 }
 
 /// Represents an agent session
