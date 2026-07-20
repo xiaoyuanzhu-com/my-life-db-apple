@@ -99,6 +99,8 @@ struct ImageFullscreenView: View {
                 }
             }
         }
+        #if os(iOS)
         .statusBar(hidden: true)
+        #endif
     }
 }

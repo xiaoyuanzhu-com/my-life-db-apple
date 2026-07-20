@@ -60,7 +60,7 @@ struct UploadItemTile: View {
 
     private var placeholder: some View {
         ZStack {
-            Color(.secondarySystemBackground)
+            Color.platformSecondaryBackground
             Image(systemName: fallbackSymbol(for: item.mimeType))
                 .font(.system(size: 36))
                 .foregroundStyle(.secondary)

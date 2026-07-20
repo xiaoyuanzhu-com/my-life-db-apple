@@ -46,14 +46,25 @@ struct ExplorePostDetailView: View {
         .task {
             await loadPost()
         }
+        #if os(iOS)
         .fullScreenCover(isPresented: $showFullscreen) {
-            if let paths = postData?.mediaPaths, !paths.isEmpty {
-                ImageFullscreenView(
-                    images: paths,
-                    initialIndex: currentImageIndex,
-                    onDismiss: { showFullscreen = false }
-                )
-            }
+            fullscreenViewer
+        }
+        #else
+        .sheet(isPresented: $showFullscreen) {
+            fullscreenViewer
+        }
+        #endif
+    }
+
+    @ViewBuilder
+    private var fullscreenViewer: some View {
+        if let paths = postData?.mediaPaths, !paths.isEmpty {
+            ImageFullscreenView(
+                images: paths,
+                initialIndex: currentImageIndex,
+                onDismiss: { showFullscreen = false }
+            )
         }
     }
 

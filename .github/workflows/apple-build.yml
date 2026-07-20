@@ -29,6 +29,8 @@ jobs:
           CERTIFICATES_P12_PASSWORD: ${{ secrets.CERTIFICATES_P12_PASSWORD }}
           APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          PROVISION_PROFILE_APP: ${{ secrets.PROVISION_PROFILE_APP }}
+          PROVISION_PROFILE_SHAREEXT: ${{ secrets.PROVISION_PROFILE_SHAREEXT }}
         run: |
           # Create temporary keychain
           KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
@@ -63,6 +65,19 @@ jobs:
           echo "$APP_STORE_CONNECT_PRIVATE_KEY" \
             > ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
 
+          # Install App Store provisioning profiles for manual signing.
+          # Write to both locations xcodebuild may scan (classic MobileDevice
+          # path + the newer Xcode UserData path) so name resolution can't miss.
+          echo "$PROVISION_PROFILE_APP" | base64 --decode > "$RUNNER_TEMP/mylifedb-app.mobileprovision"
+          echo "$PROVISION_PROFILE_SHAREEXT" | base64 --decode > "$RUNNER_TEMP/mylifedb-shareext.mobileprovision"
+          for PROFILES_DIR in \
+            "$HOME/Library/MobileDevice/Provisioning Profiles" \
+            "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"; do
+            mkdir -p "$PROFILES_DIR"
+            cp "$RUNNER_TEMP/mylifedb-app.mobileprovision" "$PROFILES_DIR/mylifedb-app.mobileprovision"
+            cp "$RUNNER_TEMP/mylifedb-shareext.mobileprovision" "$PROFILES_DIR/mylifedb-shareext.mobileprovision"
+          done
+
           # Export for later steps
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
 
@@ -79,7 +94,6 @@ jobs:
             -authenticationKeyPath ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8 \
             -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
             -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
-            -allowProvisioningUpdates \
             CURRENT_PROJECT_VERSION="$CI_BUILD_NUMBER" \
             archive
 
@@ -107,8 +121,7 @@ jobs:
             -exportOptionsPlist ExportOptions-iOS.plist \
             -authenticationKeyPath ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8 \
             -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
-            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
-            -allowProvisioningUpdates
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"
 
       - name: Validate IPA
         env:
@@ -157,125 +170,12 @@ jobs:
           security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
           rm -f "$RUNNER_TEMP/dist-cert.p12" "$RUNNER_TEMP"/AppleWWDRCA*.cer
           rm -f ~/private_keys/AuthKey_*.p8
+          for PROFILES_DIR in \
+            "$HOME/Library/MobileDevice/Provisioning Profiles" \
+            "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"; do
+            rm -f "$PROFILES_DIR/mylifedb-app.mobileprovision" \
+                  "$PROFILES_DIR/mylifedb-shareext.mobileprovision"
+          done
+          rm -f "$RUNNER_TEMP"/mylifedb-*.mobileprovision
           rm -rf "$RUNNER_TEMP/MyLifeDB-iOS.xcarchive"
           rm -rf "$RUNNER_TEMP/ios-output"
-
-  build-macos:
-    name: Build macOS → DMG
-    runs-on: self-hosted
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set macOS build number
-        run: |
-          CI_BUILD_NUMBER=$GITHUB_RUN_NUMBER
-          echo "Using macOS build number: $CI_BUILD_NUMBER"
-          echo "CI_BUILD_NUMBER=$CI_BUILD_NUMBER" >> "$GITHUB_ENV"
-
-      - name: Setup signing
-        env:
-          CERTIFICATES_P12: ${{ secrets.CERTIFICATES_P12 }}
-          CERTIFICATES_P12_PASSWORD: ${{ secrets.CERTIFICATES_P12_PASSWORD }}
-          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-        run: |
-          # Create temporary keychain
-          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
-          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -t 3600 -u "$KEYCHAIN_PATH"
-
-          # Import distribution certificate
-          echo "$CERTIFICATES_P12" | base64 --decode > "$RUNNER_TEMP/dist-cert.p12"
-          security import "$RUNNER_TEMP/dist-cert.p12" \
-            -k "$KEYCHAIN_PATH" \
-            -P "$CERTIFICATES_P12_PASSWORD" \
-            -T /usr/bin/codesign
-
-          # Import Apple WWDR intermediate certificates (needed for cert chain)
-          curl -sL https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer \
-            -o "$RUNNER_TEMP/AppleWWDRCAG3.cer"
-          curl -sL https://www.apple.com/certificateauthority/AppleWWDRCAG6.cer \
-            -o "$RUNNER_TEMP/AppleWWDRCAG6.cer"
-          security import "$RUNNER_TEMP/AppleWWDRCAG3.cer" -k "$KEYCHAIN_PATH" -T /usr/bin/codesign
-          security import "$RUNNER_TEMP/AppleWWDRCAG6.cer" -k "$KEYCHAIN_PATH" -T /usr/bin/codesign
-
-          security set-key-partition-list -S apple-tool:,apple: \
-            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
-          # Set keychain search list: temp keychain + system (for Apple root CAs)
-          security list-keychains -d user -s "$KEYCHAIN_PATH" /Library/Keychains/System.keychain
-
-          # Write API key for xcodebuild provisioning
-          mkdir -p ~/private_keys
-          echo "$APP_STORE_CONNECT_PRIVATE_KEY" \
-            > ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
-
-          # Export for later steps
-          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
-
-      - name: Build macOS archive
-        env:
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-        run: |
-          xcodebuild \
-            -project MyLifeDB.xcodeproj \
-            -scheme MyLifeDB \
-            -archivePath "$RUNNER_TEMP/MyLifeDB-macOS.xcarchive" \
-            -destination "generic/platform=macOS" \
-            -authenticationKeyPath ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8 \
-            -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
-            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
-            -allowProvisioningUpdates \
-            CURRENT_PROJECT_VERSION="$CI_BUILD_NUMBER" \
-            archive
-
-      - name: Export app
-        env:
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-        run: |
-          xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/MyLifeDB-macOS.xcarchive" \
-            -exportPath "$RUNNER_TEMP/macos-output" \
-            -exportOptionsPlist ExportOptions-macOS.plist \
-            -authenticationKeyPath ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8 \
-            -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
-            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
-            -allowProvisioningUpdates
-
-      - name: Create DMG
-        run: |
-          # Stage .app + Applications symlink for drag-and-drop install
-          mkdir -p "$RUNNER_TEMP/dmg-staging"
-          cp -R "$RUNNER_TEMP/macos-output/MyLifeDB.app" "$RUNNER_TEMP/dmg-staging/"
-          ln -s /Applications "$RUNNER_TEMP/dmg-staging/Applications"
-
-          # Create compressed DMG
-          hdiutil create \
-            -volname "MyLifeDB" \
-            -srcfolder "$RUNNER_TEMP/dmg-staging" \
-            -ov -format UDZO \
-            "$RUNNER_TEMP/MyLifeDB.dmg"
-
-      - name: Upload DMG artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: MyLifeDB-macOS-${{ github.sha }}
-          path: ${{ runner.temp }}/MyLifeDB.dmg
-          retention-days: 90
-
-      - name: Cleanup
-        if: always()
-        run: |
-          security list-keychains -d user -s login.keychain-db
-          security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
-          rm -f "$RUNNER_TEMP/dist-cert.p12" "$RUNNER_TEMP"/AppleWWDRCA*.cer
-          rm -f ~/private_keys/AuthKey_*.p8
-          rm -rf "$RUNNER_TEMP/MyLifeDB-macOS.xcarchive"
-          rm -rf "$RUNNER_TEMP/macos-output"
-          rm -rf "$RUNNER_TEMP/dmg-staging"
-          rm -f "$RUNNER_TEMP/MyLifeDB.dmg"

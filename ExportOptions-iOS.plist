@@ -7,9 +7,16 @@
 	<key>teamID</key>
 	<string>R3845XW5FZ</string>
 	<key>signingStyle</key>
-	<string>automatic</string>
-	<key>uploadBitcode</key>
-	<false/>
+	<string>manual</string>
+	<key>signingCertificate</key>
+	<string>Apple Distribution</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>xiaoyuanzhu.MyLifeDB</key>
+		<string>MyLifeDB App Store</string>
+		<key>xiaoyuanzhu.MyLifeDB.ShareExtension</key>
+		<string>MyLifeDB ShareExtension App Store</string>
+	</dict>
 	<key>uploadSymbols</key>
 	<true/>
 </dict>
